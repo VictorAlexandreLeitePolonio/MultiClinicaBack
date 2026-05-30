@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Financial;
+namespace MultiClinica.API.DTOs.Financial;
 
 // Dados recebidos ao atualizar um gasto existente.
 public class UpdateExpenseDto

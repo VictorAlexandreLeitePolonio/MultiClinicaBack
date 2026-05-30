@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Repositories;
+namespace MultiClinica.API.Repositories;
 
-public class MedicalRecordRepository(AppDbContext db) : IMedicalRecordRepository
+public class MedicalRecordRepository(AppDbContext db, IUsuarioLogadoService usuario) : IMedicalRecordRepository
 {
     public async Task<(List<MedicalRecord> Items, int TotalCount)> GetPagedAsync(
         int? patientId,
@@ -18,13 +19,14 @@ public class MedicalRecordRepository(AppDbContext db) : IMedicalRecordRepository
         var query = db.MedicalRecords
             .Include(m => m.User)
             .Include(m => m.Patient)
+            .Where(m => m.ClinicaId == usuario.ClinicaId && !m.IsDeleted)
             .AsQueryable();
 
         if (patientId.HasValue)
             query = query.Where(m => m.PatientId == patientId.Value);
 
         if (!string.IsNullOrEmpty(patientName))
-            query = query.Where(m => m.Patient.Name.Contains(patientName));
+            query = query.Where(m => m.Patient.Name != null && m.Patient.Name.Contains(patientName));
 
         if (userId.HasValue)
             query = query.Where(m => m.UserId == userId.Value);
@@ -46,7 +48,7 @@ public class MedicalRecordRepository(AppDbContext db) : IMedicalRecordRepository
         => await db.MedicalRecords
             .Include(m => m.User)
             .Include(m => m.Patient)
-            .FirstOrDefaultAsync(m => m.Id == id);
+            .FirstOrDefaultAsync(m => m.Id == id && m.ClinicaId == usuario.ClinicaId && !m.IsDeleted);
 
     public async Task<MedicalRecord> AddAsync(MedicalRecord medicalRecord)
     {
@@ -60,7 +62,9 @@ public class MedicalRecordRepository(AppDbContext db) : IMedicalRecordRepository
 
     public async Task DeleteAsync(MedicalRecord medicalRecord)
     {
-        db.MedicalRecords.Remove(medicalRecord);
+        medicalRecord.IsDeleted = true;
+        medicalRecord.DeletedAt = DateTime.UtcNow;
+        medicalRecord.DeletedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
     }
 }

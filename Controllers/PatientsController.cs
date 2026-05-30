@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Patient;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Patient;
+using MultiClinica.API.Models;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Controllers;
+namespace MultiClinica.API.Controllers;
 
-[Authorize]
+[Authorize(Roles = "Administrador,Profissional,Recepcao")]
 [ApiController]
 [Route("api/[controller]")]
 public class PatientsController(IPatientService service) : ControllerBase

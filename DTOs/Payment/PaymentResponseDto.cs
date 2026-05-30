@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.Payment;
+namespace MultiClinica.API.DTOs.Payment;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Dados retornados ao cliente nas respostas da API.
 public class PaymentResponseDto
@@ -18,6 +18,5 @@ public class PaymentResponseDto
     public PaymentStatus Status              { get; set; }
     public DateTime?     PaidAt              { get; set; }
     public DateTime?     PaymentDate         { get; set; }
-    public bool          PaymentReminderSent { get; set; }
     public DateTime      CreatedAt           { get; set; }
 }

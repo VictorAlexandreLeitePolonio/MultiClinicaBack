@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Repositories;
+namespace MultiClinica.API.Repositories;
 
-public class PatientRepository(AppDbContext db) : IPatientRepository
+public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) : IPatientRepository
 {
     public async Task<(List<Patient> Items, int TotalCount)> GetPagedAsync(
         string? name,
@@ -19,6 +20,7 @@ public class PatientRepository(AppDbContext db) : IPatientRepository
             .Include(p => p.Appointments)
             .Include(p => p.Payments)
             .Include(p => p.MedicalRecords)
+            .Where(p => p.ClinicaId == usuario.ClinicaId && !p.IsDeleted)
             .AsQueryable();
 
         if (!string.IsNullOrEmpty(name))
@@ -46,21 +48,21 @@ public class PatientRepository(AppDbContext db) : IPatientRepository
         => await db.Patients
             .Include(p => p.Appointments)
             .Include(p => p.Payments)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<Patient?> GetByIdWithDetailsAsync(int id)
         => await db.Patients
             .Include(p => p.Appointments).ThenInclude(a => a.User)
             .Include(p => p.MedicalRecords).ThenInclude(m => m.User)
             .Include(p => p.Payments).ThenInclude(p => p.Plan)
-            .FirstOrDefaultAsync(p => p.Id == id);
+            .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<bool> EmailExistsAsync(string? email, int? excludeId = null)
     {
         if (string.IsNullOrWhiteSpace(email))
             return false;
 
-        var query = db.Patients.Where(p => p.Email == email);
+        var query = db.Patients.Where(p => p.Email == email && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
         if (excludeId.HasValue)
             query = query.Where(p => p.Id != excludeId.Value);
         return await query.AnyAsync();
@@ -71,15 +73,15 @@ public class PatientRepository(AppDbContext db) : IPatientRepository
         if (string.IsNullOrWhiteSpace(cpf))
             return false;
 
-        var query = db.Patients.Where(p => p.CPF == cpf);
+        var query = db.Patients.Where(p => p.CPF == cpf && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
         if (excludeId.HasValue)
             query = query.Where(p => p.Id != excludeId.Value);
         return await query.AnyAsync();
     }
 
     public async Task<bool> HasAssociatedRecordsAsync(int id)
-        => await db.Appointments.AnyAsync(a => a.PatientId == id)
-           || await db.Payments.AnyAsync(p => p.PatientId == id);
+        => await db.Appointments.AnyAsync(a => a.PatientId == id && a.ClinicaId == usuario.ClinicaId)
+           || await db.Payments.AnyAsync(p => p.PatientId == id && p.ClinicaId == usuario.ClinicaId);
 
     public async Task<Patient> AddAsync(Patient patient)
     {
@@ -93,7 +95,9 @@ public class PatientRepository(AppDbContext db) : IPatientRepository
 
     public async Task DeleteAsync(Patient patient)
     {
-        db.Patients.Remove(patient);
+        patient.IsDeleted = true;
+        patient.DeletedAt = DateTime.UtcNow;
+        patient.DeletedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
     }
 }

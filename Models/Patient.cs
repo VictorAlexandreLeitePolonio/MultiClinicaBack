@@ -1,8 +1,8 @@
-namespace ProjetoLP.API.Models;
+namespace MultiClinica.API.Models;
 
-public class Patient
+public class Patient : AuditableEntity
 {
-    public int Id { get; set; }
+    public int ClinicaId { get; set; }
     public string? Name { get; set; }
     public string? Email { get; set; }
     public string? CPF { get; set; }
@@ -14,11 +14,9 @@ public class Patient
     public string? Estado { get; set; }
     public string? Cep { get; set; }
     public string? Phone { get; set; }
-    public bool IsActive { get; set; } = true;
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    // Navigation properties
+    public Clinica Clinica { get; set; } = null!;
     public ICollection<Appointment> Appointments { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
     public ICollection<MedicalRecord> MedicalRecords { get; set; } = [];
+    public ICollection<ClinicalAttachment> Attachments { get; set; } = [];
 }

@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.Common;
+namespace MultiClinica.API.Common;
 
 public class Result<T>
 {

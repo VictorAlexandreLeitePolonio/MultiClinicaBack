@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.Patient;
+namespace MultiClinica.API.DTOs.Patient;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Retorno da rota GET /api/patients/{id}/profile
 // Agrega dados do paciente + histórico de consultas, prontuários e pagamentos em uma única chamada.
@@ -57,6 +57,5 @@ public class PaymentSummary
     public PaymentStatus Status              { get; set; }
     public DateTime?     PaymentDate         { get; set; }
     public DateTime?     PaidAt              { get; set; }
-    public bool          PaymentReminderSent { get; set; }
     public DateTime      CreatedAt           { get; set; }
 }

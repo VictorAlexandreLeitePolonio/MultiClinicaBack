@@ -1,5 +1,5 @@
 // Define o namespace — organiza o arquivo dentro da pasta Models.
-namespace ProjetoLP.API.Models;
+namespace MultiClinica.API.Models;
 
 // Enum com os estados possíveis de um pagamento.
 public enum PaymentStatus
@@ -10,11 +10,9 @@ public enum PaymentStatus
 }
 
 // Classe que representa a tabela "Payments" (Financeiro) no banco.
-public class Payment
+public class Payment : AuditableEntity
 {
-    // Chave primária com autoincrement.
-    public int Id { get; set; }
-
+    public int ClinicaId { get; set; }
     // Chave estrangeira — liga o pagamento ao usuário/paciente responsável.
     public int PatientId { get; set; }
     public int UserId { get; set; }
@@ -41,12 +39,7 @@ public class Payment
     // Data de vencimento do pagamento — usada pelo PaymentReminderJob para enviar lembrete 24h antes.
     public DateTime? PaymentDate { get; set; }
 
-    // Controla se o lembrete de vencimento já foi enviado via WhatsApp — evita envios duplicados.
-    public bool PaymentReminderSent { get; set; } = false;
-
-    // Preenchido automaticamente com a data/hora de criação do registro.
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
+    public Clinica Clinica { get; set; } = null!;
     public User User { get; set; } = null!;
     public Patient Patient { get; set; } = null!;
     public Plans Plan { get; set; } = null!;

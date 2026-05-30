@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.MedicalRecord;
+namespace MultiClinica.API.DTOs.MedicalRecord;
 
 // UserId e PatientId omitidos — o vínculo do prontuário nunca muda após criação.
 public class UpdateMedicalRecordDto

@@ -1,13 +1,13 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Plans;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Plans;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
-public class PlanService(IPlanRepository repository) : IPlanService
+public class PlanService(IPlanRepository repository, IUsuarioLogadoService usuario) : IPlanService
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -71,10 +71,12 @@ public class PlanService(IPlanRepository repository) : IPlanService
 
         var plan = new Plans
         {
+            ClinicaId   = usuario.ClinicaId,
             Name       = dto.Name,
             Valor      = dto.Valor,
             TipoPlano  = dto.TipoPlano,
             TipoSessao = dto.TipoSessao,
+            CreatedByUserId = usuario.UserId,
         };
 
         await repository.AddAsync(plan);
@@ -111,6 +113,7 @@ public class PlanService(IPlanRepository repository) : IPlanService
         plan.Valor      = dto.Valor;
         plan.TipoPlano  = dto.TipoPlano;
         plan.TipoSessao = dto.TipoSessao;
+        plan.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
 

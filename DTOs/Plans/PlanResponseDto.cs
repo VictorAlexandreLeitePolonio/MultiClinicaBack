@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.Plans;
+namespace MultiClinica.API.DTOs.Plans;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 public class PlanResponseDto
 {
     public int Id { get; set; }

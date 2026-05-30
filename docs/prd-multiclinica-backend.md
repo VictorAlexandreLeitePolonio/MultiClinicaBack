@@ -49,7 +49,7 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 31. As a developer, I want migrations to run by explicit command, so that production startup does not mutate schema unexpectedly.
 32. As a developer, I want the initial SuperAdmin bootstrap to use env vars, so that no production password is hardcoded.
 33. As a developer, I want Swagger public only in development, so that production does not expose API documentation unnecessarily.
-34. As a developer, I want the project renamed to `MultiClinica.API`, so that the new product is not confused with `ProjetoLP`.
+34. As a developer, I want the project renamed to `MultiClinica.API`, so that the new product is not confused with `MultiClinica`.
 35. As a developer, I want a new test project, so that tests reflect the multi-clinic domain instead of the old single-clinic app.
 36. As a professional, I want appointments to choose a professional from the same clinic, so that scheduling remains scoped and correct.
 37. As a professional, I want medical records to be scoped to my clinic, so that clinical data cannot cross tenants.
@@ -67,10 +67,10 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 ## Implementation Decisions
 
 - Create a new private GitHub repository named `MultiClinicaBack` with clean history.
-- Use the current backend as the starting point, but remove the original remote that points to `ProjetoLPBack`.
+- Use the current backend as the starting point, but remove the original remote that points to `MultiClinicaBack`.
 - Keep .NET/ASP.NET Core, Controllers, Services, Repositories, DTOs and EF Core.
 - Do not rewrite to Node.js/Fastify in this phase.
-- Rename public and internal identity from `ProjetoLP.API` to `MultiClinica.API`, including solution/project names, root namespace, README, Swagger title, config names and seeds.
+- Rename public and internal identity from `MultiClinica.API` to `MultiClinica.API`, including solution/project names, root namespace, README, Swagger title, config names and seeds.
 - Migrate from SQLite to PostgreSQL using `Npgsql.EntityFrameworkCore.PostgreSQL`.
 - Remove SQLite as the active database provider.
 - Use `DATABASE_URL` as the canonical connection string variable.
@@ -143,7 +143,7 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 ## Testing Decisions
 
 - Create a new test project for `MultiClinica.API`.
-- Do not depend on the old missing `ProjetoLP.Tests` project.
+- Do not depend on the old missing `MultiClinica.Tests` project.
 - Fix the solution so it references only existing projects.
 - Tests should focus on external API behavior and domain outcomes, not implementation details.
 - Prioritize integration/API tests for authentication, authorization and clinic isolation.

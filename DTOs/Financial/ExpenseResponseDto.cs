@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Financial;
+namespace MultiClinica.API.DTOs.Financial;
 
 // Dados retornados ao cliente nas respostas da API para gastos.
 public class ExpenseResponseDto

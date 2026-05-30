@@ -3,19 +3,26 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Services;
-using ProjetoLP.API.Repositories;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Services;
+using MultiClinica.API.Repositories;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-// Cria o construtor da aplicação — todos os serviços são registrados aqui antes do Build().
 var builder = WebApplication.CreateBuilder(args);
 
-// Registra o AppDbContext com SQLite via string de conexão do appsettings.json.
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHttpContextAccessor();
+
+if (!builder.Environment.IsEnvironment("Testing"))
+{
+    var databaseUrl = builder.Configuration["DATABASE_URL"]
+        ?? builder.Configuration.GetConnectionString("DefaultConnection")
+        ?? throw new InvalidOperationException("DATABASE_URL não configurada.");
+
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(DatabaseUrl.ToNpgsqlConnectionString(databaseUrl)));
+}
 
 // Payment — Repository e Service
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
@@ -40,6 +47,9 @@ builder.Services.AddScoped<IPlanService, PlanService>();
 // User — Repository e Service
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
+builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
+builder.Services.AddScoped<IAttachmentStorage, R2AttachmentStorage>();
 
 // MedicalRecord — Repository e Service
 builder.Services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();
@@ -51,25 +61,11 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
         options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
-// Configura o Swagger para documentação da API.
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// Serviço em segundo plano — cancela consultas Scheduled com data no passado.
 builder.Services.AddHostedService<AppointmentStatusUpdater>();
-
-// WhatsApp — cliente HTTP tipado para a Evolution API.
-builder.Services.AddHttpClient<IWhatsAppService, WhatsAppService>(client =>
-{
-    client.BaseAddress = new Uri(builder.Configuration["EvolutionApi:BaseUrl"]!);
-    client.DefaultRequestHeaders.Add("apikey", builder.Configuration["EvolutionApi:ApiKey"]!);
-});
-
-// Serviço em segundo plano — envia lembretes de consulta via WhatsApp 24h antes.
-builder.Services.AddHostedService<AppointmentReminderJob>();
-
-// Serviço em segundo plano — envia lembretes de vencimento de pagamento via WhatsApp 24h antes.
-builder.Services.AddHostedService<PaymentReminderJob>();
+builder.Services.AddHostedService<ClinicBillingBackgroundJob>();
 
 // Lê as configurações JWT do appsettings.json.
 // "!" suprime o aviso de nullable — garantimos que os valores existem no appsettings.
@@ -83,11 +79,11 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     {
          options.Events = new JwtBearerEvents
   {
-      OnMessageReceived = context =>
-      {
-          context.Token = context.Request.Cookies["auth_token"];
-          return Task.CompletedTask;
-      }
+        OnMessageReceived = context =>
+        {
+            context.Token = context.Request.Cookies["auth_token"];
+            return Task.CompletedTask;
+        }
   };
 
         options.TokenValidationParameters = new TokenValidationParameters
@@ -102,48 +98,33 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-     builder.Services.AddCors(options =>
-  {
-      options.AddPolicy("Frontend", policy =>
-      {
-          policy.WithOrigins(builder.Configuration["Cors:AllowedOrigin"] ?? "http://localhost:3000")
-                .AllowAnyHeader()
-                .AllowAnyMethod()
-                .AllowCredentials(); // necessário para enviar/receber cookies
-      });
-  });
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("Frontend", policy =>
+    {
+        var origins = (builder.Configuration["CORS_ALLOWED_ORIGINS"]
+                ?? builder.Configuration["Cors:AllowedOrigin"]
+                ?? "http://localhost:3000")
+            .Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+
+        policy.WithOrigins(origins)
+            .AllowAnyHeader()
+            .AllowAnyMethod()
+            .AllowCredentials();
+    });
+});
 
 
 // Constrói a aplicação — após essa linha, não é possível registrar novos serviços.
 var app = builder.Build();
 
+await AppBootstrapper.BootstrapSuperAdminAsync(app);
 
+if (app.Environment.IsDevelopment())
+{
     app.UseSwagger();
     app.UseSwaggerUI();
-
-
-using (var scope = app.Services.CreateScope())
-{
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-    // Aplica migrations pendentes.
-    db.Database.Migrate();
-
-
-    // ── Usuário Admin ────────────────────────────────────────────────────────
-    if (!db.Users.Any(u => u.Email == "admin@clinica.com"))
-    {
-        db.Users.Add(new User
-        {
-            Name         = "Admin",
-            Email        = "admin@clinica.com",
-            PasswordHash = BCrypt.Net.BCrypt.HashPassword("admin123"),
-            Role         = UserRole.Admin
-        });
-        db.SaveChanges();
-    }
 }
-
 
 // Ordem dos middlewares importa:
 // 1. CORS — deve vir antes de Authentication/Authorization para permitir que o frontend envie o token.
@@ -152,7 +133,6 @@ using (var scope = app.Services.CreateScope())
 // 4. Authorization — verifica se o usuário tem permissão para o endpoint.
 // 5. HttpsRedirection — redireciona HTTP para HTTPS.
 app.UseCors("Frontend");
-app.UseStaticFiles(); // Habilita servir arquivos estáticos (ex: imagens, CSS, JS) da pasta wwwroot.
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseHttpsRedirection();
@@ -163,5 +143,82 @@ app.MapControllers();
 // Sobe o servidor.
 app.Run();
 
+internal static class AppBootstrapper
+{
+    public static async Task BootstrapSuperAdminAsync(WebApplication app)
+    {
+        var name = app.Configuration["SUPER_ADMIN_NAME"];
+        var email = app.Configuration["SUPER_ADMIN_EMAIL"];
+        var password = app.Configuration["SUPER_ADMIN_PASSWORD"];
+
+        if (string.IsNullOrWhiteSpace(name)
+            || string.IsNullOrWhiteSpace(email)
+            || string.IsNullOrWhiteSpace(password))
+            return;
+
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+        var adminClinic = await db.Clinicas.FirstOrDefaultAsync(c => c.Nome == "Admin Interno");
+        if (adminClinic is null)
+        {
+            adminClinic = new Clinica
+            {
+                Nome = "Admin Interno",
+                NomeFantasia = "Admin Interno",
+                NomeResponsavel = name.Trim(),
+                Email = email.Trim().ToLowerInvariant(),
+                IsActive = true,
+                CobrancaAtiva = false
+            };
+            db.Clinicas.Add(adminClinic);
+            await db.SaveChangesAsync();
+        }
+
+        var normalizedEmail = email.Trim().ToLowerInvariant();
+        if (!await db.Users.AnyAsync(u => u.Email == normalizedEmail && !u.IsDeleted))
+        {
+            db.Users.Add(new User
+            {
+                ClinicaId = adminClinic.Id,
+                Name = name.Trim(),
+                Email = normalizedEmail,
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                Role = UserRole.SuperAdmin,
+                IsActive = true
+            });
+            await db.SaveChangesAsync();
+        }
+    }
+}
+
 // Necessário para WebApplicationFactory nos testes de integração.
 public partial class Program { }
+
+internal static class DatabaseUrl
+{
+    public static string ToNpgsqlConnectionString(string value)
+    {
+        if (!Uri.TryCreate(value, UriKind.Absolute, out var uri) || string.IsNullOrWhiteSpace(uri.Host))
+            return value;
+
+        var userInfo = uri.UserInfo.Split(':', 2);
+        var username = Uri.UnescapeDataString(userInfo.ElementAtOrDefault(0) ?? string.Empty);
+        var password = Uri.UnescapeDataString(userInfo.ElementAtOrDefault(1) ?? string.Empty);
+        var database = uri.AbsolutePath.TrimStart('/');
+
+        var builder = new Npgsql.NpgsqlConnectionStringBuilder
+        {
+            Host = uri.Host,
+            Port = uri.Port > 0 ? uri.Port : 5432,
+            Username = username,
+            Password = password,
+            Database = database,
+            SslMode = uri.Query.Contains("sslmode=require", StringComparison.OrdinalIgnoreCase)
+                ? Npgsql.SslMode.Require
+                : Npgsql.SslMode.Prefer
+        };
+
+        return builder.ConnectionString;
+    }
+}

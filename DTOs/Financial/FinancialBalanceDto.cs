@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Financial;
+namespace MultiClinica.API.DTOs.Financial;
 
 // Balanço financeiro mensal — calculado dinamicamente a partir dos gastos e pagamentos do mês.
 public class FinancialBalanceDto

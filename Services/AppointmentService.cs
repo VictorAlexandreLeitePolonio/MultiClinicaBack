@@ -1,15 +1,15 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Appointment;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.Data;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Appointment;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
-public class AppointmentService(IAppointmentRepository repository, AppDbContext db) : IAppointmentService
+public class AppointmentService(IAppointmentRepository repository, AppDbContext db, IUsuarioLogadoService usuario) : IAppointmentService
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -26,7 +26,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
             UserId          = a.UserId,
             UserName        = a.User.Name,
             PatientId       = a.PatientId,
-            PatientName     = a.Patient.Name,
+            PatientName     = a.Patient.Name ?? string.Empty,
             AppointmentDate = DateTime.SpecifyKind(a.AppointmentDate, DateTimeKind.Utc),
             Status          = a.Status,
             CreatedAt       = DateTime.SpecifyKind(a.CreatedAt, DateTimeKind.Utc),
@@ -57,7 +57,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
             AppointmentDate = DateTime.SpecifyKind(appointment.AppointmentDate, DateTimeKind.Utc),
             Status          = appointment.Status,
             PatientId       = appointment.PatientId,
-            PatientName     = appointment.Patient.Name,
+            PatientName     = appointment.Patient.Name ?? string.Empty,
             CreatedAt       = DateTime.SpecifyKind(appointment.CreatedAt, DateTimeKind.Utc),
         });
     }
@@ -66,8 +66,8 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
 
     public async Task<Result<AppointmentResponseDto>> CreateAsync(CreateAppointmentDto dto)
     {
-        var user    = await db.Users.FindAsync(dto.UserId);
-        var patient = await db.Patients.FindAsync(dto.PatientId);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
+        var patient = await db.Patients.FirstOrDefaultAsync(p => p.Id == dto.PatientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
         if (user is null)
             return Result<AppointmentResponseDto>.Fail(ErrorCodes.NotFound, "Usuário não encontrado.");
@@ -88,7 +88,9 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
         {
             UserId          = dto.UserId,
             PatientId       = dto.PatientId,
+            ClinicaId       = usuario.ClinicaId,
             AppointmentDate = dto.AppointmentDate,
+            CreatedByUserId = usuario.UserId,
         };
 
         await repository.AddAsync(appointment);
@@ -99,7 +101,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
             UserId          = appointment.UserId,
             UserName        = user.Name,
             PatientId       = appointment.PatientId,
-            PatientName     = patient.Name,
+            PatientName     = patient.Name ?? string.Empty,
             AppointmentDate = DateTime.SpecifyKind(appointment.AppointmentDate, DateTimeKind.Utc),
             Status          = appointment.Status,
             CreatedAt       = DateTime.SpecifyKind(appointment.CreatedAt, DateTimeKind.Utc),
@@ -126,6 +128,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
 
         appointment.AppointmentDate = dto.AppointmentDate;
         appointment.Status          = dto.Status;
+        appointment.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
 
@@ -139,7 +142,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
             AppointmentDate = DateTime.SpecifyKind(updated.AppointmentDate, DateTimeKind.Utc),
             Status          = updated.Status,
             PatientId       = updated.PatientId,
-            PatientName     = updated.Patient.Name,
+            PatientName     = updated.Patient.Name ?? string.Empty,
             CreatedAt       = DateTime.SpecifyKind(updated.CreatedAt, DateTimeKind.Utc),
         });
     }

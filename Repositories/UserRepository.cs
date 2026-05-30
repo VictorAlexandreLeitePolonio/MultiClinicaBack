@@ -1,36 +1,39 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Repositories;
+namespace MultiClinica.API.Repositories;
 
-public class UserRepository(AppDbContext db) : IUserRepository
+public class UserRepository(AppDbContext db, IUsuarioLogadoService usuario) : IUserRepository
 {
     public async Task<List<User>> GetAllAsync()
-        => await db.Users.ToListAsync();
+        => await db.Users
+            .Where(u => u.ClinicaId == usuario.ClinicaId && !u.IsDeleted)
+            .ToListAsync();
 
     public async Task<User?> GetByIdAsync(int id)
-        => await db.Users.FindAsync(id);
+        => await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
 
     public async Task<User?> GetByEmailAsync(string email)
-        => await db.Users.FirstOrDefaultAsync(u => u.Email == email);
+        => await db.Users.FirstOrDefaultAsync(u => u.Email == email && !u.IsDeleted);
 
     public async Task<bool> EmailExistsAsync(string email, int? excludeId = null)
     {
-        var query = db.Users.Where(u => u.Email == email);
+        var query = db.Users.Where(u => u.Email == email && !u.IsDeleted);
         if (excludeId.HasValue)
             query = query.Where(u => u.Id != excludeId.Value);
         return await query.AnyAsync();
     }
 
     public async Task<int> CountAdminsAsync()
-        => await db.Users.CountAsync(u => u.Role == UserRole.Admin);
+        => await db.Users.CountAsync(u => u.Role == UserRole.Administrador && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
 
     public async Task<bool> HasAssociatedRecordsAsync(int id)
-        => await db.Appointments.AnyAsync(a => a.UserId == id)
-           || await db.MedicalRecords.AnyAsync(m => m.UserId == id)
-           || await db.Payments.AnyAsync(p => p.UserId == id);
+        => await db.Appointments.AnyAsync(a => a.UserId == id && a.ClinicaId == usuario.ClinicaId)
+           || await db.MedicalRecords.AnyAsync(m => m.UserId == id && m.ClinicaId == usuario.ClinicaId)
+           || await db.Payments.AnyAsync(p => p.UserId == id && p.ClinicaId == usuario.ClinicaId);
 
     public async Task<User> AddAsync(User user)
     {
@@ -44,7 +47,9 @@ public class UserRepository(AppDbContext db) : IUserRepository
 
     public async Task DeleteAsync(User user)
     {
-        db.Users.Remove(user);
+        user.IsDeleted = true;
+        user.DeletedAt = DateTime.UtcNow;
+        user.DeletedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
     }
 }

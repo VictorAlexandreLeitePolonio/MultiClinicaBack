@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Patient;
+namespace MultiClinica.API.DTOs.Patient;
 
 public class CreatePatientDto
 {

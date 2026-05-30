@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Payment;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Payment;
+using MultiClinica.API.Models;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Controllers;
+namespace MultiClinica.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Administrador,Recepcao")]
 [ApiController]
 [Route("api/[controller]")]
 public class PaymentsController(IPaymentService service) : ControllerBase

@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Appointment;
+namespace MultiClinica.API.DTOs.Appointment;
 
 // Dados recebidos na criação de uma consulta.
 // Status não está aqui — toda consulta começa como Scheduled automaticamente.

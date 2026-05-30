@@ -1,0 +1,6 @@
+@MultiClinica.API_HostAddress = http://localhost:5045
+
+GET {{MultiClinica.API_HostAddress}}/api/auth/me
+Accept: application/json
+
+###

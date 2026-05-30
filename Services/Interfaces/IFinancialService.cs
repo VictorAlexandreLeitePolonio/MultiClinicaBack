@@ -1,8 +1,8 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Financial;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Financial;
 
-namespace ProjetoLP.API.Services.Interfaces;
+namespace MultiClinica.API.Services.Interfaces;
 
 public interface IFinancialService
 {

@@ -1,14 +1,14 @@
 using System.Text.RegularExpressions;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Financial;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Financial;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
-public partial class FinancialService(IFinancialRepository repository) : IFinancialService
+public partial class FinancialService(IFinancialRepository repository, IUsuarioLogadoService usuario) : IFinancialService
 {
     [GeneratedRegex(@"^\d{4}-\d{2}$")]
     private static partial Regex ReferenceMonthRegex();
@@ -80,11 +80,13 @@ public partial class FinancialService(IFinancialRepository repository) : IFinanc
 
         var expense = new Expense
         {
+            ClinicaId       = usuario.ClinicaId,
             Title          = dto.Title,
             Value          = dto.Value,
             PaymentDate    = dto.PaymentDate,
             Description    = dto.Description,
             ReferenceMonth = dto.ReferenceMonth,
+            CreatedByUserId = usuario.UserId,
         };
 
         await repository.AddExpenseAsync(expense);
@@ -125,6 +127,7 @@ public partial class FinancialService(IFinancialRepository repository) : IFinanc
         expense.PaymentDate    = dto.PaymentDate;
         expense.Description    = dto.Description;
         expense.ReferenceMonth = dto.ReferenceMonth;
+        expense.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
 

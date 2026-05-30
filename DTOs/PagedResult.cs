@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs;
+namespace MultiClinica.API.DTOs;
 
 public class PagedResult<T>
 {

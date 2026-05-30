@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.Common;
+namespace MultiClinica.API.Common;
 
 public static class ErrorCodes
 {
@@ -19,4 +19,5 @@ public static class ErrorCodes
     public const string InvalidPassword    = "INVALID_PASSWORD";
     public const string InvalidFileType    = "INVALID_FILE_TYPE";
     public const string FileTooLarge       = "FILE_TOO_LARGE";
+    public const string Forbidden          = "FORBIDDEN";
 }

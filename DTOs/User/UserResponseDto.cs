@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.User;
+namespace MultiClinica.API.DTOs.User;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Dados retornados ao cliente nas respostas da API.
 // PasswordHash nunca aparece aqui — nem criptografado.

@@ -1,17 +1,18 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.MedicalRecord;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.Data;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.MedicalRecord;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
 public class MedicalRecordService(
     IMedicalRecordRepository repository,
-    AppDbContext db) : IMedicalRecordService
+    AppDbContext db,
+    IUsuarioLogadoService usuario) : IMedicalRecordService
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -48,16 +49,17 @@ public class MedicalRecordService(
 
     public async Task<Result<MedicalRecordResponseDto>> CreateAsync(CreateMedicalRecordDto dto)
     {
-        var userExists = await db.Users.AnyAsync(u => u.Id == dto.UserId);
+        var userExists = await db.Users.AnyAsync(u => u.Id == dto.UserId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
         if (!userExists)
             return Result<MedicalRecordResponseDto>.Fail(ErrorCodes.NotFound, "Fisioterapeuta não encontrado.");
 
-        var patientExists = await db.Patients.AnyAsync(p => p.Id == dto.PatientId);
+        var patientExists = await db.Patients.AnyAsync(p => p.Id == dto.PatientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
         if (!patientExists)
             return Result<MedicalRecordResponseDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
 
         var medicalRecord = new MedicalRecord
         {
+            ClinicaId            = usuario.ClinicaId,
             UserId               = dto.UserId,
             PatientId            = dto.PatientId,
             Patologia            = dto.Patologia,
@@ -73,6 +75,7 @@ public class MedicalRecordService(
             Sessao               = dto.Sessao,
             Titulo               = dto.Titulo,
             OrientacaoDomiciliar = dto.OrientacaoDomiciliar,
+            CreatedByUserId      = usuario.UserId,
         };
 
         await repository.AddAsync(medicalRecord);
@@ -192,7 +195,7 @@ public class MedicalRecordService(
         UserId               = m.UserId,
         UserName             = m.User.Name,
         PatientId            = m.PatientId,
-        PatientName          = m.Patient.Name,
+        PatientName          = m.Patient.Name ?? string.Empty,
         Patologia            = m.Patologia,
         QueixaPrincipal      = m.QueixaPrincipal,
         ExamesImagem         = m.ExamesImagem,

@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs.Financial;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs.Financial;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Controllers;
+namespace MultiClinica.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Administrador")]
 [ApiController]
 [Route("api/[controller]")]
 public class FinancialController(IFinancialService service) : ControllerBase

@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Payment;
+namespace MultiClinica.API.DTOs.Payment;
 
 // Dados recebidos na criação de um pagamento.
 // Status não está aqui — todo pagamento começa como Pending automaticamente.

@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Repositories;
+namespace MultiClinica.API.Repositories;
 
-public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
+public class AppointmentRepository(AppDbContext db, IUsuarioLogadoService usuario) : IAppointmentRepository
 {
     public async Task<(List<Appointment> Items, int TotalCount)> GetPagedAsync(
         AppointmentStatus? status,
@@ -19,6 +20,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
         var query = db.Appointments
             .Include(a => a.Patient)
             .Include(a => a.User)
+            .Where(a => a.ClinicaId == usuario.ClinicaId && !a.IsDeleted)
             .AsQueryable();
 
         if (status.HasValue)
@@ -34,7 +36,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
             query = query.Where(a => a.AppointmentDate <= dateTo.Value.ToDateTime(TimeOnly.MaxValue));
 
         if (!string.IsNullOrEmpty(patientName))
-            query = query.Where(a => a.Patient.Name.Contains(patientName));
+            query = query.Where(a => a.Patient.Name != null && a.Patient.Name.Contains(patientName));
 
         var totalCount = await query.CountAsync();
         var items = await query
@@ -49,7 +51,7 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
         => await db.Appointments
             .Include(a => a.Patient)
             .Include(a => a.User)
-            .FirstOrDefaultAsync(a => a.Id == id);
+            .FirstOrDefaultAsync(a => a.Id == id && a.ClinicaId == usuario.ClinicaId && !a.IsDeleted);
 
     public async Task<Appointment> AddAsync(Appointment appointment)
     {
@@ -63,7 +65,9 @@ public class AppointmentRepository(AppDbContext db) : IAppointmentRepository
 
     public async Task DeleteAsync(Appointment appointment)
     {
-        db.Appointments.Remove(appointment);
+        appointment.IsDeleted = true;
+        appointment.DeletedAt = DateTime.UtcNow;
+        appointment.DeletedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
     }
 }

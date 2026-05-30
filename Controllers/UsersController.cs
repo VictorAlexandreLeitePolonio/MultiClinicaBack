@@ -1,12 +1,12 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs.User;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs.User;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Controllers;
+namespace MultiClinica.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Administrador")]
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController(IUserService service) : ControllerBase
@@ -36,6 +36,7 @@ public class UsersController(IUserService service) : ControllerBase
             {
                 ErrorCodes.DuplicateEmail    => Conflict(new { message = result.ErrorMessage }),
                 ErrorCodes.InvalidPassword   => BadRequest(new { message = result.ErrorMessage }),
+                ErrorCodes.Forbidden          => Forbid(),
                 _                            => BadRequest(new { message = result.ErrorMessage })
             };
 

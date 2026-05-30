@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.Appointment;
+namespace MultiClinica.API.DTOs.Appointment;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Dados permitidos na atualização de uma consulta.
 // UserId não está aqui — o dono da consulta nunca muda.

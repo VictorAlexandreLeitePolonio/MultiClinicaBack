@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Repositories;
+namespace MultiClinica.API.Repositories;
 
-public class FinancialRepository(AppDbContext db) : IFinancialRepository
+public class FinancialRepository(AppDbContext db, IUsuarioLogadoService usuario) : IFinancialRepository
 {
     public async Task<(List<Expense> Items, int TotalCount)> GetExpensesPagedAsync(
         string? month,
@@ -13,7 +14,7 @@ public class FinancialRepository(AppDbContext db) : IFinancialRepository
         int page,
         int pageSize)
     {
-        var query = db.Expenses.AsQueryable();
+        var query = db.Expenses.Where(e => e.ClinicaId == usuario.ClinicaId && !e.IsDeleted).AsQueryable();
 
         if (!string.IsNullOrEmpty(month))
             query = query.Where(e => e.ReferenceMonth == month);
@@ -32,7 +33,7 @@ public class FinancialRepository(AppDbContext db) : IFinancialRepository
     }
 
     public async Task<Expense?> GetExpenseByIdAsync(int id)
-        => await db.Expenses.FindAsync(id);
+        => await db.Expenses.FirstOrDefaultAsync(e => e.Id == id && e.ClinicaId == usuario.ClinicaId && !e.IsDeleted);
 
     public async Task<Expense> AddExpenseAsync(Expense expense)
     {
@@ -46,17 +47,21 @@ public class FinancialRepository(AppDbContext db) : IFinancialRepository
 
     public async Task DeleteExpenseAsync(Expense expense)
     {
-        db.Expenses.Remove(expense);
+        expense.IsDeleted = true;
+        expense.DeletedAt = DateTime.UtcNow;
+        expense.DeletedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
     }
 
     public async Task<decimal> GetTotalExpensesByMonthAsync(string month)
         => await db.Expenses
             .Where(e => e.ReferenceMonth == month)
+            .Where(e => e.ClinicaId == usuario.ClinicaId && !e.IsDeleted)
             .SumAsync(e => (decimal?)e.Value) ?? 0m;
 
     public async Task<decimal> GetTotalIncomeByMonthAsync(string month)
         => await db.Payments
             .Where(p => p.ReferenceMonth == month && p.Status == PaymentStatus.Paid)
+            .Where(p => p.ClinicaId == usuario.ClinicaId && !p.IsDeleted)
             .SumAsync(p => (decimal?)p.Amount) ?? 0m;
 }

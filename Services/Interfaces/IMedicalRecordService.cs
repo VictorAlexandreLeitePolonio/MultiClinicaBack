@@ -1,8 +1,8 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.MedicalRecord;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.MedicalRecord;
 
-namespace ProjetoLP.API.Services.Interfaces;
+namespace MultiClinica.API.Services.Interfaces;
 
 public interface IMedicalRecordService
 {

@@ -1,14 +1,14 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Plans;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Plans;
+using MultiClinica.API.Models;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Controllers;
+namespace MultiClinica.API.Controllers;
 
-[Authorize(Roles = "Admin")]
+[Authorize(Roles = "Administrador")]
 [ApiController]
 [Route("api/[controller]")]
 public class PlansController(IPlanService service) : ControllerBase

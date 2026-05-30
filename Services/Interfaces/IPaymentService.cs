@@ -1,9 +1,9 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Payment;
-using ProjetoLP.API.Models;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Payment;
+using MultiClinica.API.Models;
 
-namespace ProjetoLP.API.Services.Interfaces;
+namespace MultiClinica.API.Services.Interfaces;
 
 public interface IPaymentService
 {

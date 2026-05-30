@@ -1,12 +1,12 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs.User;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs.User;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
-public class UserService(IUserRepository repository) : IUserService
+public class UserService(IUserRepository repository, IUsuarioLogadoService usuario) : IUserService
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -58,12 +58,22 @@ public class UserService(IUserRepository repository) : IUserService
             return Result<UserResponseDto>.Fail(
                 ErrorCodes.DuplicateEmail, "Email já cadastrado por outro usuário.");
 
+        if (!usuario.IsSuperAdmin && dto.Role == UserRole.SuperAdmin)
+            return Result<UserResponseDto>.Fail(
+                ErrorCodes.Forbidden, "Administrador não pode criar SuperAdmin.");
+
+        if (!usuario.IsSuperAdmin && dto.Role == UserRole.Administrador)
+            return Result<UserResponseDto>.Fail(
+                ErrorCodes.Forbidden, "Administrador só pode criar Profissional ou Recepcao.");
+
         var user = new User
         {
+            ClinicaId     = usuario.ClinicaId,
             Name         = dto.Name,
-            Email        = dto.Email,
+            Email        = dto.Email.Trim().ToLowerInvariant(),
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password),
-            Role         = dto.Role
+            Role         = dto.Role,
+            CreatedByUserId = usuario.UserId
         };
 
         await repository.AddAsync(user);
@@ -92,7 +102,8 @@ public class UserService(IUserRepository repository) : IUserService
             return Result<UserResponseDto>.Fail(ErrorCodes.NotFound, "Usuário não encontrado.");
 
         user.Name      = dto.Name;
-        user.Email     = dto.Email;
+        user.Email     = dto.Email.Trim().ToLowerInvariant();
+        user.UpdatedByUserId = usuario.UserId;
         user.UpdatedAt = DateTime.UtcNow;
 
         await repository.SaveChangesAsync();
@@ -115,8 +126,8 @@ public class UserService(IUserRepository repository) : IUserService
         if (user is null)
             return Result<bool>.Fail(ErrorCodes.NotFound, "Usuário não encontrado.");
 
-        // Impede deletar o último Admin
-        if (user.Role == UserRole.Admin)
+        // Impede deletar o último Administrador
+        if (user.Role == UserRole.Administrador)
         {
             var adminCount = await repository.CountAdminsAsync();
             if (adminCount <= 1)

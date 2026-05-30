@@ -1,9 +1,9 @@
-namespace ProjetoLP.API.Models;
+namespace MultiClinica.API.Models;
 
 // Representa um gasto manual inserido pela admin para o controle financeiro mensal.
-public class Expense
+public class Expense : AuditableEntity
 {
-    public int Id { get; set; }
+    public int ClinicaId { get; set; }
 
     // Título do gasto (ex: "Aluguel", "Conta de Luz").
     public string Title { get; set; } = string.Empty;
@@ -21,6 +21,5 @@ public class Expense
     // Liga este gasto ao balanço do mês correspondente.
     public string ReferenceMonth { get; set; } = string.Empty;
 
-    // Preenchido automaticamente na criação.
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public Clinica Clinica { get; set; } = null!;
 }

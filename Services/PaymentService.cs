@@ -1,16 +1,16 @@
 using System.Text.RegularExpressions;
-using ProjetoLP.API.Common;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Payment;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.Data;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Payment;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
-public partial class PaymentService(IPaymentRepository repository, AppDbContext db) : IPaymentService
+public partial class PaymentService(IPaymentRepository repository, AppDbContext db, IUsuarioLogadoService usuario) : IPaymentService
 {
     [GeneratedRegex(@"^\d{4}-\d{2}$")]
     private static partial Regex ReferenceMonthRegex();
@@ -60,9 +60,9 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
                 ErrorCodes.EmptyField, "O método de pagamento é obrigatório.");
 
         // Validações de existência
-        var user    = await db.Users.FindAsync(dto.UserId);
-        var patient = await db.Patients.FindAsync(dto.PatientId);
-        var plan    = await db.Plans.FindAsync(dto.PlanId);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
+        var patient = await db.Patients.FirstOrDefaultAsync(p => p.Id == dto.PatientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
+        var plan = await db.Plans.FirstOrDefaultAsync(p => p.Id == dto.PlanId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
         if (user    is null) return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Usuário não encontrado.");
         if (patient is null) return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
@@ -79,6 +79,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
 
         var payment = new Payment
         {
+            ClinicaId      = usuario.ClinicaId,
             UserId         = dto.UserId,
             PatientId      = dto.PatientId,
             PlanId         = dto.PlanId,
@@ -86,6 +87,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
             ReferenceMonth = dto.ReferenceMonth,
             PaymentMethod  = dto.PaymentMethod,
             PaymentDate    = dto.PaymentDate,
+            CreatedByUserId = usuario.UserId,
         };
 
         await repository.AddAsync(payment);
@@ -96,7 +98,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
             Id                  = payment.Id,
             UserId              = payment.UserId,
             PatientId           = payment.PatientId,
-            PatientName         = patient.Name,
+            PatientName         = patient.Name ?? string.Empty,
             PlanId              = payment.PlanId,
             PlanName            = plan.Name,
             PlanAmount          = plan.Valor,
@@ -105,7 +107,6 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
             Status              = payment.Status,
             PaidAt              = payment.PaidAt,
             PaymentDate         = payment.PaymentDate,
-            PaymentReminderSent = payment.PaymentReminderSent,
             CreatedAt           = payment.CreatedAt
         });
     }
@@ -129,29 +130,22 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         // Se o plano mudou, atualiza Amount
         if (dto.PlanId != payment.PlanId)
         {
-            var plan = await db.Plans.FindAsync(dto.PlanId);
+            var plan = await db.Plans.FirstOrDefaultAsync(p => p.Id == dto.PlanId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
             if (plan is null)
                 return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Plano não encontrado.");
             payment.PlanId = dto.PlanId;
             payment.Amount = plan.Valor;
         }
-
-        var oldPaymentDate = payment.PaymentDate;
-
         payment.ReferenceMonth = dto.ReferenceMonth;
         payment.PaymentMethod  = dto.PaymentMethod;
         payment.Status         = dto.Status;
         payment.PaymentDate    = dto.PaymentDate;
+        payment.UpdatedByUserId = usuario.UserId;
 
         // Gerencia PaidAt automaticamente
         payment.PaidAt = dto.Status == PaymentStatus.Paid
             ? (dto.PaidAt ?? DateTime.UtcNow)
             : null;
-
-        // Se data de vencimento mudou, reseta flag de lembrete
-        if (dto.PaymentDate != oldPaymentDate)
-            payment.PaymentReminderSent = false;
-
         await repository.SaveChangesAsync();
 
         // Recarrega para retornar dados atualizados com navigations
@@ -183,7 +177,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         Id                  = p.Id,
         UserId              = p.UserId,
         PatientId           = p.PatientId,
-        PatientName         = p.Patient.Name,
+        PatientName         = p.Patient.Name ?? string.Empty,
         PlanId              = p.PlanId,
         PlanName            = p.Plan.Name,
         PlanAmount          = p.Plan.Valor,
@@ -192,7 +186,6 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         Status              = p.Status,
         PaidAt              = p.PaidAt,
         PaymentDate         = p.PaymentDate,
-        PaymentReminderSent = p.PaymentReminderSent,
         CreatedAt           = p.CreatedAt
     };
 }

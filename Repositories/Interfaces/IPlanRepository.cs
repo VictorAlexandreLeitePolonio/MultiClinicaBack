@@ -1,6 +1,6 @@
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
-namespace ProjetoLP.API.Repositories.Interfaces;
+namespace MultiClinica.API.Repositories.Interfaces;
 
 public interface IPlanRepository
 {

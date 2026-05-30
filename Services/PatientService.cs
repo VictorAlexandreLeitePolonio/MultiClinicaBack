@@ -1,16 +1,19 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs;
-using ProjetoLP.API.DTOs.Patient;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
-using ProjetoLP.API.Services.Interfaces;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Patient;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
-public class PatientService(IPatientRepository repository) : IPatientService
+public class PatientService(IPatientRepository repository, IUsuarioLogadoService usuario) : IPatientService
 {
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+
+    private static string? DigitsOnly(string? value)
+        => string.IsNullOrWhiteSpace(value) ? null : new string(value.Where(char.IsDigit).ToArray());
 
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -139,7 +142,6 @@ public class PatientService(IPatientRepository repository) : IPatientService
                     Status              = p.Status,
                     PaymentDate         = p.PaymentDate,
                     PaidAt              = p.PaidAt,
-                    PaymentReminderSent = p.PaymentReminderSent,
                     CreatedAt           = p.CreatedAt,
                 }).ToList(),
         };
@@ -152,7 +154,7 @@ public class PatientService(IPatientRepository repository) : IPatientService
     public async Task<Result<PatientResponseDto>> CreateAsync(CreatePatientDto dto)
     {
         var normalizedEmail = NormalizeOptional(dto.Email);
-        var normalizedCpf = NormalizeOptional(dto.CPF);
+        var normalizedCpf = DigitsOnly(dto.CPF);
 
         // Validações de unicidade
         if (await repository.EmailExistsAsync(normalizedEmail))
@@ -163,6 +165,7 @@ public class PatientService(IPatientRepository repository) : IPatientService
 
         var patient = new Patient
         {
+            ClinicaId = usuario.ClinicaId,
             Name   = NormalizeOptional(dto.Name),
             Email  = normalizedEmail,
             CPF    = normalizedCpf,
@@ -172,8 +175,9 @@ public class PatientService(IPatientRepository repository) : IPatientService
             Bairro = NormalizeOptional(dto.Bairro),
             Cidade = NormalizeOptional(dto.Cidade),
             Estado = NormalizeOptional(dto.Estado),
-            Cep    = NormalizeOptional(dto.Cep),
-            Phone  = NormalizeOptional(dto.Phone),
+            Cep    = DigitsOnly(dto.Cep),
+            Phone  = DigitsOnly(dto.Phone),
+            CreatedByUserId = usuario.UserId,
         };
 
         await repository.AddAsync(patient);
@@ -204,7 +208,7 @@ public class PatientService(IPatientRepository repository) : IPatientService
     public async Task<Result<bool>> UpdateAsync(int id, UpdatePatientDto dto)
     {
         var normalizedEmail = NormalizeOptional(dto.Email);
-        var normalizedCpf = NormalizeOptional(dto.CPF);
+        var normalizedCpf = DigitsOnly(dto.CPF);
 
         // Validações de unicidade
         if (await repository.EmailExistsAsync(normalizedEmail, id))
@@ -226,8 +230,9 @@ public class PatientService(IPatientRepository repository) : IPatientService
         patient.Bairro = NormalizeOptional(dto.Bairro);
         patient.Cidade = NormalizeOptional(dto.Cidade);
         patient.Estado = NormalizeOptional(dto.Estado);
-        patient.Cep    = NormalizeOptional(dto.Cep);
-        patient.Phone  = NormalizeOptional(dto.Phone);
+        patient.Cep    = DigitsOnly(dto.Cep);
+        patient.Phone  = DigitsOnly(dto.Phone);
+        patient.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
         return Result<bool>.Ok(true);

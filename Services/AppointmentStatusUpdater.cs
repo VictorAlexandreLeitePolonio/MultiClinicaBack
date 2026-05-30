@@ -1,8 +1,8 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
 
-namespace ProjetoLP.API.Services;
+namespace MultiClinica.API.Services;
 
 // Serviço em segundo plano que cancela automaticamente consultas agendadas no passado.
 // Executa ao iniciar a aplicação e depois a cada hora.

@@ -1,7 +1,7 @@
-using ProjetoLP.API.Common;
-using ProjetoLP.API.DTOs.User;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs.User;
 
-namespace ProjetoLP.API.Services.Interfaces;
+namespace MultiClinica.API.Services.Interfaces;
 
 public interface IUserService
 {

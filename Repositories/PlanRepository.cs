@@ -1,11 +1,12 @@
 using Microsoft.EntityFrameworkCore;
-using ProjetoLP.API.Data;
-using ProjetoLP.API.Models;
-using ProjetoLP.API.Repositories.Interfaces;
+using MultiClinica.API.Data;
+using MultiClinica.API.Models;
+using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Interfaces;
 
-namespace ProjetoLP.API.Repositories;
+namespace MultiClinica.API.Repositories;
 
-public class PlanRepository(AppDbContext db) : IPlanRepository
+public class PlanRepository(AppDbContext db, IUsuarioLogadoService usuario) : IPlanRepository
 {
     public async Task<(List<Plans> Items, int TotalCount)> GetPagedAsync(
         TipoPlano? tipoPlano,
@@ -14,7 +15,7 @@ public class PlanRepository(AppDbContext db) : IPlanRepository
         int page,
         int pageSize)
     {
-        var query = db.Plans.AsQueryable();
+        var query = db.Plans.Where(p => p.ClinicaId == usuario.ClinicaId && !p.IsDeleted).AsQueryable();
 
         if (tipoPlano.HasValue)
             query = query.Where(p => p.TipoPlano == tipoPlano.Value);
@@ -35,18 +36,18 @@ public class PlanRepository(AppDbContext db) : IPlanRepository
     }
 
     public async Task<Plans?> GetByIdAsync(int id)
-        => await db.Plans.FindAsync(id);
+        => await db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<bool> NameExistsAsync(string name, int? excludeId = null)
     {
-        var query = db.Plans.Where(p => p.Name == name);
+        var query = db.Plans.Where(p => p.Name == name && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
         if (excludeId.HasValue)
             query = query.Where(p => p.Id != excludeId.Value);
         return await query.AnyAsync();
     }
 
     public async Task<bool> HasPaymentsAsync(int id)
-        => await db.Payments.AnyAsync(p => p.PlanId == id);
+        => await db.Payments.AnyAsync(p => p.PlanId == id && p.ClinicaId == usuario.ClinicaId);
 
     public async Task<Plans> AddAsync(Plans plan)
     {
@@ -60,7 +61,9 @@ public class PlanRepository(AppDbContext db) : IPlanRepository
 
     public async Task DeleteAsync(Plans plan)
     {
-        db.Plans.Remove(plan);
+        plan.IsDeleted = true;
+        plan.DeletedAt = DateTime.UtcNow;
+        plan.DeletedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
     }
 }

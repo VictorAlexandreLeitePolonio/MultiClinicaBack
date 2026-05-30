@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.Appointment;
+namespace MultiClinica.API.DTOs.Appointment;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Dados retornados ao cliente nas respostas da API.
 public class AppointmentResponseDto

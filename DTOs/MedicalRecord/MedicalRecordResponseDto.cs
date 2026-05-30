@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.MedicalRecord;
+namespace MultiClinica.API.DTOs.MedicalRecord;
 
 public class MedicalRecordResponseDto
 {

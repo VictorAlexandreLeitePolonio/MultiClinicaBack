@@ -1,4 +1,4 @@
-namespace ProjetoLP.API.DTOs.Auth;
+namespace MultiClinica.API.DTOs.Auth;
 
 // Dados recebidos no login — email e senha em texto puro.
 // A senha é verificada contra o hash BCrypt salvo no banco.

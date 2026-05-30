@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.User;
+namespace MultiClinica.API.DTOs.User;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Dados recebidos na criação de um usuário.
 // Não inclui Id, CreatedAt, UpdatedAt — gerados pelo servidor.
@@ -13,5 +13,5 @@ public class CreateUserDto
     public string Password { get; set; } = string.Empty;
 
     // Role padrão é Patient — pode ser alterado apenas na criação.
-    public UserRole Role { get; set; } = UserRole.Fisio;
+    public UserRole Role { get; set; } = UserRole.Profissional;
 }

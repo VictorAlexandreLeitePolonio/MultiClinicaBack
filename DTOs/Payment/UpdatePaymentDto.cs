@@ -1,6 +1,6 @@
-namespace ProjetoLP.API.DTOs.Payment;
+namespace MultiClinica.API.DTOs.Payment;
 
-using ProjetoLP.API.Models;
+using MultiClinica.API.Models;
 
 // Dados permitidos na atualização de um pagamento.
 public class UpdatePaymentDto

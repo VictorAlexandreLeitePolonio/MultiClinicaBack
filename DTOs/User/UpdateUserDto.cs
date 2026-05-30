@@ -1,7 +1,7 @@
-namespace ProjetoLP.API.DTOs.User;
+namespace MultiClinica.API.DTOs.User;
 
 // Dados permitidos na atualização de um usuário.
-// Role não está aqui — um Patient sempre será Patient e um Admin sempre será Admin.
+// Role não está aqui — um Patient sempre será Patient e um Administrador sempre será Administrador.
 // Password não está aqui — troca de senha é feita em endpoint dedicado.
 public class UpdateUserDto
 {
