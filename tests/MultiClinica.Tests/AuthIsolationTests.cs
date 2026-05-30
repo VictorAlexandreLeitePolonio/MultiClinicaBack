@@ -336,6 +336,42 @@ public class AuthIsolationTests
             h.Type == CommercialHistoryEventType.AutomaticBillingBlock));
     }
 
+    [Fact]
+    public async Task Existing_session_is_blocked_when_clinic_becomes_billing_blocked()
+    {
+        await using var app = new MultiClinicaFactory();
+        await app.SeedAsync(async db =>
+        {
+            var clinic = new Clinica { Nome = "Clinica A", NomeResponsavel = "Victor" };
+            db.Clinicas.Add(clinic);
+            await db.SaveChangesAsync();
+
+            db.Users.Add(new User
+            {
+                ClinicaId = clinic.Id,
+                Name = "Admin A",
+                Email = "admin-a@test.local",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Administrador
+            });
+            await db.SaveChangesAsync();
+        });
+
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin-a@test.local", "secret123");
+
+        await app.SeedAsync(async db =>
+        {
+            var clinic = await db.Clinicas.SingleAsync();
+            clinic.IsBlockedByBilling = true;
+            await db.SaveChangesAsync();
+        });
+
+        var response = await client.GetAsync("/api/patients");
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
     private static async Task LoginAsync(HttpClient client, string email, string password)
     {
         var response = await client.PostAsJsonAsync("/api/auth/login", new LoginDto

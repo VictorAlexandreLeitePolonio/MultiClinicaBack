@@ -134,6 +134,52 @@ if (app.Environment.IsDevelopment())
 // 5. HttpsRedirection — redireciona HTTP para HTTPS.
 app.UseCors("Frontend");
 app.UseAuthentication();
+app.Use(async (context, next) =>
+{
+    if (context.User.Identity?.IsAuthenticated != true
+        || context.Request.Path.StartsWithSegments("/api/auth/login")
+        || context.Request.Path.StartsWithSegments("/api/superadmin"))
+    {
+        await next();
+        return;
+    }
+
+    var userIdValue = context.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    if (!int.TryParse(userIdValue, out var userId))
+    {
+        context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+        await context.Response.WriteAsJsonAsync(new { message = "Sessão inválida." });
+        return;
+    }
+
+    var db = context.RequestServices.GetRequiredService<AppDbContext>();
+    var user = await db.Users
+        .Include(u => u.Clinica)
+        .FirstOrDefaultAsync(u => u.Id == userId && !u.IsDeleted);
+
+    if (user is null || !user.IsActive)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { message = "Usuário inativo." });
+        return;
+    }
+
+    if (!user.Clinica.IsActive || user.Clinica.IsDeleted)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { message = "Clínica inativa." });
+        return;
+    }
+
+    if (user.Clinica.IsBlockedByBilling && user.Role != UserRole.SuperAdmin)
+    {
+        context.Response.StatusCode = StatusCodes.Status403Forbidden;
+        await context.Response.WriteAsJsonAsync(new { message = "Clínica bloqueada por pendência financeira." });
+        return;
+    }
+
+    await next();
+});
 app.UseAuthorization();
 app.UseHttpsRedirection();
 
