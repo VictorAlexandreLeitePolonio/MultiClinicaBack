@@ -67,6 +67,78 @@ public class AuthIsolationTests
     }
 
     [Fact]
+    public async Task Login_blocks_inactive_user_with_explicit_error()
+    {
+        await using var app = new MultiClinicaFactory();
+        await app.SeedAsync(async db =>
+        {
+            var clinica = new Clinica { Nome = "Clinica Ativa", NomeResponsavel = "Victor" };
+            db.Clinicas.Add(clinica);
+            await db.SaveChangesAsync();
+
+            db.Users.Add(new User
+            {
+                ClinicaId = clinica.Id,
+                Name = "Admin",
+                Email = "admin@inactive-user.test",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Administrador,
+                IsActive = false
+            });
+            await db.SaveChangesAsync();
+        });
+
+        using var client = app.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginDto
+        {
+            Email = "admin@inactive-user.test",
+            Password = "secret123"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("Usuário inativo", body);
+    }
+
+    [Fact]
+    public async Task Login_blocks_billing_blocked_clinic_with_explicit_error()
+    {
+        await using var app = new MultiClinicaFactory();
+        await app.SeedAsync(async db =>
+        {
+            var clinica = new Clinica
+            {
+                Nome = "Clinica Bloqueada",
+                NomeResponsavel = "Victor",
+                IsBlockedByBilling = true
+            };
+            db.Clinicas.Add(clinica);
+            await db.SaveChangesAsync();
+
+            db.Users.Add(new User
+            {
+                ClinicaId = clinica.Id,
+                Name = "Admin",
+                Email = "admin@blocked.test",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Administrador
+            });
+            await db.SaveChangesAsync();
+        });
+
+        using var client = app.CreateClient();
+        var response = await client.PostAsJsonAsync("/api/auth/login", new LoginDto
+        {
+            Email = "admin@blocked.test",
+            Password = "secret123"
+        });
+
+        Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+        var body = await response.Content.ReadAsStringAsync();
+        Assert.Contains("pendência financeira", body);
+    }
+
+    [Fact]
     public async Task Clinic_user_gets_404_for_patient_from_another_clinic()
     {
         await using var app = new MultiClinicaFactory();
@@ -134,6 +206,89 @@ public class AuthIsolationTests
         });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Administrator_cannot_create_user_in_another_clinic_even_if_body_sends_clinica_id()
+    {
+        await using var app = new MultiClinicaFactory();
+        await app.SeedAsync(async db =>
+        {
+            var clinicA = new Clinica { Nome = "Clinica A", NomeResponsavel = "Victor" };
+            var clinicB = new Clinica { Nome = "Clinica B", NomeResponsavel = "Victor" };
+            db.Clinicas.AddRange(clinicA, clinicB);
+            await db.SaveChangesAsync();
+
+            db.Users.Add(new User
+            {
+                ClinicaId = clinicA.Id,
+                Name = "Admin A",
+                Email = "admin-a@test.local",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Administrador
+            });
+            await db.SaveChangesAsync();
+        });
+
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin-a@test.local", "secret123");
+
+        var response = await client.PostAsJsonAsync("/api/users", new
+        {
+            clinicaId = 2,
+            name = "Recepção",
+            email = "recepcao@test.local",
+            password = "secret123",
+            role = "Recepcao"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        await app.SeedAsync(async db =>
+        {
+            var user = await db.Users.SingleAsync(u => u.Email == "recepcao@test.local");
+            Assert.Equal(1, user.ClinicaId);
+        });
+    }
+
+    [Fact]
+    public async Task Patient_creation_uses_authenticated_clinic()
+    {
+        await using var app = new MultiClinicaFactory();
+        await app.SeedAsync(async db =>
+        {
+            var clinic = new Clinica { Nome = "Clinica A", NomeResponsavel = "Victor" };
+            db.Clinicas.Add(clinic);
+            await db.SaveChangesAsync();
+
+            db.Users.Add(new User
+            {
+                ClinicaId = clinic.Id,
+                Name = "Admin A",
+                Email = "admin-a@test.local",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Administrador
+            });
+            await db.SaveChangesAsync();
+        });
+
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin-a@test.local", "secret123");
+
+        var response = await client.PostAsJsonAsync("/api/patients", new
+        {
+            name = "Paciente A",
+            cpf = "123.456.789-00",
+            phone = "(11) 99999-9999"
+        });
+
+        Assert.Equal(HttpStatusCode.Created, response.StatusCode);
+        await app.SeedAsync(async db =>
+        {
+            var patient = await db.Patients.SingleAsync();
+            Assert.Equal(1, patient.ClinicaId);
+            Assert.Equal("12345678900", patient.CPF);
+            Assert.Equal("11999999999", patient.Phone);
+        });
     }
 
     [Fact]
