@@ -8,10 +8,19 @@ namespace MultiClinica.API.Repositories;
 
 public class UserRepository(AppDbContext db, IUsuarioLogadoService usuario) : IUserRepository
 {
-    public async Task<List<User>> GetAllAsync()
-        => await db.Users
-            .Where(u => u.ClinicaId == usuario.ClinicaId && !u.IsDeleted)
+    public async Task<(List<User> Items, int TotalCount)> GetPagedAsync(int page, int pageSize)
+    {
+        var query = db.Users.Where(u => u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderBy(u => u.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
+
+        return (items, totalCount);
+    }
 
     public async Task<User?> GetByIdAsync(int id)
         => await db.Users.FirstOrDefaultAsync(u => u.Id == id && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);

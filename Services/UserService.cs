@@ -1,4 +1,5 @@
 using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.User;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
@@ -10,11 +11,11 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
 
-    public async Task<Result<List<UserResponseDto>>> GetAllAsync()
+    public async Task<Result<PagedResult<UserResponseDto>>> GetPagedAsync(int page, int pageSize)
     {
-        var users = await repository.GetAllAsync();
+        var (items, totalCount) = await repository.GetPagedAsync(page, pageSize);
 
-        var data = users.Select(u => new UserResponseDto
+        var data = items.Select(u => new UserResponseDto
         {
             Id        = u.Id,
             Name      = u.Name,
@@ -23,7 +24,13 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
             CreatedAt = u.CreatedAt,
         }).ToList();
 
-        return Result<List<UserResponseDto>>.Ok(data);
+        return Result<PagedResult<UserResponseDto>>.Ok(new PagedResult<UserResponseDto>
+        {
+            Data = data,
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        });
     }
 
     // ── Busca por Id ─────────────────────────────────────────────────────────

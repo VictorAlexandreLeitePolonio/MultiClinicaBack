@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Data;
+using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.SuperAdmin;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services.Interfaces;
@@ -66,7 +67,9 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
         [FromQuery] bool? isActive,
         [FromQuery] bool? cobrancaAtiva,
         [FromQuery] bool? isBlockedByBilling,
-        [FromQuery] bool? overdue)
+        [FromQuery] bool? overdue,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
         var query = db.Clinicas.Where(c => !c.IsDeleted).AsQueryable();
 
@@ -84,12 +87,15 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
                 : query.Where(c => !c.Charges.Any(ch => ch.Status == ClinicChargeStatus.Pending && ch.DueDate < today));
         }
 
+        var totalCount = await query.CountAsync();
         var clinicas = await query
             .OrderBy(c => c.Nome)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(c => ToClinicaResponse(c))
             .ToListAsync();
 
-        return Ok(clinicas);
+        return Ok(ToPagedResult(clinicas, totalCount, page, pageSize));
     }
 
     [HttpGet("{id:int}")]
@@ -188,16 +194,23 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
     }
 
     [HttpGet("{id:int}/charges")]
-    public async Task<IActionResult> GetCharges(int id)
+    public async Task<IActionResult> GetCharges(
+        int id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
         if (!await db.Clinicas.AnyAsync(c => c.Id == id && !c.IsDeleted))
             return NotFound(new { message = "Clínica não encontrada." });
 
-        var charges = await db.ClinicCharges
-            .Where(c => c.ClinicaId == id && !c.IsDeleted)
+        var query = db.ClinicCharges.Where(c => c.ClinicaId == id && !c.IsDeleted);
+
+        var totalCount = await query.CountAsync();
+        var charges = await query
             .OrderByDescending(c => c.ReferenceMonth)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
-        return Ok(charges);
+        return Ok(ToPagedResult(charges, totalCount, page, pageSize));
     }
 
     [HttpPost("{id:int}/charges/{chargeId:int}/payments")]
@@ -285,30 +298,44 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
     }
 
     [HttpGet("{id:int}/history")]
-    public async Task<IActionResult> GetHistory(int id)
+    public async Task<IActionResult> GetHistory(
+        int id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
         if (!await db.Clinicas.AnyAsync(c => c.Id == id && !c.IsDeleted))
             return NotFound(new { message = "Clínica não encontrada." });
 
-        var history = await db.CommercialHistoryEvents
-            .Where(h => h.ClinicaId == id && !h.IsDeleted)
+        var query = db.CommercialHistoryEvents.Where(h => h.ClinicaId == id && !h.IsDeleted);
+
+        var totalCount = await query.CountAsync();
+        var history = await query
             .OrderByDescending(h => h.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
-        return Ok(history);
+        return Ok(ToPagedResult(history, totalCount, page, pageSize));
     }
 
     [HttpGet("{id:int}/users")]
-    public async Task<IActionResult> GetUsers(int id)
+    public async Task<IActionResult> GetUsers(
+        int id,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
         if (!await db.Clinicas.AnyAsync(c => c.Id == id && !c.IsDeleted))
             return NotFound(new { message = "Clínica não encontrada." });
 
-        var users = await db.Users
-            .Where(u => u.ClinicaId == id && !u.IsDeleted)
+        var query = db.Users.Where(u => u.ClinicaId == id && !u.IsDeleted);
+
+        var totalCount = await query.CountAsync();
+        var users = await query
             .OrderBy(u => u.Name)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .Select(u => new { u.Id, u.Name, u.Email, Role = u.Role.ToString(), u.IsActive })
             .ToListAsync();
-        return Ok(users);
+        return Ok(ToPagedResult(users, totalCount, page, pageSize));
     }
 
     [HttpPost("users")]
@@ -378,6 +405,14 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
         c.CobrancaAtiva,
         c.DataInicioCobranca,
         c.CreatedAt
+    };
+
+    private static PagedResult<T> ToPagedResult<T>(IEnumerable<T> data, int totalCount, int page, int pageSize) => new()
+    {
+        Data = data,
+        TotalCount = totalCount,
+        Page = page,
+        PageSize = pageSize
     };
 
     private static void ApplyClinicaFields(Clinica clinica, CreateClinicaDto dto)

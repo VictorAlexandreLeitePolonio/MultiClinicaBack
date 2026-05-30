@@ -12,9 +12,11 @@ namespace MultiClinica.API.Controllers;
 public class UsersController(IUserService service) : ControllerBase
 {
     [HttpGet]
-    public async Task<IActionResult> GetUsers()
+    public async Task<IActionResult> GetUsers(
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
     {
-        var result = await service.GetAllAsync();
+        var result = await service.GetPagedAsync(page, pageSize);
         return Ok(result.Value);
     }
 

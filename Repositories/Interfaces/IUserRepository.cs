@@ -4,8 +4,8 @@ namespace MultiClinica.API.Repositories.Interfaces;
 
 public interface IUserRepository
 {
-    /// <summary>Retorna todos os usuários.</summary>
-    Task<List<User>> GetAllAsync();
+    /// <summary>Retorna usuários paginados.</summary>
+    Task<(List<User> Items, int TotalCount)> GetPagedAsync(int page, int pageSize);
 
     /// <summary>Busca um usuário pelo Id.</summary>
     Task<User?> GetByIdAsync(int id);

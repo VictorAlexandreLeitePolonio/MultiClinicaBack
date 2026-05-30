@@ -1,11 +1,12 @@
 using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.User;
 
 namespace MultiClinica.API.Services.Interfaces;
 
 public interface IUserService
 {
-    Task<Result<List<UserResponseDto>>> GetAllAsync();
+    Task<Result<PagedResult<UserResponseDto>>> GetPagedAsync(int page, int pageSize);
 
     Task<Result<UserResponseDto>> GetByIdAsync(int id);
 
