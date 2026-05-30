@@ -1,0 +1,25 @@
+## .NET / ASP.NET Core
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.db
+*.db-shm
+*.db-wal
+appsettings.Development.json
+
+## Logs
+*.log
+logs/
+
+## OS
+.DS_Store
+Thumbs.db
+
+## Uploads gerados em runtime
+wwwroot/uploads/
+
+docs/superpowers/plans
+CLAUDE.md
+AGENTS.md

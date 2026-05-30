@@ -1,0 +1,19 @@
+bin/
+obj/
+.vs/
+*.user
+*.suo
+
+# Banco de dados local — em produção o volume Docker é usado
+*.db
+*.db-shm
+*.db-wal
+
+# Configurações de desenvolvimento
+appsettings.Development.json
+
+# Arquivos de upload locais
+wwwroot/
+
+# Arquivos de teste
+../ProjetoLP.Tests/
