@@ -68,6 +68,13 @@ public class CancelClinicChargeDto
     public string Reason { get; set; } = string.Empty;
 }
 
+public class AdjustClinicChargeDto
+{
+    public decimal Amount { get; set; }
+    public DateOnly DueDate { get; set; }
+    public string Reason { get; set; } = string.Empty;
+}
+
 public class ManualUnblockDto
 {
     public string Reason { get; set; } = string.Empty;

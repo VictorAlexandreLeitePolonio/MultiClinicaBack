@@ -406,4 +406,7 @@ public class FakeAttachmentStorage : IAttachmentStorage
 {
     public Task<string> SaveAsync(Stream stream, string objectKey, string contentType, CancellationToken cancellationToken = default)
         => Task.FromResult(objectKey);
+
+    public Task<string> CreateReadUrlAsync(string objectKey, TimeSpan expiresIn, CancellationToken cancellationToken = default)
+        => Task.FromResult($"https://storage.test/{objectKey}");
 }

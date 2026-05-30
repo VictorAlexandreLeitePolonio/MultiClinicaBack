@@ -13,6 +13,54 @@ namespace MultiClinica.API.Controllers;
 [Route("api/superadmin/clinicas")]
 public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService usuario) : ControllerBase
 {
+    [HttpGet("/api/superadmin/dashboard")]
+    public async Task<IActionResult> GetDashboard()
+    {
+        var currentMonth = DateTime.UtcNow.ToString("yyyy-MM");
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var totalClinics = await db.Clinicas.CountAsync(c => !c.IsDeleted);
+        var activeClinics = await db.Clinicas.CountAsync(c => c.IsActive && !c.IsDeleted);
+        var inactiveClinics = await db.Clinicas.CountAsync(c => !c.IsActive && !c.IsDeleted);
+        var billingBlocked = await db.Clinicas.CountAsync(c => c.IsBlockedByBilling && !c.IsDeleted);
+        var billingEnabled = await db.Clinicas.CountAsync(c => c.CobrancaAtiva && !c.IsDeleted);
+        var overdueCharges = await db.ClinicCharges.CountAsync(c =>
+            c.Status == ClinicChargeStatus.Pending && c.DueDate < today && !c.IsDeleted);
+        var monthlyReceived = await db.ClinicCharges
+            .Where(c => c.ReferenceMonth == currentMonth && c.Status == ClinicChargeStatus.Paid && !c.IsDeleted)
+            .SumAsync(c => (decimal?)c.Amount) ?? 0m;
+        var monthlyPending = await db.ClinicCharges
+            .Where(c => c.ReferenceMonth == currentMonth && c.Status == ClinicChargeStatus.Pending && !c.IsDeleted)
+            .SumAsync(c => (decimal?)c.Amount) ?? 0m;
+
+        var latestActivities = await db.CommercialHistoryEvents
+            .Where(h => !h.IsDeleted)
+            .OrderByDescending(h => h.CreatedAt)
+            .Take(10)
+            .Select(h => new
+            {
+                h.Id,
+                h.ClinicaId,
+                Type = h.Type.ToString(),
+                h.Description,
+                h.CreatedAt
+            })
+            .ToListAsync();
+
+        return Ok(new
+        {
+            totalClinics,
+            activeClinics,
+            inactiveClinics,
+            billingBlocked,
+            billingEnabled,
+            overdueCharges,
+            monthlyReceived,
+            monthlyPending,
+            latestActivities
+        });
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetClinicas(
         [FromQuery] bool? isActive,
@@ -192,6 +240,27 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
         charge.Notes = dto.Reason.Trim();
         charge.UpdatedByUserId = usuario.UserId;
         AddHistory(id, CommercialHistoryEventType.PaymentCancelled, dto.Reason.Trim());
+        await db.SaveChangesAsync();
+        return Ok(charge);
+    }
+
+    [HttpPut("{id:int}/charges/{chargeId:int}/adjust")]
+    public async Task<IActionResult> AdjustCharge(int id, int chargeId, AdjustClinicChargeDto dto)
+    {
+        if (dto.Amount <= 0 || string.IsNullOrWhiteSpace(dto.Reason))
+            return BadRequest(new { message = "Valor e motivo do ajuste são obrigatórios." });
+
+        var charge = await db.ClinicCharges.FirstOrDefaultAsync(c => c.Id == chargeId && c.ClinicaId == id && !c.IsDeleted);
+        if (charge is null)
+            return NotFound(new { message = "Cobrança não encontrada." });
+        if (charge.Status == ClinicChargeStatus.Paid)
+            return BadRequest(new { message = "Cobrança paga não pode ser ajustada." });
+
+        charge.Amount = dto.Amount;
+        charge.DueDate = dto.DueDate;
+        charge.Notes = dto.Reason.Trim();
+        charge.UpdatedByUserId = usuario.UserId;
+        AddHistory(id, CommercialHistoryEventType.BillingConfigChanged, $"Cobrança {charge.ReferenceMonth} ajustada: {dto.Reason.Trim()}");
         await db.SaveChangesAsync();
         return Ok(charge);
     }

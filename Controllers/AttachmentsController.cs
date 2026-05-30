@@ -82,6 +82,19 @@ public class AttachmentsController(
             : Ok(ToDto(attachment));
     }
 
+    [HttpGet("{id:int}/download")]
+    public async Task<IActionResult> CreateDownloadUrl(int id, CancellationToken cancellationToken)
+    {
+        var attachment = await db.ClinicalAttachments.FirstOrDefaultAsync(a =>
+            a.Id == id && a.ClinicaId == usuario.ClinicaId && !a.IsDeleted, cancellationToken);
+
+        if (attachment is null)
+            return NotFound(new { message = "Anexo não encontrado." });
+
+        var url = await storage.CreateReadUrlAsync(attachment.ObjectKey, TimeSpan.FromMinutes(10), cancellationToken);
+        return Ok(new { url, expiresInSeconds = 600 });
+    }
+
     private static AttachmentResponseDto ToDto(ClinicalAttachment attachment) => new()
     {
         Id = attachment.Id,
