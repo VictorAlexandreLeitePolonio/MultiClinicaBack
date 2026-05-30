@@ -47,48 +47,6 @@ public class MedicalRecordsController(IMedicalRecordService service) : Controlle
         return CreatedAtAction(nameof(GetMedicalRecord), new { id = result.Value!.Id }, result.Value);
     }
 
-    [HttpPost("{id}/contrato")]
-    public async Task<IActionResult> UploadContrato(int id, IFormFile file)
-    {
-        if (file == null)
-            return BadRequest(new { message = "Arquivo não fornecido." });
-
-        using var stream = file.OpenReadStream();
-        var result = await service.UploadContratoAsync(id, stream, file.FileName, file.ContentType);
-
-        if (!result.IsSuccess)
-            return result.ErrorCode switch
-            {
-                ErrorCodes.NotFound         => NotFound(new { message = result.ErrorMessage }),
-                ErrorCodes.InvalidFileType  => BadRequest(new { message = result.ErrorMessage }),
-                ErrorCodes.FileTooLarge     => BadRequest(new { message = result.ErrorMessage }),
-                _                           => BadRequest(new { message = result.ErrorMessage })
-            };
-
-        return Ok(new { url = result.Value });
-    }
-
-    [HttpPost("{id}/exames")]
-    public async Task<IActionResult> UploadExame(int id, IFormFile file)
-    {
-        if (file == null)
-            return BadRequest(new { message = "Arquivo não fornecido." });
-
-        using var stream = file.OpenReadStream();
-        var result = await service.UploadExameAsync(id, stream, file.FileName, file.ContentType);
-
-        if (!result.IsSuccess)
-            return result.ErrorCode switch
-            {
-                ErrorCodes.NotFound         => NotFound(new { message = result.ErrorMessage }),
-                ErrorCodes.InvalidFileType  => BadRequest(new { message = result.ErrorMessage }),
-                ErrorCodes.FileTooLarge     => BadRequest(new { message = result.ErrorMessage }),
-                _                           => BadRequest(new { message = result.ErrorMessage })
-            };
-
-        return Ok(new { url = result.Value });
-    }
-
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdateMedicalRecord(int id, UpdateMedicalRecordDto dto)
     {

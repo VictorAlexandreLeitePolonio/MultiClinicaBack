@@ -23,7 +23,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
         var data = items.Select(a => new AppointmentResponseDto
         {
             Id              = a.Id,
-            UserId          = a.UserId,
+            ProfessionalId  = a.UserId,
             UserName        = a.User.Name,
             PatientId       = a.PatientId,
             PatientName     = a.Patient.Name ?? string.Empty,
@@ -52,7 +52,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
         return Result<AppointmentResponseDto>.Ok(new AppointmentResponseDto
         {
             Id              = appointment.Id,
-            UserId          = appointment.UserId,
+            ProfessionalId  = appointment.UserId,
             UserName        = appointment.User.Name,
             AppointmentDate = DateTime.SpecifyKind(appointment.AppointmentDate, DateTimeKind.Utc),
             Status          = appointment.Status,
@@ -66,7 +66,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
 
     public async Task<Result<AppointmentResponseDto>> CreateAsync(CreateAppointmentDto dto)
     {
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.ProfessionalId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
         var patient = await db.Patients.FirstOrDefaultAsync(p => p.Id == dto.PatientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
         if (user is null)
@@ -86,7 +86,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
 
         var appointment = new Appointment
         {
-            UserId          = dto.UserId,
+            UserId          = dto.ProfessionalId,
             PatientId       = dto.PatientId,
             ClinicaId       = usuario.ClinicaId,
             AppointmentDate = dto.AppointmentDate,
@@ -98,7 +98,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
         return Result<AppointmentResponseDto>.Ok(new AppointmentResponseDto
         {
             Id              = appointment.Id,
-            UserId          = appointment.UserId,
+            ProfessionalId  = appointment.UserId,
             UserName        = user.Name,
             PatientId       = appointment.PatientId,
             PatientName     = patient.Name ?? string.Empty,
@@ -137,7 +137,7 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
         return Result<AppointmentResponseDto>.Ok(new AppointmentResponseDto
         {
             Id              = updated!.Id,
-            UserId          = updated.UserId,
+            ProfessionalId  = updated.UserId,
             UserName        = updated.User.Name,
             AppointmentDate = DateTime.SpecifyKind(updated.AppointmentDate, DateTimeKind.Utc),
             Status          = updated.Status,

@@ -20,9 +20,5 @@ public interface IMedicalRecordService
 
     Task<Result<MedicalRecordResponseDto>> UpdateAsync(int id, UpdateMedicalRecordDto dto);
 
-    Task<Result<string>> UploadContratoAsync(int id, Stream fileStream, string fileName, string contentType);
-
-    Task<Result<string>> UploadExameAsync(int id, Stream fileStream, string fileName, string contentType);
-
     Task<Result<bool>> DeleteAsync(int id);
 }

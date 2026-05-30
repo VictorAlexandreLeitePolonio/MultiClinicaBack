@@ -49,7 +49,7 @@ public class MedicalRecordService(
 
     public async Task<Result<MedicalRecordResponseDto>> CreateAsync(CreateMedicalRecordDto dto)
     {
-        var userExists = await db.Users.AnyAsync(u => u.Id == dto.UserId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
+        var userExists = await db.Users.AnyAsync(u => u.Id == dto.ProfessionalId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
         if (!userExists)
             return Result<MedicalRecordResponseDto>.Fail(ErrorCodes.NotFound, "Fisioterapeuta não encontrado.");
 
@@ -60,7 +60,7 @@ public class MedicalRecordService(
         var medicalRecord = new MedicalRecord
         {
             ClinicaId            = usuario.ClinicaId,
-            UserId               = dto.UserId,
+            UserId               = dto.ProfessionalId,
             PatientId            = dto.PatientId,
             Patologia            = dto.Patologia,
             QueixaPrincipal      = dto.QueixaPrincipal,
@@ -112,69 +112,6 @@ public class MedicalRecordService(
         return Result<MedicalRecordResponseDto>.Ok(ToDto(record));
     }
 
-    // ── Upload Contrato ──────────────────────────────────────────────────────
-
-    public async Task<Result<string>> UploadContratoAsync(int id, Stream fileStream, string fileName, string contentType)
-    {
-        var record = await repository.GetByIdAsync(id);
-        if (record is null)
-            return Result<string>.Fail(ErrorCodes.NotFound, "Prontuário não encontrado.");
-
-        if (contentType != "application/pdf")
-            return Result<string>.Fail(ErrorCodes.InvalidFileType, "Apenas arquivos PDF são aceitos.");
-
-        // Limite de 20MB para contratos
-        if (fileStream.Length > 20 * 1024 * 1024)
-            return Result<string>.Fail(ErrorCodes.FileTooLarge, "O arquivo não pode ser maior que 20MB.");
-
-        var newFileName = $"{Guid.NewGuid()}{Path.GetExtension(fileName)}";
-        var folder = Path.Combine("wwwroot", "uploads", "contratos");
-        Directory.CreateDirectory(folder);
-        var filePath = Path.Combine(folder, newFileName);
-
-        using (var stream = File.Create(filePath))
-        {
-            await fileStream.CopyToAsync(stream);
-        }
-
-        record.Contrato = $"/uploads/contratos/{newFileName}";
-        await repository.SaveChangesAsync();
-
-        return Result<string>.Ok(record.Contrato);
-    }
-
-    // ── Upload Exame ─────────────────────────────────────────────────────────
-
-    public async Task<Result<string>> UploadExameAsync(int id, Stream fileStream, string fileName, string contentType)
-    {
-        var record = await repository.GetByIdAsync(id);
-        if (record is null)
-            return Result<string>.Fail(ErrorCodes.NotFound, "Prontuário não encontrado.");
-
-        var allowedTypes = new[] { "image/jpeg", "image/png" };
-        if (!allowedTypes.Contains(contentType))
-            return Result<string>.Fail(ErrorCodes.InvalidFileType, "Apenas imagens JPG ou PNG são aceitas.");
-
-        // Limite de 10MB para imagens
-        if (fileStream.Length > 10 * 1024 * 1024)
-            return Result<string>.Fail(ErrorCodes.FileTooLarge, "A imagem não pode ser maior que 10MB.");
-
-        var newFileName = $"{Guid.NewGuid()}{Path.GetExtension(fileName)}";
-        var folder = Path.Combine("wwwroot", "uploads", "exames");
-        Directory.CreateDirectory(folder);
-        var filePath = Path.Combine(folder, newFileName);
-
-        using (var stream = File.Create(filePath))
-        {
-            await fileStream.CopyToAsync(stream);
-        }
-
-        record.ExamesImagem = $"/uploads/exames/{newFileName}";
-        await repository.SaveChangesAsync();
-
-        return Result<string>.Ok(record.ExamesImagem);
-    }
-
     // ── Deleção ──────────────────────────────────────────────────────────────
 
     public async Task<Result<bool>> DeleteAsync(int id)
@@ -192,7 +129,7 @@ public class MedicalRecordService(
     private static MedicalRecordResponseDto ToDto(MedicalRecord m) => new()
     {
         Id                   = m.Id,
-        UserId               = m.UserId,
+        ProfessionalId       = m.UserId,
         UserName             = m.User.Name,
         PatientId            = m.PatientId,
         PatientName          = m.Patient.Name ?? string.Empty,

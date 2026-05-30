@@ -6,7 +6,7 @@ using MultiClinica.API.Models;
 public class AppointmentResponseDto
 {
     public int Id { get; set; }
-    public int UserId { get; set; }
+    public int ProfessionalId { get; set; }
     public string UserName { get; set; } = string.Empty;
     public int PatientId { get; set; }
     public string PatientName { get; set; } = string.Empty;

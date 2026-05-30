@@ -4,7 +4,7 @@ namespace MultiClinica.API.DTOs.Appointment;
 // Status não está aqui — toda consulta começa como Scheduled automaticamente.
 public class CreateAppointmentDto
 {
-    public int UserId { get; set; }
+    public int ProfessionalId { get; set; }
     public int PatientId { get; set; }
     public DateTime AppointmentDate { get; set; }
 }

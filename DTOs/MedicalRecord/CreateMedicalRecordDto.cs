@@ -2,11 +2,10 @@ namespace MultiClinica.API.DTOs.MedicalRecord;
 
 public class CreateMedicalRecordDto
 {
-    public int UserId { get; set; }
+    public int ProfessionalId { get; set; }
     public int PatientId { get; set; }
     public string Patologia { get; set; } = string.Empty;
     public string QueixaPrincipal { get; set; } = string.Empty;
-    public string ExamesImagem { get; set; } = string.Empty;
     public string DoencaAntiga { get; set; } = string.Empty;
     public string DoencaAtual { get; set; } = string.Empty;
     public string Habitos { get; set; } = string.Empty;
@@ -17,6 +16,5 @@ public class CreateMedicalRecordDto
     public string OutrasDoencas { get; set; } = string.Empty;
     public string Sessao { get; set; } = string.Empty;
     public string Titulo { get; set; } = string.Empty;
-    public string Contrato { get; set; } = string.Empty;
     public string OrientacaoDomiciliar { get; set; } = string.Empty;
 }

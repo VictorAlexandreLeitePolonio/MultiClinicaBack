@@ -60,7 +60,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
                 ErrorCodes.EmptyField, "O método de pagamento é obrigatório.");
 
         // Validações de existência
-        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.UserId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
+        var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.ResponsavelId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
         var patient = await db.Patients.FirstOrDefaultAsync(p => p.Id == dto.PatientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
         var plan = await db.Plans.FirstOrDefaultAsync(p => p.Id == dto.PlanId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
@@ -80,7 +80,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         var payment = new Payment
         {
             ClinicaId      = usuario.ClinicaId,
-            UserId         = dto.UserId,
+            UserId         = dto.ResponsavelId,
             PatientId      = dto.PatientId,
             PlanId         = dto.PlanId,
             Amount         = plan.Valor,  // valor sempre vem do plano
@@ -96,7 +96,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         return Result<PaymentResponseDto>.Ok(new PaymentResponseDto
         {
             Id                  = payment.Id,
-            UserId              = payment.UserId,
+            ResponsavelId       = payment.UserId,
             PatientId           = payment.PatientId,
             PatientName         = patient.Name ?? string.Empty,
             PlanId              = payment.PlanId,
@@ -175,7 +175,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
     private static PaymentResponseDto ToDto(Payment p) => new()
     {
         Id                  = p.Id,
-        UserId              = p.UserId,
+        ResponsavelId       = p.UserId,
         PatientId           = p.PatientId,
         PatientName         = p.Patient.Name ?? string.Empty,
         PlanId              = p.PlanId,

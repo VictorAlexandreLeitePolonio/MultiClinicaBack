@@ -256,6 +256,50 @@ public class AuthIsolationTests
     }
 
     [Fact]
+    public async Task Appointment_creation_rejects_professional_from_another_clinic()
+    {
+        await using var app = new MultiClinicaFactory();
+        await app.SeedAsync(async db =>
+        {
+            var clinicA = new Clinica { Nome = "Clinica A", NomeResponsavel = "Victor" };
+            var clinicB = new Clinica { Nome = "Clinica B", NomeResponsavel = "Victor" };
+            db.Clinicas.AddRange(clinicA, clinicB);
+            await db.SaveChangesAsync();
+
+            db.Users.Add(new User
+            {
+                ClinicaId = clinicA.Id,
+                Name = "Admin A",
+                Email = "admin-a@test.local",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Administrador
+            });
+            db.Users.Add(new User
+            {
+                ClinicaId = clinicB.Id,
+                Name = "Profissional B",
+                Email = "pro-b@test.local",
+                PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"),
+                Role = UserRole.Profissional
+            });
+            db.Patients.Add(new Patient { ClinicaId = clinicA.Id, Name = "Paciente A" });
+            await db.SaveChangesAsync();
+        });
+
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin-a@test.local", "secret123");
+
+        var response = await client.PostAsJsonAsync("/api/appointments", new
+        {
+            professionalId = 2,
+            patientId = 1,
+            appointmentDate = DateTime.UtcNow.AddDays(1)
+        });
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task Billing_service_generates_monthly_charge_and_blocks_overdue_clinic()
     {
         await using var app = new MultiClinicaFactory();
