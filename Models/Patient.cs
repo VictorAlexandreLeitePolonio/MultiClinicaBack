@@ -19,4 +19,5 @@ public class Patient : AuditableEntity
     public ICollection<Payment> Payments { get; set; } = [];
     public ICollection<MedicalRecord> MedicalRecords { get; set; } = [];
     public ICollection<ClinicalAttachment> Attachments { get; set; } = [];
+    public ICollection<PatientTreatment> Treatments { get; set; } = [];
 }

@@ -50,6 +50,9 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
 builder.Services.AddScoped<IAttachmentStorage, R2AttachmentStorage>();
+builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
+builder.Services.AddScoped<IEvolutionService, EvolutionService>();
+builder.Services.AddScoped<IEvolutionDashboardService, EvolutionDashboardService>();
 
 // MedicalRecord — Repository e Service
 builder.Services.AddScoped<IMedicalRecordRepository, MedicalRecordRepository>();

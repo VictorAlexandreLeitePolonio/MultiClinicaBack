@@ -18,6 +18,11 @@ public class AppDbContext : DbContext
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
+    public DbSet<EvolutionTemplate> EvolutionTemplates { get; set; } = null!;
+    public DbSet<EvolutionTemplateField> EvolutionTemplateFields { get; set; } = null!;
+    public DbSet<PatientTreatment> PatientTreatments { get; set; } = null!;
+    public DbSet<PatientEvolution> PatientEvolutions { get; set; } = null!;
+    public DbSet<PatientEvolutionValue> PatientEvolutionValues { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -50,6 +55,26 @@ public class AppDbContext : DbContext
 
         modelBuilder.Entity<ClinicalAttachment>()
             .Property(a => a.Type)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<EvolutionTemplateField>()
+            .Property(f => f.Type)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<EvolutionTemplateField>()
+            .Property(f => f.Unit)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<EvolutionTemplateField>()
+            .Property(f => f.ExpectedDirection)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<PatientTreatment>()
+            .Property(t => t.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<PatientEvolution>()
+            .Property(e => e.Status)
             .HasConversion<string>();
 
         modelBuilder.Entity<User>()
@@ -110,6 +135,105 @@ public class AppDbContext : DbContext
             .HasOne(a => a.MedicalRecord)
             .WithMany(m => m.Attachments)
             .HasForeignKey(a => a.MedicalRecordId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<EvolutionTemplate>()
+            .HasIndex(t => t.ClinicaId);
+
+        modelBuilder.Entity<EvolutionTemplateField>()
+            .HasIndex(f => f.ClinicaId);
+
+        modelBuilder.Entity<EvolutionTemplateField>()
+            .HasIndex(f => f.TemplateId);
+
+        modelBuilder.Entity<PatientTreatment>()
+            .HasIndex(t => t.ClinicaId);
+
+        modelBuilder.Entity<PatientTreatment>()
+            .HasIndex(t => t.PatientId);
+
+        modelBuilder.Entity<PatientTreatment>()
+            .HasIndex(t => t.TemplateId);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasIndex(e => e.ClinicaId);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasIndex(e => e.PatientId);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasIndex(e => e.TreatmentId);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasIndex(e => e.ProfessionalId);
+
+        modelBuilder.Entity<PatientEvolutionValue>()
+            .HasIndex(v => v.ClinicaId);
+
+        modelBuilder.Entity<PatientEvolutionValue>()
+            .HasIndex(v => v.EvolutionId);
+
+        modelBuilder.Entity<PatientEvolutionValue>()
+            .HasIndex(v => v.FieldId);
+
+        modelBuilder.Entity<EvolutionTemplate>()
+            .HasOne(t => t.Clinica)
+            .WithMany(c => c.EvolutionTemplates)
+            .HasForeignKey(t => t.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<EvolutionTemplate>()
+            .HasMany(t => t.Fields)
+            .WithOne(f => f.Template)
+            .HasForeignKey(f => f.TemplateId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<EvolutionTemplate>()
+            .HasMany(t => t.Treatments)
+            .WithOne(t => t.Template)
+            .HasForeignKey(t => t.TemplateId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Patient>()
+            .HasMany(p => p.Treatments)
+            .WithOne(t => t.Patient)
+            .HasForeignKey(t => t.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<User>()
+            .HasMany(u => u.PatientTreatments)
+            .WithOne(t => t.Professional)
+            .HasForeignKey(t => t.ProfessionalId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasOne(e => e.Patient)
+            .WithMany()
+            .HasForeignKey(e => e.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasOne(e => e.Treatment)
+            .WithMany(t => t.Evolutions)
+            .HasForeignKey(e => e.TreatmentId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasOne(e => e.Professional)
+            .WithMany(u => u.PatientEvolutions)
+            .HasForeignKey(e => e.ProfessionalId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientEvolutionValue>()
+            .HasOne(v => v.Evolution)
+            .WithMany(e => e.Values)
+            .HasForeignKey(v => v.EvolutionId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientEvolutionValue>()
+            .HasOne(v => v.Field)
+            .WithMany(f => f.Values)
+            .HasForeignKey(v => v.FieldId)
             .OnDelete(DeleteBehavior.Restrict);
     }
 

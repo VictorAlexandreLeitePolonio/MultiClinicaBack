@@ -26,4 +26,5 @@ public class Clinica : AuditableEntity
     public ICollection<Patient> Patients { get; set; } = [];
     public ICollection<ClinicCharge> Charges { get; set; } = [];
     public ICollection<CommercialHistoryEvent> CommercialHistory { get; set; } = [];
+    public ICollection<EvolutionTemplate> EvolutionTemplates { get; set; } = [];
 }

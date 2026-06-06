@@ -29,4 +29,6 @@ public class User : AuditableEntity
     public ICollection<Appointment> Appointments { get; set; } = [];
     public ICollection<MedicalRecord> MedicalRecords { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];
+    public ICollection<PatientTreatment> PatientTreatments { get; set; } = [];
+    public ICollection<PatientEvolution> PatientEvolutions { get; set; } = [];
 }
