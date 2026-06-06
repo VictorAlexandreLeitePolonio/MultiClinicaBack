@@ -23,3 +23,5 @@ wwwroot/uploads/
 docs/superpowers/plans
 CLAUDE.md
 AGENTS.md
+
+.env

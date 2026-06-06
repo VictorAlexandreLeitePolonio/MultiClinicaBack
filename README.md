@@ -24,6 +24,9 @@ Backend ASP.NET Core para um SaaS multi-clinica com PostgreSQL, autenticação p
 cp .env.example .env
 docker compose up -d
 dotnet restore
+set -a
+source .env
+set +a
 dotnet ef database update --project MultiClinica.API.csproj
 dotnet run --project MultiClinica.API.csproj --launch-profile http
 ```
