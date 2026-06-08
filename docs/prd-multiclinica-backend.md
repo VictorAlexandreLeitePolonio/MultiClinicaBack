@@ -56,7 +56,7 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 38. As a front-desk user, I want patient creation to use my clinic automatically, so that I do not need to choose a clinic manually.
 39. As a clinic user, I want files attached to patients and records to be private, so that clinical documents are protected.
 40. As a clinic user, I want patient attachments and record attachments separated logically, so that documents can be found in the right context.
-41. As a developer, I want storage in Cloudflare R2, so that deploys do not depend on local container filesystem.
+41. As a developer, I want storage in AWS S3, so that deploys do not depend on local container filesystem.
 42. As a developer, I want the database to store file metadata and object keys only, so that large file bytes stay outside PostgreSQL.
 43. As a developer, I want uploads to validate clinic ownership of patient and record, so that files cannot be attached across clinics.
 44. As a system owner, I want WhatsApp/Evolution API removed from the initial product, so that deployment stays simpler.
@@ -129,14 +129,14 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 - SuperAdmin can manually unblock billing block with required reason and audit record.
 - Create a commercial event history/timeline per clinic.
 - Commercial history should record clinic creation, billing config changes, charge creation, payment registration, payment cancellation, automatic block, manual unblock, clinic activation/inactivation and admin user creation.
-- Use Cloudflare R2 as private external storage for clinical files.
+- Use AWS S3 as private external storage for clinical files.
 - Do not store file bytes in PostgreSQL.
 - Store file metadata and object key in the database.
 - Create a clinical attachment entity.
 - Attachments have `ClinicaId`, required `PatientId` and optional `MedicalRecordId`.
 - Attachments store type, original filename, object key, content type, size, uploaded by user and uploaded at.
 - Backend must validate patient, medical record and attachment belong to the same clinic.
-- Access files through backend-controlled download or temporary signed URL. Do not expose the R2 bucket publicly.
+- Access files through backend-controlled download or temporary signed URL. Do not expose the S3 bucket publicly.
 - Remove the old `Contrato` and `ExamesImagem` string-field approach gradually in favor of attachments.
 - Swagger is enabled in development and disabled or protected in production. First phase preference is disabled in production.
 
@@ -162,7 +162,7 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 - Cover overdue charge blocking behavior.
 - Cover manual unblock requiring reason.
 - Cover attachment upload validating patient/medical record clinic ownership.
-- Test R2 storage through a fake/mock storage abstraction rather than real Cloudflare calls.
+- Test S3 storage through a fake/mock storage abstraction rather than real AWS calls.
 - Prefer PostgreSQL for integration tests when viable, using isolated database/container strategy.
 
 ## Out of Scope
@@ -179,7 +179,7 @@ O SuperAdmin tera um painel global para criar e administrar clinicas, usuarios, 
 - Rewriting backend to Node.js/Fastify.
 - Migrating existing SQLite data from the old project.
 - Importing the original clinic's production data.
-- Public R2 bucket access.
+- Public S3 bucket access.
 - Broad redesign of unrelated business rules.
 
 ## Further Notes
