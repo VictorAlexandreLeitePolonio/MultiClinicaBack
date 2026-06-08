@@ -19,6 +19,7 @@ public class MedicalRecordRepository(AppDbContext db, IUsuarioLogadoService usua
         var query = db.MedicalRecords
             .Include(m => m.User)
             .Include(m => m.Patient)
+            .Include(m => m.Attachments.Where(a => !a.IsDeleted))
             .Where(m => m.ClinicaId == usuario.ClinicaId && !m.IsDeleted)
             .AsQueryable();
 
@@ -48,6 +49,7 @@ public class MedicalRecordRepository(AppDbContext db, IUsuarioLogadoService usua
         => await db.MedicalRecords
             .Include(m => m.User)
             .Include(m => m.Patient)
+            .Include(m => m.Attachments.Where(a => !a.IsDeleted))
             .FirstOrDefaultAsync(m => m.Id == id && m.ClinicaId == usuario.ClinicaId && !m.IsDeleted);
 
     public async Task<MedicalRecord> AddAsync(MedicalRecord medicalRecord)

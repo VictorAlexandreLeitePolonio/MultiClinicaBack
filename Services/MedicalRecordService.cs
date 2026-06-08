@@ -1,6 +1,7 @@
 using MultiClinica.API.Common;
 using MultiClinica.API.Data;
 using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Attachment;
 using MultiClinica.API.DTOs.MedicalRecord;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
@@ -149,5 +150,23 @@ public class MedicalRecordService(
         Contrato             = m.Contrato,
         OrientacaoDomiciliar = m.OrientacaoDomiciliar,
         CreatedAt            = m.CreatedAt,
+        Attachments          = m.Attachments
+            .Where(a => !a.IsDeleted)
+            .OrderByDescending(a => a.UploadedAt)
+            .Select(ToAttachmentDto),
+    };
+
+    private static AttachmentResponseDto ToAttachmentDto(ClinicalAttachment attachment) => new()
+    {
+        Id = attachment.Id,
+        PatientId = attachment.PatientId,
+        MedicalRecordId = attachment.MedicalRecordId,
+        Type = attachment.Type,
+        OriginalFileName = attachment.OriginalFileName,
+        ObjectKey = attachment.ObjectKey,
+        ContentType = attachment.ContentType,
+        Size = attachment.Size,
+        UploadedByUserId = attachment.UploadedByUserId,
+        UploadedAt = attachment.UploadedAt
     };
 }

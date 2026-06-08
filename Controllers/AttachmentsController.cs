@@ -16,6 +16,10 @@ public class AttachmentsController(
     IUsuarioLogadoService usuario,
     IAttachmentStorage storage) : ControllerBase
 {
+    private const long MaxFileSize = 10 * 1024 * 1024;
+    private static readonly HashSet<string> ContractContentTypes = ["application/pdf"];
+    private static readonly HashSet<string> ExamContentTypes = ["image/jpeg", "image/png"];
+
     [HttpPost]
     [RequestSizeLimit(25 * 1024 * 1024)]
     public async Task<IActionResult> Upload(
@@ -27,6 +31,12 @@ public class AttachmentsController(
     {
         if (file.Length == 0)
             return BadRequest(new { message = "Arquivo vazio." });
+
+        if (file.Length > MaxFileSize)
+            return BadRequest(new { message = "Arquivo muito grande. Máximo permitido: 10MB." });
+
+        if (!IsAllowedFile(type, file))
+            return BadRequest(new { message = "Tipo de arquivo inválido para o anexo informado." });
 
         var patient = await db.Patients.FirstOrDefaultAsync(p =>
             p.Id == patientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted, cancellationToken);
@@ -108,4 +118,19 @@ public class AttachmentsController(
         UploadedByUserId = attachment.UploadedByUserId,
         UploadedAt = attachment.UploadedAt
     };
+
+    private static bool IsAllowedFile(ClinicalAttachmentType type, IFormFile file)
+    {
+        var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+
+        return type switch
+        {
+            ClinicalAttachmentType.Contract =>
+                ContractContentTypes.Contains(file.ContentType) && extension == ".pdf",
+            ClinicalAttachmentType.Exam =>
+                ExamContentTypes.Contains(file.ContentType) && (extension == ".jpg" || extension == ".jpeg" || extension == ".png"),
+            ClinicalAttachmentType.Other => false,
+            _ => false
+        };
+    }
 }

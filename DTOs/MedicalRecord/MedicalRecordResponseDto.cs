@@ -1,5 +1,7 @@
 namespace MultiClinica.API.DTOs.MedicalRecord;
 
+using MultiClinica.API.DTOs.Attachment;
+
 public class MedicalRecordResponseDto
 {
     public int Id { get; set; }
@@ -23,4 +25,5 @@ public class MedicalRecordResponseDto
     public string Contrato { get; set; } = string.Empty;
     public string OrientacaoDomiciliar { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; }
+    public IEnumerable<AttachmentResponseDto> Attachments { get; set; } = [];
 }
