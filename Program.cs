@@ -145,7 +145,10 @@ app.Logger.LogInformation(
     string.Join(", ", app.Urls),
     string.IsNullOrWhiteSpace(railwayPort) ? "not set" : railwayPort);
 
-await AppBootstrapper.BootstrapSuperAdminAsync(app);
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    _ = Task.Run(() => AppBootstrapper.BootstrapSuperAdminAsync(app));
+});
 
 app.Logger.LogInformation("MultiClinica API startup completed.");
 
@@ -235,38 +238,45 @@ internal static class AppBootstrapper
             || string.IsNullOrWhiteSpace(password))
             return;
 
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var adminClinic = await db.Clinicas.FirstOrDefaultAsync(c => c.Nome == "Admin Interno");
-        if (adminClinic is null)
+        try
         {
-            adminClinic = new Clinica
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var adminClinic = await db.Clinicas.FirstOrDefaultAsync(c => c.Nome == "Admin Interno");
+            if (adminClinic is null)
             {
-                Nome = "Admin Interno",
-                NomeFantasia = "Admin Interno",
-                NomeResponsavel = name.Trim(),
-                Email = email.Trim().ToLowerInvariant(),
-                IsActive = true,
-                CobrancaAtiva = false
-            };
-            db.Clinicas.Add(adminClinic);
-            await db.SaveChangesAsync();
+                adminClinic = new Clinica
+                {
+                    Nome = "Admin Interno",
+                    NomeFantasia = "Admin Interno",
+                    NomeResponsavel = name.Trim(),
+                    Email = email.Trim().ToLowerInvariant(),
+                    IsActive = true,
+                    CobrancaAtiva = false
+                };
+                db.Clinicas.Add(adminClinic);
+                await db.SaveChangesAsync();
+            }
+
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            if (!await db.Users.AnyAsync(u => u.Email == normalizedEmail && !u.IsDeleted))
+            {
+                db.Users.Add(new User
+                {
+                    ClinicaId = adminClinic.Id,
+                    Name = name.Trim(),
+                    Email = normalizedEmail,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    Role = UserRole.SuperAdmin,
+                    IsActive = true
+                });
+                await db.SaveChangesAsync();
+            }
         }
-
-        var normalizedEmail = email.Trim().ToLowerInvariant();
-        if (!await db.Users.AnyAsync(u => u.Email == normalizedEmail && !u.IsDeleted))
+        catch (Exception ex)
         {
-            db.Users.Add(new User
-            {
-                ClinicaId = adminClinic.Id,
-                Name = name.Trim(),
-                Email = normalizedEmail,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-                Role = UserRole.SuperAdmin,
-                IsActive = true
-            });
-            await db.SaveChangesAsync();
+            app.Logger.LogError(ex, "SuperAdmin bootstrap failed.");
         }
     }
 }

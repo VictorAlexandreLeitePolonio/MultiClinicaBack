@@ -22,12 +22,24 @@ public class AppointmentStatusUpdater : BackgroundService
     {
         while (!stoppingToken.IsCancellationRequested)
         {
-            await CancelPastAppointmentsAsync();
+            try
+            {
+                await CancelPastAppointmentsAsync(stoppingToken);
+            }
+            catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "[AppointmentStatusUpdater] Falha ao cancelar consultas passadas.");
+            }
+
             await Task.Delay(Interval, stoppingToken);
         }
     }
 
-    private async Task CancelPastAppointmentsAsync()
+    private async Task CancelPastAppointmentsAsync(CancellationToken cancellationToken)
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
@@ -36,14 +48,14 @@ public class AppointmentStatusUpdater : BackgroundService
 
         var outdated = await db.Appointments
             .Where(a => a.Status == AppointmentStatus.Scheduled && a.AppointmentDate < now)
-            .ToListAsync();
+            .ToListAsync(cancellationToken);
 
         if (outdated.Count == 0) return;
 
         foreach (var appointment in outdated)
             appointment.Status = AppointmentStatus.Cancelled;
 
-        await db.SaveChangesAsync();
+        await db.SaveChangesAsync(cancellationToken);
 
         _logger.LogInformation(
             "[AppointmentStatusUpdater] {Count} consulta(s) cancelada(s) automaticamente em {Time}.",
