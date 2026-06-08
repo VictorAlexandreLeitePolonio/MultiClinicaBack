@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -11,6 +12,16 @@ using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var railwayPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(railwayPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{railwayPort}");
+}
+else if (builder.Environment.IsProduction())
+{
+    builder.WebHost.UseUrls("http://0.0.0.0:8080");
+}
 
 builder.Services.AddHttpContextAccessor();
 
@@ -70,6 +81,13 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddHostedService<AppointmentStatusUpdater>();
 builder.Services.AddHostedService<ClinicBillingBackgroundJob>();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
+
 // Lê as configurações JWT do appsettings.json.
 // "!" suprime o aviso de nullable — garantimos que os valores existem no appsettings.
 var jwtKey = builder.Configuration["Jwt:Key"]!;
@@ -121,7 +139,15 @@ builder.Services.AddCors(options =>
 // Constrói a aplicação — após essa linha, não é possível registrar novos serviços.
 var app = builder.Build();
 
+app.Logger.LogInformation(
+    "Starting MultiClinica API in {Environment}. Listening on {Urls}. Railway PORT={Port}.",
+    app.Environment.EnvironmentName,
+    string.Join(", ", app.Urls),
+    string.IsNullOrWhiteSpace(railwayPort) ? "not set" : railwayPort);
+
 await AppBootstrapper.BootstrapSuperAdminAsync(app);
+
+app.Logger.LogInformation("MultiClinica API startup completed.");
 
 if (app.Environment.IsDevelopment())
 {
@@ -130,11 +156,13 @@ if (app.Environment.IsDevelopment())
 }
 
 // Ordem dos middlewares importa:
-// 1. CORS — deve vir antes de Authentication/Authorization para permitir que o frontend envie o token.
-// 2. StaticFiles — deve vir antes de Authentication/Authorization para servir arquivos públicos sem exigir autenticação.
-// 3. Authentication — identifica quem é o usuário pelo token.
-// 4. Authorization — verifica se o usuário tem permissão para o endpoint.
-// 5. HttpsRedirection — redireciona HTTP para HTTPS.
+// 1. ForwardedHeaders — respeita HTTPS/proxy do Railway.
+// 2. Routing — prepara endpoints para CORS e controllers.
+// 3. CORS — deve vir antes de Authentication/Authorization para preflight OPTIONS.
+// 4. Authentication — identifica quem é o usuário pelo token.
+// 5. Authorization — verifica se o usuário tem permissão para o endpoint.
+app.UseForwardedHeaders();
+app.UseRouting();
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.Use(async (context, next) =>
@@ -184,7 +212,9 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseAuthorization();
-app.UseHttpsRedirection();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+    .AllowAnonymous();
 
 // Mapeia automaticamente as rotas definidas nos Controllers.
 app.MapControllers();
