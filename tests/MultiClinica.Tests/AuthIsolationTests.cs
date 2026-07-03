@@ -479,7 +479,7 @@ public class AuthIsolationTests
         await service.GenerateMonthlyChargesAsync(new DateOnly(2026, 5, 1));
         var charge = await dbContext.ClinicCharges.SingleAsync();
 
-        Assert.Equal("2026-05", charge.ReferenceMonth);
+        Assert.Equal("05-2026", charge.ReferenceMonth);
         Assert.Equal(new DateOnly(2026, 5, 10), charge.DueDate);
         Assert.Equal(ClinicChargeStatus.Pending, charge.Status);
 

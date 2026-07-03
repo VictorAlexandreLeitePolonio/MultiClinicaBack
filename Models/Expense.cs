@@ -17,7 +17,7 @@ public class Expense : AuditableEntity
     // Descrição detalhada do gasto.
     public string Description { get; set; } = string.Empty;
 
-    // Mês de referência — formato "YYYY-MM" (ex: "2026-03").
+    // Mês de referência — formato "MM-YYYY" (ex: "03-2026").
     // Liga este gasto ao balanço do mês correspondente.
     public string ReferenceMonth { get; set; } = string.Empty;
 

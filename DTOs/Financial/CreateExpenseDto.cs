@@ -8,6 +8,6 @@ public class CreateExpenseDto
     public DateTime PaymentDate { get; set; }
     public string Description { get; set; } = string.Empty;
 
-    // Formato "YYYY-MM" — determina a qual balanço mensal esse gasto pertence.
+    // Formato "MM-YYYY" — determina a qual balanço mensal esse gasto pertence.
     public string ReferenceMonth { get; set; } = string.Empty;
 }

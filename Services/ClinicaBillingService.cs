@@ -9,7 +9,7 @@ public class ClinicaBillingService(AppDbContext db) : IClinicaBillingService
 {
     public async Task GenerateMonthlyChargesAsync(DateOnly today, CancellationToken cancellationToken = default)
     {
-        var referenceMonth = today.ToString("yyyy-MM");
+        var referenceMonth = today.ToString("MM-yyyy");
         var clinics = await db.Clinicas
             .Where(c => c.CobrancaAtiva && c.IsActive && !c.IsDeleted)
             .ToListAsync(cancellationToken);

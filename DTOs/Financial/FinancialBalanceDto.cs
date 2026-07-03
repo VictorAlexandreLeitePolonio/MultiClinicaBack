@@ -3,7 +3,7 @@ namespace MultiClinica.API.DTOs.Financial;
 // Balanço financeiro mensal — calculado dinamicamente a partir dos gastos e pagamentos do mês.
 public class FinancialBalanceDto
 {
-    // Mês de referência no formato "YYYY-MM".
+    // Mês de referência no formato "MM-YYYY".
     public string ReferenceMonth { get; set; } = string.Empty;
 
     // Soma de todos os gastos inseridos para este mês.
