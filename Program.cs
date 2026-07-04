@@ -42,6 +42,12 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 // Financial — Repository e Service
 builder.Services.AddScoped<IFinancialRepository, FinancialRepository>();
 builder.Services.AddScoped<IFinancialService, FinancialService>();
+builder.Services.AddScoped<IFormaPagamentoRepository, FormaPagamentoRepository>();
+builder.Services.AddScoped<IFormaPagamentoService, FormaPagamentoService>();
+builder.Services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
+builder.Services.AddScoped<ICategoriaFinanceiraService, CategoriaFinanceiraService>();
+builder.Services.AddScoped<IContaFinanceiraRepository, ContaFinanceiraRepository>();
+builder.Services.AddScoped<IContaFinanceiraService, ContaFinanceiraService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
