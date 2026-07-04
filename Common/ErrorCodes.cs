@@ -20,4 +20,5 @@ public static class ErrorCodes
     public const string InvalidFileType    = "INVALID_FILE_TYPE";
     public const string FileTooLarge       = "FILE_TOO_LARGE";
     public const string Forbidden          = "FORBIDDEN";
+    public const string AlreadyOpen        = "ALREADY_OPEN";
 }
