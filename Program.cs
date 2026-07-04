@@ -48,6 +48,10 @@ builder.Services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRe
 builder.Services.AddScoped<ICategoriaFinanceiraService, CategoriaFinanceiraService>();
 builder.Services.AddScoped<IContaFinanceiraRepository, ContaFinanceiraRepository>();
 builder.Services.AddScoped<IContaFinanceiraService, ContaFinanceiraService>();
+builder.Services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
+builder.Services.AddScoped<IContaReceberService, ContaReceberService>();
+builder.Services.AddScoped<IRecebimentoRepository, RecebimentoRepository>();
+builder.Services.AddScoped<IRecebimentoService, RecebimentoService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
