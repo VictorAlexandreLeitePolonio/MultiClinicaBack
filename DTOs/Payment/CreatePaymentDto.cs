@@ -7,7 +7,7 @@ public class CreatePaymentDto
     public int ResponsavelId { get; set; }
     public int PatientId { get; set; }
     public int PlanId { get; set; }
-    public string    ReferenceMonth { get; set; } = string.Empty; // Formato: "YYYY-MM"
+    public string    ReferenceMonth { get; set; } = string.Empty; // Formato: "MM-YYYY"
     public string    PaymentMethod  { get; set; } = string.Empty;
     public DateTime? PaymentDate    { get; set; }
 }

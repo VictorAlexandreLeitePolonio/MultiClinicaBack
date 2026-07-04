@@ -16,7 +16,7 @@ Backend ASP.NET Core para um SaaS multi-clinica com PostgreSQL, autenticação p
 - `api/auth`: login, cookie seguro por ambiente e `/api/auth/me`
 - `api/superadmin/clinicas`: gestão global de clínicas, usuários, cobrança, desbloqueio e histórico comercial
 - `api/patients`, `api/appointments`, `api/medicalrecords`, `api/payments`, `api/plans`, `api/financial`: módulos operacionais sempre escopados pela clínica autenticada
-- `api/attachments`: metadados de anexos clínicos e envio para storage externo privado
+- `api/attachments`: metadados de anexos clínicos e envio para bucket S3 privado
 
 ## Ambiente Local
 
@@ -32,6 +32,17 @@ dotnet run --project MultiClinica.API.csproj --launch-profile http
 ```
 
 `DATABASE_URL` é a variável canônica para produção/Railway. O `appsettings.json` mantém uma connection string local equivalente para desenvolvimento.
+
+## Storage S3
+
+Os anexos clínicos usam bucket S3 privado. O backend salva o `ObjectKey` no banco e gera URL temporária para download em `/api/attachments/{id}/download`; não deixe o bucket público.
+
+Variáveis obrigatórias:
+
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `AWS_REGION`
+- `S3_BUCKET_NAME`
 
 ## SuperAdmin Inicial
 

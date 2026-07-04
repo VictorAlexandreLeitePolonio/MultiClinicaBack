@@ -12,7 +12,7 @@ namespace MultiClinica.API.Services;
 
 public partial class PaymentService(IPaymentRepository repository, AppDbContext db, IUsuarioLogadoService usuario) : IPaymentService
 {
-    [GeneratedRegex(@"^\d{4}-\d{2}$")]
+    [GeneratedRegex(@"^\d{2}-\d{4}$")]
     private static partial Regex ReferenceMonthRegex();
 
     // ── Listagem ─────────────────────────────────────────────────────────────
@@ -53,7 +53,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         // Validações de formato
         if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
             return Result<PaymentResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'YYYY-MM'.");
+                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
 
         if (string.IsNullOrWhiteSpace(dto.PaymentMethod))
             return Result<PaymentResponseDto>.Fail(
@@ -117,7 +117,7 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
     {
         if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
             return Result<PaymentResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'YYYY-MM'.");
+                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
 
         if (string.IsNullOrWhiteSpace(dto.PaymentMethod))
             return Result<PaymentResponseDto>.Fail(

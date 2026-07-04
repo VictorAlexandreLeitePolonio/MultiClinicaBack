@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
@@ -11,6 +12,16 @@ using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var railwayPort = Environment.GetEnvironmentVariable("PORT");
+if (!string.IsNullOrWhiteSpace(railwayPort))
+{
+    builder.WebHost.UseUrls($"http://0.0.0.0:{railwayPort}");
+}
+else if (builder.Environment.IsProduction())
+{
+    builder.WebHost.UseUrls("http://0.0.0.0:8080");
+}
 
 builder.Services.AddHttpContextAccessor();
 
@@ -49,7 +60,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
-builder.Services.AddScoped<IAttachmentStorage, R2AttachmentStorage>();
+builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
 builder.Services.AddScoped<IEvolutionService, EvolutionService>();
 builder.Services.AddScoped<IEvolutionDashboardService, EvolutionDashboardService>();
@@ -69,6 +80,13 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddHostedService<AppointmentStatusUpdater>();
 builder.Services.AddHostedService<ClinicBillingBackgroundJob>();
+
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    options.KnownIPNetworks.Clear();
+    options.KnownProxies.Clear();
+});
 
 // Lê as configurações JWT do appsettings.json.
 // "!" suprime o aviso de nullable — garantimos que os valores existem no appsettings.
@@ -121,7 +139,18 @@ builder.Services.AddCors(options =>
 // Constrói a aplicação — após essa linha, não é possível registrar novos serviços.
 var app = builder.Build();
 
-await AppBootstrapper.BootstrapSuperAdminAsync(app);
+app.Logger.LogInformation(
+    "Starting MultiClinica API in {Environment}. Listening on {Urls}. Railway PORT={Port}.",
+    app.Environment.EnvironmentName,
+    string.Join(", ", app.Urls),
+    string.IsNullOrWhiteSpace(railwayPort) ? "not set" : railwayPort);
+
+app.Lifetime.ApplicationStarted.Register(() =>
+{
+    _ = Task.Run(() => AppBootstrapper.BootstrapSuperAdminAsync(app));
+});
+
+app.Logger.LogInformation("MultiClinica API startup completed.");
 
 if (app.Environment.IsDevelopment())
 {
@@ -130,11 +159,13 @@ if (app.Environment.IsDevelopment())
 }
 
 // Ordem dos middlewares importa:
-// 1. CORS — deve vir antes de Authentication/Authorization para permitir que o frontend envie o token.
-// 2. StaticFiles — deve vir antes de Authentication/Authorization para servir arquivos públicos sem exigir autenticação.
-// 3. Authentication — identifica quem é o usuário pelo token.
-// 4. Authorization — verifica se o usuário tem permissão para o endpoint.
-// 5. HttpsRedirection — redireciona HTTP para HTTPS.
+// 1. ForwardedHeaders — respeita HTTPS/proxy do Railway.
+// 2. Routing — prepara endpoints para CORS e controllers.
+// 3. CORS — deve vir antes de Authentication/Authorization para preflight OPTIONS.
+// 4. Authentication — identifica quem é o usuário pelo token.
+// 5. Authorization — verifica se o usuário tem permissão para o endpoint.
+app.UseForwardedHeaders();
+app.UseRouting();
 app.UseCors("Frontend");
 app.UseAuthentication();
 app.Use(async (context, next) =>
@@ -184,7 +215,9 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseAuthorization();
-app.UseHttpsRedirection();
+
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }))
+    .AllowAnonymous();
 
 // Mapeia automaticamente as rotas definidas nos Controllers.
 app.MapControllers();
@@ -205,38 +238,45 @@ internal static class AppBootstrapper
             || string.IsNullOrWhiteSpace(password))
             return;
 
-        using var scope = app.Services.CreateScope();
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        var adminClinic = await db.Clinicas.FirstOrDefaultAsync(c => c.Nome == "Admin Interno");
-        if (adminClinic is null)
+        try
         {
-            adminClinic = new Clinica
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            var adminClinic = await db.Clinicas.FirstOrDefaultAsync(c => c.Nome == "Admin Interno");
+            if (adminClinic is null)
             {
-                Nome = "Admin Interno",
-                NomeFantasia = "Admin Interno",
-                NomeResponsavel = name.Trim(),
-                Email = email.Trim().ToLowerInvariant(),
-                IsActive = true,
-                CobrancaAtiva = false
-            };
-            db.Clinicas.Add(adminClinic);
-            await db.SaveChangesAsync();
+                adminClinic = new Clinica
+                {
+                    Nome = "Admin Interno",
+                    NomeFantasia = "Admin Interno",
+                    NomeResponsavel = name.Trim(),
+                    Email = email.Trim().ToLowerInvariant(),
+                    IsActive = true,
+                    CobrancaAtiva = false
+                };
+                db.Clinicas.Add(adminClinic);
+                await db.SaveChangesAsync();
+            }
+
+            var normalizedEmail = email.Trim().ToLowerInvariant();
+            if (!await db.Users.AnyAsync(u => u.Email == normalizedEmail && !u.IsDeleted))
+            {
+                db.Users.Add(new User
+                {
+                    ClinicaId = adminClinic.Id,
+                    Name = name.Trim(),
+                    Email = normalizedEmail,
+                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
+                    Role = UserRole.SuperAdmin,
+                    IsActive = true
+                });
+                await db.SaveChangesAsync();
+            }
         }
-
-        var normalizedEmail = email.Trim().ToLowerInvariant();
-        if (!await db.Users.AnyAsync(u => u.Email == normalizedEmail && !u.IsDeleted))
+        catch (Exception ex)
         {
-            db.Users.Add(new User
-            {
-                ClinicaId = adminClinic.Id,
-                Name = name.Trim(),
-                Email = normalizedEmail,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(password),
-                Role = UserRole.SuperAdmin,
-                IsActive = true
-            });
-            await db.SaveChangesAsync();
+            app.Logger.LogError(ex, "SuperAdmin bootstrap failed.");
         }
     }
 }

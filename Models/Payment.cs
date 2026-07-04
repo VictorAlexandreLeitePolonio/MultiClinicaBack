@@ -18,7 +18,7 @@ public class Payment : AuditableEntity
     public int UserId { get; set; }
     public int PlanId { get; set; }
 
-    // Mês de referência do pagamento. Formato: "2026-03".
+    // Mês de referência do pagamento. Formato: "03-2026".
     // Usando string para simplicidade — identifica qual mês está sendo cobrado.
     public string ReferenceMonth { get; set; } = string.Empty;
 

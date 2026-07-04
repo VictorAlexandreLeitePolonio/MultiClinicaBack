@@ -10,7 +10,7 @@ namespace MultiClinica.API.Services;
 
 public partial class FinancialService(IFinancialRepository repository, IUsuarioLogadoService usuario) : IFinancialService
 {
-    [GeneratedRegex(@"^\d{4}-\d{2}$")]
+    [GeneratedRegex(@"^\d{2}-\d{4}$")]
     private static partial Regex ReferenceMonthRegex();
 
     // ── Expenses ─────────────────────────────────────────────────────────────
@@ -21,7 +21,7 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
         // Valida formato do mês se informado
         if (!string.IsNullOrEmpty(month) && !ReferenceMonthRegex().IsMatch(month))
             return Result<PagedResult<ExpenseResponseDto>>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês deve ser 'YYYY-MM'.");
+                ErrorCodes.InvalidFormat, "O formato do mês deve ser 'MM-YYYY'.");
 
         var (items, total) = await repository.GetExpensesPagedAsync(month, title, page, pageSize);
 
@@ -72,7 +72,7 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
 
         if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
             return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'YYYY-MM'.");
+                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
 
         if (string.IsNullOrWhiteSpace(dto.Title))
             return Result<ExpenseResponseDto>.Fail(
@@ -112,7 +112,7 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
 
         if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
             return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'YYYY-MM'.");
+                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
 
         if (string.IsNullOrWhiteSpace(dto.Title))
             return Result<ExpenseResponseDto>.Fail(
@@ -159,7 +159,7 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
     {
         if (!ReferenceMonthRegex().IsMatch(month))
             return Result<FinancialBalanceDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês deve ser 'YYYY-MM'. Exemplo: 2026-03");
+                ErrorCodes.InvalidFormat, "O formato do mês deve ser 'MM-YYYY'. Exemplo: 03-2026");
 
         var totalExpenses = await repository.GetTotalExpensesByMonthAsync(month);
         var totalIncome = await repository.GetTotalIncomeByMonthAsync(month);
@@ -186,7 +186,7 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
         for (int i = months - 1; i >= 0; i--)
         {
             var date  = now.AddMonths(-i);
-            var month = date.ToString("yyyy-MM");
+            var month = date.ToString("MM-yyyy");
 
             var totalExpenses = await repository.GetTotalExpensesByMonthAsync(month);
             var totalIncome = await repository.GetTotalIncomeByMonthAsync(month);
