@@ -15,6 +15,9 @@ public class AppDbContext : DbContext
     public DbSet<Patient> Patients { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Expense> Expenses { get; set; } = null!;
+    public DbSet<FormaPagamento> FormasPagamento { get; set; } = null!;
+    public DbSet<CategoriaFinanceira> CategoriasFinanceiras { get; set; } = null!;
+    public DbSet<ContaFinanceira> ContasFinanceiras { get; set; } = null!;
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
@@ -77,6 +80,14 @@ public class AppDbContext : DbContext
             .Property(e => e.Status)
             .HasConversion<string>();
 
+        modelBuilder.Entity<CategoriaFinanceira>()
+            .Property(c => c.Tipo)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<ContaFinanceira>()
+            .Property(c => c.Tipo)
+            .HasConversion<string>();
+
         modelBuilder.Entity<User>()
             .HasOne(u => u.Clinica)
             .WithMany(c => c.Users)
@@ -106,6 +117,27 @@ public class AppDbContext : DbContext
             .WithMany(c => c.Patients)
             .HasForeignKey(p => p.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<FormaPagamento>()
+            .HasOne(f => f.Clinica)
+            .WithMany()
+            .HasForeignKey(f => f.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<FormaPagamento>().HasIndex(f => f.ClinicaId);
+
+        modelBuilder.Entity<CategoriaFinanceira>()
+            .HasOne(c => c.Clinica)
+            .WithMany()
+            .HasForeignKey(c => c.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CategoriaFinanceira>().HasIndex(c => c.ClinicaId);
+
+        modelBuilder.Entity<ContaFinanceira>()
+            .HasOne(c => c.Clinica)
+            .WithMany()
+            .HasForeignKey(c => c.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ContaFinanceira>().HasIndex(c => c.ClinicaId);
 
         modelBuilder.Entity<Patient>()
             .HasMany(p => p.Appointments)
