@@ -52,6 +52,9 @@ builder.Services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
 builder.Services.AddScoped<IContaReceberService, ContaReceberService>();
 builder.Services.AddScoped<IRecebimentoRepository, RecebimentoRepository>();
 builder.Services.AddScoped<IRecebimentoService, RecebimentoService>();
+builder.Services.AddScoped<IMovimentacaoFinanceiraRepository, MovimentacaoFinanceiraRepository>();
+builder.Services.AddScoped<ICaixaRepository, CaixaRepository>();
+builder.Services.AddScoped<ICaixaService, CaixaService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
