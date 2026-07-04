@@ -9,6 +9,7 @@ public enum TipoMovimentacaoFinanceira
 public enum OrigemMovimentacaoFinanceira
 {
     Recebimento,
+    Pagamento,
     Estorno
 }
 
