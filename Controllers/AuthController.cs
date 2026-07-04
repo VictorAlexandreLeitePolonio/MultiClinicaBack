@@ -6,6 +6,7 @@ using MultiClinica.API.Data;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Text;
+using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Auth;
 using Microsoft.AspNetCore.Authorization;
 using MultiClinica.API.Models;
@@ -109,7 +110,8 @@ public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvi
             email = user.Email,
             role = user.Role.ToString(),
             clinicaId = user.ClinicaId,
-            clinicaNome = user.Clinica.Nome
+            clinicaNome = user.Clinica.Nome,
+            permissions = PermissionMatrix.PermissionsFor(user.Role)
         });
     }
 }
