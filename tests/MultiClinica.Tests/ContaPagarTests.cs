@@ -123,7 +123,8 @@ public class ContaPagarTests
             await db.SaveChangesAsync();
         });
 
-        var response = await client.PostAsync($"/api/contas-pagar/{conta!.Id}/cancelar", null);
+        var response = await client.PostAsJsonAsync($"/api/contas-pagar/{conta!.Id}/cancelar",
+            new MotivoDto { Motivo = "Teste" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }

@@ -127,7 +127,8 @@ public class ContaReceberTests
             await db.SaveChangesAsync();
         });
 
-        var response = await client.PostAsync($"/api/contas-receber/{conta!.Id}/cancelar", null);
+        var response = await client.PostAsJsonAsync($"/api/contas-receber/{conta!.Id}/cancelar",
+            new MotivoDto { Motivo = "Teste" });
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
@@ -152,7 +153,8 @@ public class ContaReceberTests
         using var recepClient = app.CreateClient();
         await LoginAsync(recepClient, "recep@a.local");
 
-        var response = await recepClient.PostAsync($"/api/contas-receber/{conta!.Id}/cancelar", null);
+        var response = await recepClient.PostAsJsonAsync($"/api/contas-receber/{conta!.Id}/cancelar",
+            new MotivoDto { Motivo = "Teste" });
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
