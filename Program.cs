@@ -67,6 +67,8 @@ builder.Services.AddScoped<ICategoriaProdutoRepository, CategoriaProdutoReposito
 builder.Services.AddScoped<ICategoriaProdutoService, CategoriaProdutoService>();
 builder.Services.AddScoped<IProdutoRepository, ProdutoRepository>();
 builder.Services.AddScoped<IProdutoService, ProdutoService>();
+builder.Services.AddScoped<IMovimentacaoEstoqueRepository, MovimentacaoEstoqueRepository>();
+builder.Services.AddScoped<IMovimentacaoEstoqueService, MovimentacaoEstoqueService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();

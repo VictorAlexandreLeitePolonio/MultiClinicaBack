@@ -34,6 +34,7 @@ public static class PermissionMatrix
             Permissions.Caixa.VisualizarMovimentacoes,
             Permissions.Produtos.Visualizar,
             Permissions.Produtos.VisualizarPrecoVenda,
+            Permissions.Estoque.MovimentacoesVisualizar,
         };
 
         var profissional = new HashSet<string>

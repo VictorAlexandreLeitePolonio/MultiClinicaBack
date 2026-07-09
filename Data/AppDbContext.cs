@@ -28,6 +28,7 @@ public class AppDbContext : DbContext
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
     public DbSet<CategoriaProduto> CategoriasProduto { get; set; } = null!;
     public DbSet<Produto> Produtos { get; set; } = null!;
+    public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
@@ -321,6 +322,22 @@ public class AppDbContext : DbContext
             .HasForeignKey(p => p.CategoriaProdutoId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Produto>().HasIndex(p => p.ClinicaId);
+
+        modelBuilder.Entity<MovimentacaoEstoque>()
+            .Property(m => m.Tipo)
+            .HasConversion<string>();
+        modelBuilder.Entity<MovimentacaoEstoque>()
+            .HasOne(m => m.Clinica)
+            .WithMany()
+            .HasForeignKey(m => m.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<MovimentacaoEstoque>()
+            .HasOne(m => m.Produto)
+            .WithMany()
+            .HasForeignKey(m => m.ProdutoId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ClinicaId);
+        modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ProdutoId);
 
         modelBuilder.Entity<Patient>()
             .HasMany(p => p.Appointments)

@@ -48,11 +48,12 @@ public class PermissionMatrixTests
     }
 
     [Fact]
-    public void PermissionsFor_Recepcao_ContemExatamente14Permissoes()
+    public void PermissionsFor_Recepcao_ContemExatamente15Permissoes()
     {
         var perms = PermissionMatrix.PermissionsFor(UserRole.Recepcao);
 
-        Assert.Equal(14, perms.Count);
+        Assert.Equal(15, perms.Count);
+        Assert.Contains(Permissions.Estoque.MovimentacoesVisualizar, perms);
     }
 
     [Fact]

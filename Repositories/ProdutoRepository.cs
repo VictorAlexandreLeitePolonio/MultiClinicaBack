@@ -41,6 +41,9 @@ public class ProdutoRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             && !c.IsDeleted
             && c.IsActive);
 
+    public Task<List<Produto>> GetAbaixoDoMinimoAsync() =>
+        Scoped.Where(p => p.IsActive && p.QuantidadeAtual <= p.QuantidadeMinima).ToListAsync();
+
     public async Task<Produto> AddAsync(Produto entity)
     {
         db.Produtos.Add(entity);
