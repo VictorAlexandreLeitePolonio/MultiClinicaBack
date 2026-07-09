@@ -9,6 +9,7 @@ namespace MultiClinica.API.Services;
 public class RecebimentoService(
     IRecebimentoRepository recebimentoRepository,
     IContaReceberRepository contaReceberRepository,
+    IAuditoriaFinanceiraService auditoria,
     IUsuarioLogadoService usuario) : IRecebimentoService
 {
     private static RecebimentoResponseDto Map(Recebimento r) => new()
@@ -97,6 +98,8 @@ public class RecebimentoService(
         if (conta is null)
             return Result<RecebimentoResponseDto>.Fail(ErrorCodes.NotFound, "Conta a receber não encontrada.");
 
+        var antes = Map(recebimento);
+
         recebimento.IsEstornado = true;
         recebimento.MotivoEstorno = motivo;
         recebimento.UpdatedByUserId = usuario.UserId;
@@ -126,6 +129,9 @@ public class RecebimentoService(
         });
         await recebimentoRepository.SaveChangesAsync();
 
-        return Result<RecebimentoResponseDto>.Ok(Map(recebimento));
+        var depois = Map(recebimento);
+        await auditoria.RegistrarAsync("ContasReceber", "EstornarRecebimento", "Recebimento", recebimento.Id, antes, depois, motivo);
+
+        return Result<RecebimentoResponseDto>.Ok(depois);
     }
 }

@@ -7,7 +7,10 @@ using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class ContaReceberService(IContaReceberRepository repository, IUsuarioLogadoService usuario)
+public class ContaReceberService(
+    IContaReceberRepository repository,
+    IAuditoriaFinanceiraService auditoria,
+    IUsuarioLogadoService usuario)
     : IContaReceberService
 {
     private static ContaReceberResponseDto Map(ContaReceber c) => new()
@@ -90,7 +93,11 @@ public class ContaReceberService(IContaReceberRepository repository, IUsuarioLog
         };
 
         await repository.AddAsync(entity);
-        return Result<ContaReceberResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("ContasReceber", "Criar", "ContaReceber", entity.Id, null, depois);
+
+        return Result<ContaReceberResponseDto>.Ok(depois);
     }
 
     public async Task<Result<ContaReceberResponseDto>> UpdateAsync(int id, UpdateContaReceberDto dto)
@@ -105,6 +112,8 @@ public class ContaReceberService(IContaReceberRepository repository, IUsuarioLog
         if (entity.Status == StatusContaReceber.Paga)
             return Result<ContaReceberResponseDto>.Fail(ErrorCodes.CannotModify, "Conta já paga não pode ser editada.");
 
+        var antes = Map(entity);
+
         entity.CategoriaFinanceiraId = dto.CategoriaFinanceiraId;
         entity.Descricao = dto.Descricao.Trim();
         entity.ValorOriginal = dto.ValorOriginal;
@@ -115,21 +124,35 @@ public class ContaReceberService(IContaReceberRepository repository, IUsuarioLog
         entity.Observacao = dto.Observacao;
         entity.UpdatedByUserId = usuario.UserId;
         await repository.SaveChangesAsync();
-        return Result<ContaReceberResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("ContasReceber", "Editar", "ContaReceber", entity.Id, antes, depois);
+
+        return Result<ContaReceberResponseDto>.Ok(depois);
     }
 
-    public async Task<Result<ContaReceberResponseDto>> CancelarAsync(int id)
+    public async Task<Result<ContaReceberResponseDto>> CancelarAsync(int id, MotivoDto dto)
     {
+        var motivo = dto.Motivo.Trim();
+        if (string.IsNullOrWhiteSpace(motivo))
+            return Result<ContaReceberResponseDto>.Fail(ErrorCodes.EmptyField, "O motivo do cancelamento é obrigatório.");
+
         var entity = await repository.GetByIdAsync(id);
         if (entity is null)
             return Result<ContaReceberResponseDto>.Fail(ErrorCodes.NotFound, "Conta a receber não encontrada.");
         if (entity.ValorRecebido > 0)
             return Result<ContaReceberResponseDto>.Fail(ErrorCodes.CannotModify, "Estorne os recebimentos antes de cancelar a conta.");
 
+        var antes = Map(entity);
+
         entity.Status = StatusContaReceber.Cancelada;
         entity.UpdatedByUserId = usuario.UserId;
         await repository.SaveChangesAsync();
-        return Result<ContaReceberResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("ContasReceber", "Cancelar", "ContaReceber", entity.Id, antes, depois, motivo);
+
+        return Result<ContaReceberResponseDto>.Ok(depois);
     }
 
     private async Task<Result<ContaReceberResponseDto>?> ValidateAsync(

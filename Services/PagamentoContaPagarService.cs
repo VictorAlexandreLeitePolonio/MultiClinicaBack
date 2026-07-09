@@ -9,6 +9,7 @@ namespace MultiClinica.API.Services;
 public class PagamentoContaPagarService(
     IPagamentoContaPagarRepository pagamentoRepository,
     IContaPagarRepository contaPagarRepository,
+    IAuditoriaFinanceiraService auditoria,
     IUsuarioLogadoService usuario) : IPagamentoContaPagarService
 {
     private static PagamentoContaPagarResponseDto Map(PagamentoContaPagar p) => new()
@@ -96,6 +97,8 @@ public class PagamentoContaPagarService(
         if (conta is null)
             return Result<PagamentoContaPagarResponseDto>.Fail(ErrorCodes.NotFound, "Conta a pagar não encontrada.");
 
+        var antes = Map(pagamento);
+
         pagamento.IsEstornado = true;
         pagamento.MotivoEstorno = motivo;
         pagamento.UpdatedByUserId = usuario.UserId;
@@ -124,6 +127,9 @@ public class PagamentoContaPagarService(
         });
         await pagamentoRepository.SaveChangesAsync();
 
-        return Result<PagamentoContaPagarResponseDto>.Ok(Map(pagamento));
+        var depois = Map(pagamento);
+        await auditoria.RegistrarAsync("ContasPagar", "EstornarPagamento", "PagamentoContaPagar", pagamento.Id, antes, depois, motivo);
+
+        return Result<PagamentoContaPagarResponseDto>.Ok(depois);
     }
 }

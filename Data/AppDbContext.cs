@@ -25,6 +25,9 @@ public class AppDbContext : DbContext
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<ContaPagar> ContasPagar { get; set; } = null!;
     public DbSet<PagamentoContaPagar> PagamentosContaPagar { get; set; } = null!;
+    public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
+    public DbSet<CategoriaProduto> CategoriasProduto { get; set; } = null!;
+    public DbSet<Produto> Produtos { get; set; } = null!;
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
@@ -292,6 +295,32 @@ public class AppDbContext : DbContext
             .HasForeignKey(p => p.FormaPagamentoId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<PagamentoContaPagar>().HasIndex(p => p.ClinicaId);
+
+        modelBuilder.Entity<AuditoriaFinanceira>()
+            .HasOne(a => a.Clinica)
+            .WithMany()
+            .HasForeignKey(a => a.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<AuditoriaFinanceira>().HasIndex(a => a.ClinicaId);
+
+        modelBuilder.Entity<CategoriaProduto>()
+            .HasOne(c => c.Clinica)
+            .WithMany()
+            .HasForeignKey(c => c.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CategoriaProduto>().HasIndex(c => c.ClinicaId);
+
+        modelBuilder.Entity<Produto>()
+            .HasOne(p => p.Clinica)
+            .WithMany()
+            .HasForeignKey(p => p.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Produto>()
+            .HasOne(p => p.CategoriaProduto)
+            .WithMany()
+            .HasForeignKey(p => p.CategoriaProdutoId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Produto>().HasIndex(p => p.ClinicaId);
 
         modelBuilder.Entity<Patient>()
             .HasMany(p => p.Appointments)

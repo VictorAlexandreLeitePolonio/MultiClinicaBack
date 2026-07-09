@@ -9,6 +9,7 @@ namespace MultiClinica.API.Services;
 public class CaixaService(
     ICaixaRepository repository,
     IMovimentacaoFinanceiraRepository movimentacaoRepository,
+    IAuditoriaFinanceiraService auditoria,
     IUsuarioLogadoService usuario) : ICaixaService
 {
     private static CaixaResponseDto Map(Caixa c) => new()
@@ -85,7 +86,11 @@ public class CaixaService(
         };
 
         await repository.AddAsync(entity);
-        return Result<CaixaResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("Caixa", "AbrirCaixa", "Caixa", entity.Id, null, depois);
+
+        return Result<CaixaResponseDto>.Ok(depois);
     }
 
     public async Task<Result<CaixaResponseDto>> FecharAsync(int id, FecharCaixaDto dto)
@@ -102,6 +107,8 @@ public class CaixaService(
         var entradas = movimentacoes.Where(m => m.Tipo == TipoMovimentacaoFinanceira.Entrada).Sum(m => m.Valor);
         var saidas = movimentacoes.Where(m => m.Tipo == TipoMovimentacaoFinanceira.Saida).Sum(m => m.Valor);
 
+        var antes = Map(caixa);
+
         caixa.SaldoFinalInformado = dto.SaldoFinalInformado;
         caixa.SaldoFinalCalculado = caixa.SaldoInicial + entradas - saidas;
         caixa.Diferenca = dto.SaldoFinalInformado - caixa.SaldoFinalCalculado;
@@ -112,7 +119,11 @@ public class CaixaService(
         caixa.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
-        return Result<CaixaResponseDto>.Ok(Map(caixa));
+
+        var depois = Map(caixa);
+        await auditoria.RegistrarAsync("Caixa", "FecharCaixa", "Caixa", caixa.Id, antes, depois);
+
+        return Result<CaixaResponseDto>.Ok(depois);
     }
 
     public async Task<Result<CaixaResponseDto>> ReabrirAsync(int id, MotivoDto dto)
@@ -127,6 +138,8 @@ public class CaixaService(
         if (caixa.Status != StatusCaixa.Fechado)
             return Result<CaixaResponseDto>.Fail(ErrorCodes.CannotModify, "Só é possível reabrir um caixa fechado.");
 
+        var antes = Map(caixa);
+
         caixa.Status = StatusCaixa.Aberto;
         caixa.MotivoReabertura = motivo;
         caixa.DataFechamento = null;
@@ -136,7 +149,11 @@ public class CaixaService(
         caixa.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
-        return Result<CaixaResponseDto>.Ok(Map(caixa));
+
+        var depois = Map(caixa);
+        await auditoria.RegistrarAsync("Caixa", "ReabrirCaixa", "Caixa", caixa.Id, antes, depois, motivo);
+
+        return Result<CaixaResponseDto>.Ok(depois);
     }
 
     public async Task<Result<CaixaResponseDto>> AjustarAsync(int id, AjustarCaixaDto dto)
@@ -151,13 +168,19 @@ public class CaixaService(
         if (caixa.Status != StatusCaixa.Fechado)
             return Result<CaixaResponseDto>.Fail(ErrorCodes.CannotModify, "Só é possível ajustar um caixa fechado.");
 
+        var antes = Map(caixa);
+
         caixa.SaldoFinalInformado = dto.SaldoFinalInformado;
         caixa.Diferenca = dto.SaldoFinalInformado - caixa.SaldoFinalCalculado;
         caixa.MotivoAjuste = motivo;
         caixa.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
-        return Result<CaixaResponseDto>.Ok(Map(caixa));
+
+        var depois = Map(caixa);
+        await auditoria.RegistrarAsync("Caixa", "AjustarCaixa", "Caixa", caixa.Id, antes, depois, motivo);
+
+        return Result<CaixaResponseDto>.Ok(depois);
     }
 
     public async Task<Result<CaixaResponseDto>> CancelarAsync(int id, MotivoDto dto)
@@ -170,11 +193,17 @@ public class CaixaService(
         if (caixa is null)
             return Result<CaixaResponseDto>.Fail(ErrorCodes.NotFound, "Caixa não encontrado.");
 
+        var antes = Map(caixa);
+
         caixa.Status = StatusCaixa.Cancelado;
         caixa.MotivoCancelamento = motivo;
         caixa.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
-        return Result<CaixaResponseDto>.Ok(Map(caixa));
+
+        var depois = Map(caixa);
+        await auditoria.RegistrarAsync("Caixa", "CancelarCaixa", "Caixa", caixa.Id, antes, depois, motivo);
+
+        return Result<CaixaResponseDto>.Ok(depois);
     }
 }

@@ -61,6 +61,12 @@ builder.Services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
 builder.Services.AddScoped<IContaPagarService, ContaPagarService>();
 builder.Services.AddScoped<IPagamentoContaPagarRepository, PagamentoContaPagarRepository>();
 builder.Services.AddScoped<IPagamentoContaPagarService, PagamentoContaPagarService>();
+builder.Services.AddScoped<IAuditoriaFinanceiraRepository, AuditoriaFinanceiraRepository>();
+builder.Services.AddScoped<IAuditoriaFinanceiraService, AuditoriaFinanceiraService>();
+builder.Services.AddScoped<ICategoriaProdutoRepository, CategoriaProdutoRepository>();
+builder.Services.AddScoped<ICategoriaProdutoService, CategoriaProdutoService>();
+builder.Services.AddScoped<IProdutoRepository, ProdutoRepository>();
+builder.Services.AddScoped<IProdutoService, ProdutoService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();

@@ -55,9 +55,9 @@ public class ContasPagarController(IContaPagarService service) : ControllerBase
 
     [HttpPost("{id:int}/cancelar")]
     [RequirePermission(Permissions.ContasPagar.Cancelar)]
-    public async Task<IActionResult> Cancelar(int id)
+    public async Task<IActionResult> Cancelar(int id, MotivoDto dto)
     {
-        var result = await service.CancelarAsync(id);
+        var result = await service.CancelarAsync(id, dto);
         if (result.IsSuccess)
             return Ok(result.Value);
 

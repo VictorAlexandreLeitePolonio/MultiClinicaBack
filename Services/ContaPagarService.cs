@@ -7,7 +7,10 @@ using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class ContaPagarService(IContaPagarRepository repository, IUsuarioLogadoService usuario) : IContaPagarService
+public class ContaPagarService(
+    IContaPagarRepository repository,
+    IAuditoriaFinanceiraService auditoria,
+    IUsuarioLogadoService usuario) : IContaPagarService
 {
     private static ContaPagarResponseDto Map(ContaPagar c) => new()
     {
@@ -80,7 +83,11 @@ public class ContaPagarService(IContaPagarRepository repository, IUsuarioLogadoS
         };
 
         await repository.AddAsync(entity);
-        return Result<ContaPagarResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("ContasPagar", "Criar", "ContaPagar", entity.Id, null, depois);
+
+        return Result<ContaPagarResponseDto>.Ok(depois);
     }
 
     public async Task<Result<ContaPagarResponseDto>> UpdateAsync(int id, UpdateContaPagarDto dto)
@@ -108,18 +115,28 @@ public class ContaPagarService(IContaPagarRepository repository, IUsuarioLogadoS
         return Result<ContaPagarResponseDto>.Ok(Map(entity));
     }
 
-    public async Task<Result<ContaPagarResponseDto>> CancelarAsync(int id)
+    public async Task<Result<ContaPagarResponseDto>> CancelarAsync(int id, MotivoDto dto)
     {
+        var motivo = dto.Motivo.Trim();
+        if (string.IsNullOrWhiteSpace(motivo))
+            return Result<ContaPagarResponseDto>.Fail(ErrorCodes.EmptyField, "O motivo do cancelamento é obrigatório.");
+
         var entity = await repository.GetByIdAsync(id);
         if (entity is null)
             return Result<ContaPagarResponseDto>.Fail(ErrorCodes.NotFound, "Conta a pagar não encontrada.");
         if (entity.ValorPago > 0)
             return Result<ContaPagarResponseDto>.Fail(ErrorCodes.CannotModify, "Estorne os pagamentos antes de cancelar a conta.");
 
+        var antes = Map(entity);
+
         entity.Status = StatusContaPagar.Cancelada;
         entity.UpdatedByUserId = usuario.UserId;
         await repository.SaveChangesAsync();
-        return Result<ContaPagarResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("ContasPagar", "Cancelar", "ContaPagar", entity.Id, antes, depois, motivo);
+
+        return Result<ContaPagarResponseDto>.Ok(depois);
     }
 
     private async Task<Result<ContaPagarResponseDto>?> ValidateAsync(int? fornecedorId, int? categoriaId, string descricao, decimal valorOriginal)

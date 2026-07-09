@@ -16,5 +16,5 @@ public interface IContaReceberService
     Task<Result<List<ContaReceberResponseDto>>> GetInadimplentesAsync();
     Task<Result<ContaReceberResponseDto>> CreateAsync(CreateContaReceberDto dto);
     Task<Result<ContaReceberResponseDto>> UpdateAsync(int id, UpdateContaReceberDto dto);
-    Task<Result<ContaReceberResponseDto>> CancelarAsync(int id);
+    Task<Result<ContaReceberResponseDto>> CancelarAsync(int id, MotivoDto dto);
 }

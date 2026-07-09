@@ -7,7 +7,10 @@ using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class FornecedorService(IFornecedorRepository repository, IUsuarioLogadoService usuario) : IFornecedorService
+public class FornecedorService(
+    IFornecedorRepository repository,
+    IAuditoriaFinanceiraService auditoria,
+    IUsuarioLogadoService usuario) : IFornecedorService
 {
     private static FornecedorResponseDto Map(Fornecedor f) => new()
     {
@@ -49,6 +52,10 @@ public class FornecedorService(IFornecedorRepository repository, IUsuarioLogadoS
             CreatedByUserId = usuario.UserId
         };
         await repository.AddAsync(entity);
-        return Result<FornecedorResponseDto>.Ok(Map(entity));
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("Fornecedores", "Criar", "Fornecedor", entity.Id, null, depois);
+
+        return Result<FornecedorResponseDto>.Ok(depois);
     }
 }

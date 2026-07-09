@@ -11,5 +11,5 @@ public interface IContaPagarService
     Task<Result<ContaPagarResponseDto>> GetByIdAsync(int id);
     Task<Result<ContaPagarResponseDto>> CreateAsync(CreateContaPagarDto dto);
     Task<Result<ContaPagarResponseDto>> UpdateAsync(int id, UpdateContaPagarDto dto);
-    Task<Result<ContaPagarResponseDto>> CancelarAsync(int id);
+    Task<Result<ContaPagarResponseDto>> CancelarAsync(int id, MotivoDto dto);
 }
