@@ -30,6 +30,7 @@ public class ContaPagarService(
         Vencida = (c.Status == StatusContaPagar.Aberta || c.Status == StatusContaPagar.Parcial)
             && c.DataVencimento < DateTime.UtcNow,
         Origem = c.Origem,
+        OrigemId = c.OrigemId,
         Observacao = c.Observacao,
         CreatedAt = c.CreatedAt
     };

@@ -138,6 +138,9 @@ public class MovimentacaoEstoqueService(
             return Result<MovimentacaoEstoqueResponseDto>.Fail(ErrorCodes.NotFound, "Movimentação não encontrada.");
         if (movimentacao.IsCancelada)
             return Result<MovimentacaoEstoqueResponseDto>.Fail(ErrorCodes.CannotModify, "Movimentação já cancelada.");
+        if (movimentacao.Tipo == TipoMovimentacaoEstoque.Compra)
+            return Result<MovimentacaoEstoqueResponseDto>.Fail(ErrorCodes.CannotModify,
+                "Movimentações geradas por compra não podem ser canceladas diretamente.");
 
         var produto = await repository.GetProdutoAsync(movimentacao.ProdutoId);
         if (produto is null)
@@ -175,7 +178,9 @@ public class MovimentacaoEstoqueService(
         Produto produto,
         TipoMovimentacaoEstoque tipo,
         int delta,
-        string? observacao)
+        string? observacao,
+        string? origem = null,
+        int? origemId = null)
     {
         var anterior = produto.QuantidadeAtual;
         produto.QuantidadeAtual += delta;
@@ -189,6 +194,8 @@ public class MovimentacaoEstoqueService(
             Quantidade = Math.Abs(delta),
             QuantidadeAnterior = anterior,
             QuantidadeAtual = produto.QuantidadeAtual,
+            Origem = origem,
+            OrigemId = origemId,
             Observacao = observacao,
             UsuarioId = usuario.UserId
         };
@@ -200,5 +207,17 @@ public class MovimentacaoEstoqueService(
             await auditoria.RegistrarAsync("Estoque", "Perda", "MovimentacaoEstoque", movimentacao.Id, null, depois, observacao);
 
         return Result<MovimentacaoEstoqueResponseDto>.Ok(depois);
+    }
+
+    public async Task<Result<MovimentacaoEstoqueResponseDto>> RegistrarEntradaPorCompraAsync(int produtoId, int quantidade, int compraId)
+    {
+        if (quantidade <= 0)
+            return Result<MovimentacaoEstoqueResponseDto>.Fail(ErrorCodes.InvalidValue, "A quantidade deve ser maior que zero.");
+
+        var produto = await repository.GetProdutoAsync(produtoId);
+        if (produto is null)
+            return Result<MovimentacaoEstoqueResponseDto>.Fail(ErrorCodes.NotFound, "Produto não encontrado.");
+
+        return await RegistrarAsync(produto, TipoMovimentacaoEstoque.Compra, quantidade, null, "Compra", compraId);
     }
 }

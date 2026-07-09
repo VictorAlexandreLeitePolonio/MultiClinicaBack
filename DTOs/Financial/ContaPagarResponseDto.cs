@@ -19,6 +19,7 @@ public class ContaPagarResponseDto
     public StatusContaPagar Status { get; set; }
     public bool Vencida { get; set; }
     public OrigemContaPagar Origem { get; set; }
+    public int? OrigemId { get; set; }
     public string? Observacao { get; set; }
     public DateTime CreatedAt { get; set; }
 }

@@ -29,6 +29,8 @@ public class AppDbContext : DbContext
     public DbSet<CategoriaProduto> CategoriasProduto { get; set; } = null!;
     public DbSet<Produto> Produtos { get; set; } = null!;
     public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
+    public DbSet<Compra> Compras { get; set; } = null!;
+    public DbSet<CompraItem> ComprasItens { get; set; } = null!;
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
@@ -338,6 +340,38 @@ public class AppDbContext : DbContext
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ClinicaId);
         modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ProdutoId);
+
+        modelBuilder.Entity<Compra>()
+            .Property(c => c.Status)
+            .HasConversion<string>();
+        modelBuilder.Entity<Compra>()
+            .HasOne(c => c.Clinica)
+            .WithMany()
+            .HasForeignKey(c => c.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Compra>()
+            .HasOne(c => c.Fornecedor)
+            .WithMany()
+            .HasForeignKey(c => c.FornecedorId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Compra>()
+            .HasOne(c => c.ContaPagar)
+            .WithMany()
+            .HasForeignKey(c => c.ContaPagarId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<Compra>().HasIndex(c => c.ClinicaId);
+
+        modelBuilder.Entity<CompraItem>()
+            .HasOne(i => i.Compra)
+            .WithMany(c => c.Itens)
+            .HasForeignKey(i => i.CompraId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<CompraItem>()
+            .HasOne(i => i.Produto)
+            .WithMany()
+            .HasForeignKey(i => i.ProdutoId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<CompraItem>().HasIndex(i => i.CompraId);
 
         modelBuilder.Entity<Patient>()
             .HasMany(p => p.Appointments)
