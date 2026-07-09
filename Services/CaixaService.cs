@@ -1,4 +1,5 @@
 using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
@@ -26,6 +27,18 @@ public class CaixaService(
         Observacao = c.Observacao,
         CreatedAt = c.CreatedAt
     };
+
+    public async Task<Result<PagedResult<CaixaResponseDto>>> GetPagedAsync(StatusCaixa? status, int page, int pageSize)
+    {
+        var (items, total) = await repository.GetPagedAsync(status, page, pageSize);
+        return Result<PagedResult<CaixaResponseDto>>.Ok(new PagedResult<CaixaResponseDto>
+        {
+            Data = items.Select(Map),
+            TotalCount = total,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
 
     public async Task<Result<CaixaResponseDto>> GetAtualAsync()
     {

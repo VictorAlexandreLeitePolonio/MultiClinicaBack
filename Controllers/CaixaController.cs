@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Financial;
+using MultiClinica.API.Models;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Controllers;
@@ -12,6 +13,14 @@ namespace MultiClinica.API.Controllers;
 [Route("api/caixa")]
 public class CaixaController(ICaixaService service) : ControllerBase
 {
+    [HttpGet]
+    [RequirePermission(Permissions.Caixa.Visualizar)]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] StatusCaixa? status,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 10)
+        => Ok((await service.GetPagedAsync(status, page, pageSize)).Value);
+
     [HttpGet("atual")]
     [RequirePermission(Permissions.Caixa.Visualizar)]
     public async Task<IActionResult> GetAtual()

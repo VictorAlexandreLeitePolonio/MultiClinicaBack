@@ -1,10 +1,13 @@
 using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Financial;
+using MultiClinica.API.Models;
 
 namespace MultiClinica.API.Services.Interfaces;
 
 public interface ICaixaService
 {
+    Task<Result<PagedResult<CaixaResponseDto>>> GetPagedAsync(StatusCaixa? status, int page, int pageSize);
     Task<Result<CaixaResponseDto>> GetAtualAsync();
     Task<Result<CaixaResponseDto>> GetByIdAsync(int id);
     Task<Result<List<MovimentacaoResumoDto>>> GetMovimentacoesAsync(int id);

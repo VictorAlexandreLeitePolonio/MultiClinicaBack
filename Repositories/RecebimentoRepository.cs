@@ -11,6 +11,12 @@ public class RecebimentoRepository(AppDbContext db, IUsuarioLogadoService usuari
     public Task<Recebimento?> GetByIdAsync(int id) =>
         db.Recebimentos.FirstOrDefaultAsync(r => r.Id == id && r.ClinicaId == usuario.ClinicaId && !r.IsDeleted);
 
+    public Task<List<Recebimento>> GetByContaReceberAsync(int contaReceberId) =>
+        db.Recebimentos
+            .Where(r => r.ContaReceberId == contaReceberId && r.ClinicaId == usuario.ClinicaId && !r.IsDeleted)
+            .OrderByDescending(r => r.DataRecebimento)
+            .ToListAsync();
+
     public Task<bool> ContaFinanceiraExistsAsync(int id) =>
         db.ContasFinanceiras.AnyAsync(c => c.Id == id && c.ClinicaId == usuario.ClinicaId && !c.IsDeleted && c.IsActive);
 

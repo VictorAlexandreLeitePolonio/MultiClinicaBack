@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Auth;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
@@ -270,6 +271,56 @@ public class CaixaTests
         var caixa = await AbrirAsync(client, contaFinanceiraId);
 
         var response = await client.GetAsync($"/api/caixa/{caixa.Id}/movimentacoes");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetCaixas_RetornaHistoricoOrdenadoPorDataAbertura()
+    {
+        await using var app = new MultiClinicaFactory();
+        var contaFinanceiraId = await SeedAsync(app);
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin.caixa@a.local");
+        var caixa1 = await AbrirAsync(client, contaFinanceiraId, 100m);
+        await client.PostAsJsonAsync($"/api/caixa/{caixa1.Id}/fechar", new FecharCaixaDto { SaldoFinalInformado = 100m });
+        await AbrirAsync(client, contaFinanceiraId, 50m);
+
+        var response = await client.GetAsync("/api/caixa");
+        var caixas = await response.Content.ReadFromJsonAsync<PagedResult<CaixaResponseDto>>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(2, caixas!.TotalCount);
+    }
+
+    [Fact]
+    public async Task GetCaixas_FiltraPorStatus()
+    {
+        await using var app = new MultiClinicaFactory();
+        var contaFinanceiraId = await SeedAsync(app);
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin.caixa@a.local");
+        var caixa1 = await AbrirAsync(client, contaFinanceiraId, 100m);
+        await client.PostAsJsonAsync($"/api/caixa/{caixa1.Id}/fechar", new FecharCaixaDto { SaldoFinalInformado = 100m });
+        await AbrirAsync(client, contaFinanceiraId, 50m);
+
+        var response = await client.GetAsync("/api/caixa?status=Aberto");
+        var caixas = await response.Content.ReadFromJsonAsync<PagedResult<CaixaResponseDto>>(JsonOptions);
+
+        Assert.Equal(1, caixas!.TotalCount);
+        Assert.Equal(StatusCaixa.Aberto, caixas.Data.Single().Status);
+    }
+
+    [Fact]
+    public async Task GetCaixas_Recepcao_Retorna200()
+    {
+        await using var app = new MultiClinicaFactory();
+        var contaFinanceiraId = await SeedAsync(app);
+        using var client = app.CreateClient();
+        await LoginAsync(client, "recep.caixa@a.local");
+        await AbrirAsync(client, contaFinanceiraId);
+
+        var response = await client.GetAsync("/api/caixa");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }

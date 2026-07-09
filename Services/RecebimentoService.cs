@@ -82,6 +82,16 @@ public class RecebimentoService(
         return Result<RecebimentoResponseDto>.Ok(Map(recebimento));
     }
 
+    public async Task<Result<List<RecebimentoResponseDto>>> GetByContaReceberAsync(int contaReceberId)
+    {
+        var conta = await contaReceberRepository.GetByIdAsync(contaReceberId);
+        if (conta is null)
+            return Result<List<RecebimentoResponseDto>>.Fail(ErrorCodes.NotFound, "Conta a receber não encontrada.");
+
+        var recebimentos = await recebimentoRepository.GetByContaReceberAsync(contaReceberId);
+        return Result<List<RecebimentoResponseDto>>.Ok(recebimentos.Select(Map).ToList());
+    }
+
     public async Task<Result<RecebimentoResponseDto>> EstornarAsync(int id, EstornarRecebimentoDto dto)
     {
         var motivo = dto.Motivo.Trim();

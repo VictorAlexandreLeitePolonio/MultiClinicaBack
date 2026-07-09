@@ -12,6 +12,14 @@ namespace MultiClinica.API.Controllers;
 [Route("api/recebimentos")]
 public class RecebimentosController(IRecebimentoService service) : ControllerBase
 {
+    [HttpGet("~/api/contas-receber/{contaReceberId:int}/recebimentos")]
+    [RequirePermission(Permissions.ContasReceber.Visualizar)]
+    public async Task<IActionResult> GetByContaReceber(int contaReceberId)
+    {
+        var result = await service.GetByContaReceberAsync(contaReceberId);
+        return result.IsSuccess ? Ok(result.Value) : NotFound(new { message = result.ErrorMessage });
+    }
+
     [HttpPost]
     [RequirePermission(Permissions.ContasReceber.RegistrarRecebimento)]
     public async Task<IActionResult> Registrar(CreateRecebimentoDto dto)

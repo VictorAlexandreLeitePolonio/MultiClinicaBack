@@ -225,4 +225,75 @@ public class RecebimentoTests
 
         Assert.Equal(HttpStatusCode.Forbidden, response.StatusCode);
     }
+
+    [Fact]
+    public async Task GetRecebimentosPorConta_RetornaTodosOsRecebimentosDaConta()
+    {
+        await using var app = new MultiClinicaFactory();
+        var (pacienteId, contaFinanceiraId, formaId) = await SeedAsync(app);
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin@a.local");
+        var conta = await CriarContaAsync(client, pacienteId, 100);
+        await client.PostAsJsonAsync("/api/recebimentos", new CreateRecebimentoDto
+        {
+            ContaReceberId = conta.Id,
+            ContaFinanceiraId = contaFinanceiraId,
+            FormaPagamentoId = formaId,
+            Valor = 40,
+            DataRecebimento = DateTime.UtcNow
+        });
+        await client.PostAsJsonAsync("/api/recebimentos", new CreateRecebimentoDto
+        {
+            ContaReceberId = conta.Id,
+            ContaFinanceiraId = contaFinanceiraId,
+            FormaPagamentoId = formaId,
+            Valor = 60,
+            DataRecebimento = DateTime.UtcNow
+        });
+
+        var response = await client.GetAsync($"/api/contas-receber/{conta.Id}/recebimentos");
+        var recebimentos = await response.Content.ReadFromJsonAsync<List<RecebimentoResponseDto>>(JsonOptions);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(2, recebimentos!.Count);
+        Assert.Equal(100, recebimentos.Sum(r => r.Valor));
+    }
+
+    [Fact]
+    public async Task GetRecebimentosPorConta_ContaInexistente_Retorna404()
+    {
+        await using var app = new MultiClinicaFactory();
+        await SeedAsync(app);
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin@a.local");
+
+        var response = await client.GetAsync("/api/contas-receber/9999/recebimentos");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetRecebimentosPorConta_Recepcao_Retorna200()
+    {
+        await using var app = new MultiClinicaFactory();
+        var (pacienteId, contaFinanceiraId, formaId) = await SeedAsync(app);
+        using var adminClient = app.CreateClient();
+        await LoginAsync(adminClient, "admin@a.local");
+        var conta = await CriarContaAsync(adminClient, pacienteId, 100);
+        await adminClient.PostAsJsonAsync("/api/recebimentos", new CreateRecebimentoDto
+        {
+            ContaReceberId = conta.Id,
+            ContaFinanceiraId = contaFinanceiraId,
+            FormaPagamentoId = formaId,
+            Valor = 100,
+            DataRecebimento = DateTime.UtcNow
+        });
+
+        using var recepClient = app.CreateClient();
+        await LoginAsync(recepClient, "recep@a.local");
+
+        var response = await recepClient.GetAsync($"/api/contas-receber/{conta.Id}/recebimentos");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
 }

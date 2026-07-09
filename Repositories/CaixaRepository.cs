@@ -14,6 +14,22 @@ public class CaixaRepository(AppDbContext db, IUsuarioLogadoService usuario) : I
     public Task<Caixa?> GetAbertoAsync() =>
         Scoped.FirstOrDefaultAsync(c => c.Status == StatusCaixa.Aberto);
 
+    public async Task<(List<Caixa> Items, int TotalCount)> GetPagedAsync(StatusCaixa? status, int page, int pageSize)
+    {
+        var query = Scoped;
+        if (status is not null)
+            query = query.Where(c => c.Status == status);
+
+        var total = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(c => c.DataAbertura)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, total);
+    }
+
     public Task<Caixa?> GetByIdAsync(int id) =>
         Scoped.FirstOrDefaultAsync(c => c.Id == id);
 
