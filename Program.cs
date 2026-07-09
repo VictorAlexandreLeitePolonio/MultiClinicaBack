@@ -63,16 +63,15 @@ builder.Services.AddScoped<IPagamentoContaPagarRepository, PagamentoContaPagarRe
 builder.Services.AddScoped<IPagamentoContaPagarService, PagamentoContaPagarService>();
 builder.Services.AddScoped<IAuditoriaFinanceiraRepository, AuditoriaFinanceiraRepository>();
 builder.Services.AddScoped<IAuditoriaFinanceiraService, AuditoriaFinanceiraService>();
-builder.Services.AddScoped<ICategoriaProdutoRepository, CategoriaProdutoRepository>();
-builder.Services.AddScoped<ICategoriaProdutoService, CategoriaProdutoService>();
-builder.Services.AddScoped<IProdutoRepository, ProdutoRepository>();
-builder.Services.AddScoped<IProdutoService, ProdutoService>();
-builder.Services.AddScoped<IMovimentacaoEstoqueRepository, MovimentacaoEstoqueRepository>();
-builder.Services.AddScoped<IMovimentacaoEstoqueService, MovimentacaoEstoqueService>();
-builder.Services.AddScoped<ICompraRepository, CompraRepository>();
-builder.Services.AddScoped<ICompraService, CompraService>();
-builder.Services.AddScoped<IRelatorioRepository, RelatorioRepository>();
-builder.Services.AddScoped<IRelatorioService, RelatorioService>();
+builder.Services.AddScoped<CategoriaProdutoRepository>();
+builder.Services.AddScoped<CategoriaProdutoService>();
+builder.Services.AddScoped<ProdutoRepository>();
+builder.Services.AddScoped<ProdutoService>();
+builder.Services.AddScoped<MovimentacaoEstoqueRepository>();
+builder.Services.AddScoped<MovimentacaoEstoqueService>();
+builder.Services.AddScoped<CompraRepository>();
+builder.Services.AddScoped<CompraService>();
+builder.Services.AddScoped<RelatorioService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();

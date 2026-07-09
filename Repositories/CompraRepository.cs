@@ -1,12 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Data;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Repositories;
 
-public class CompraRepository(AppDbContext db, IUsuarioLogadoService usuario) : ICompraRepository
+public class CompraRepository(AppDbContext db, IUsuarioLogadoService usuario)
 {
     private IQueryable<Compra> Scoped =>
         db.Compras

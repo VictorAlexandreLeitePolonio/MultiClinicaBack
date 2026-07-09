@@ -1,12 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Data;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Repositories;
 
-public class MovimentacaoEstoqueRepository(AppDbContext db, IUsuarioLogadoService usuario) : IMovimentacaoEstoqueRepository
+public class MovimentacaoEstoqueRepository(AppDbContext db, IUsuarioLogadoService usuario)
 {
     private IQueryable<MovimentacaoEstoque> Scoped =>
         db.MovimentacoesEstoque.Where(m => m.ClinicaId == usuario.ClinicaId);

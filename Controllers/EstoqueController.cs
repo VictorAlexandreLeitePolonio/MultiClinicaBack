@@ -4,14 +4,14 @@ using MultiClinica.API.Authorization;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Services.Interfaces;
+using MultiClinica.API.Services;
 
 namespace MultiClinica.API.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/estoque")]
-public class EstoqueController(IMovimentacaoEstoqueService service) : ControllerBase
+public class EstoqueController(MovimentacaoEstoqueService service) : ControllerBase
 {
     [HttpGet("movimentacoes")]
     [RequirePermission(Permissions.Estoque.MovimentacoesVisualizar)]

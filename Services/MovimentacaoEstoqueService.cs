@@ -2,16 +2,16 @@ using MultiClinica.API.Common;
 using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Repositories;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
 public class MovimentacaoEstoqueService(
-    IMovimentacaoEstoqueRepository repository,
-    IProdutoRepository produtoRepository,
+    MovimentacaoEstoqueRepository repository,
+    ProdutoRepository produtoRepository,
     IAuditoriaFinanceiraService auditoria,
-    IUsuarioLogadoService usuario) : IMovimentacaoEstoqueService
+    IUsuarioLogadoService usuario)
 {
     private static MovimentacaoEstoqueResponseDto Map(MovimentacaoEstoque m) => new()
     {

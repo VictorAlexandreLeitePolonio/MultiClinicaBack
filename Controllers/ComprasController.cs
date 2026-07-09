@@ -4,14 +4,14 @@ using MultiClinica.API.Authorization;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Services.Interfaces;
+using MultiClinica.API.Services;
 
 namespace MultiClinica.API.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/compras")]
-public class ComprasController(ICompraService service) : ControllerBase
+public class ComprasController(CompraService service) : ControllerBase
 {
     [HttpGet]
     [RequirePermission(Permissions.Compras.Visualizar)]

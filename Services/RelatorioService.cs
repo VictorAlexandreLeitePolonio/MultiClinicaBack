@@ -1,12 +1,13 @@
+using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Common;
+using MultiClinica.API.Data;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class RelatorioService(IRelatorioRepository repository) : IRelatorioService
+public class RelatorioService(AppDbContext db, IUsuarioLogadoService usuario)
 {
     public async Task<Result<List<RelatorioAgrupadoDto>>> GetFaturamentoAsync(
         DateTime de,
@@ -17,7 +18,7 @@ public class RelatorioService(IRelatorioRepository repository) : IRelatorioServi
         if (periodoInvalido is not null)
             return periodoInvalido;
 
-        var recebimentos = await repository.GetRecebimentosAsync(de, ate);
+        var recebimentos = await GetRecebimentosAsync(de, ate);
         IEnumerable<IGrouping<string, Recebimento>> agrupado = agruparPor switch
         {
             AgrupamentoRelatorio.FormaPagamento => recebimentos.GroupBy(r => r.FormaPagamento.Nome),
@@ -37,7 +38,7 @@ public class RelatorioService(IRelatorioRepository repository) : IRelatorioServi
         if (periodoInvalido is not null)
             return periodoInvalido;
 
-        var pagamentos = await repository.GetPagamentosAsync(de, ate);
+        var pagamentos = await GetPagamentosAsync(de, ate);
         return Result<List<RelatorioAgrupadoDto>>.Ok(pagamentos
             .GroupBy(p => p.ContaPagar.CategoriaFinanceira?.Nome ?? "Sem categoria")
             .Select(g => new RelatorioAgrupadoDto { Chave = g.Key, Valor = g.Sum(p => p.Valor) })
@@ -51,8 +52,8 @@ public class RelatorioService(IRelatorioRepository repository) : IRelatorioServi
         if (periodoInvalido is not null)
             return periodoInvalido;
 
-        var faturamento = (await repository.GetRecebimentosAsync(de, ate)).Sum(r => r.Valor);
-        var despesas = (await repository.GetPagamentosAsync(de, ate)).Sum(p => p.Valor);
+        var faturamento = (await GetRecebimentosAsync(de, ate)).Sum(r => r.Valor);
+        var despesas = (await GetPagamentosAsync(de, ate)).Sum(p => p.Valor);
 
         return Result<ResultadoFinanceiroDto>.Ok(new ResultadoFinanceiroDto
         {
@@ -73,7 +74,7 @@ public class RelatorioService(IRelatorioRepository repository) : IRelatorioServi
         if (limite <= 0)
             return Result<List<ProdutoMovimentadoDto>>.Ok([]);
 
-        var movimentacoes = await repository.GetMovimentacoesEstoqueAsync(de, ate);
+        var movimentacoes = await GetMovimentacoesEstoqueAsync(de, ate);
         return Result<List<ProdutoMovimentadoDto>>.Ok(movimentacoes
             .GroupBy(m => new { m.ProdutoId, m.Produto.Nome })
             .Select(g => new ProdutoMovimentadoDto
@@ -92,4 +93,36 @@ public class RelatorioService(IRelatorioRepository repository) : IRelatorioServi
         de > ate
             ? Result<T>.Fail(ErrorCodes.InvalidDate, "A data inicial não pode ser maior que a data final.")
             : null;
+
+    private Task<List<Recebimento>> GetRecebimentosAsync(DateTime de, DateTime ate) =>
+        db.Recebimentos
+            .Include(r => r.FormaPagamento)
+            .Include(r => r.ContaReceber)
+                .ThenInclude(c => c.CategoriaFinanceira)
+            .Where(r => r.ClinicaId == usuario.ClinicaId
+                && r.DataRecebimento >= de
+                && r.DataRecebimento <= ate
+                && !r.IsEstornado
+                && r.ContaReceber.Status != StatusContaReceber.Cancelada)
+            .ToListAsync();
+
+    private Task<List<PagamentoContaPagar>> GetPagamentosAsync(DateTime de, DateTime ate) =>
+        db.PagamentosContaPagar
+            .Include(p => p.ContaPagar)
+                .ThenInclude(c => c.CategoriaFinanceira)
+            .Where(p => p.ClinicaId == usuario.ClinicaId
+                && p.DataPagamento >= de
+                && p.DataPagamento <= ate
+                && !p.IsEstornado
+                && p.ContaPagar.Status != StatusContaPagar.Cancelada)
+            .ToListAsync();
+
+    private Task<List<MovimentacaoEstoque>> GetMovimentacoesEstoqueAsync(DateTime de, DateTime ate) =>
+        db.MovimentacoesEstoque
+            .Include(m => m.Produto)
+            .Where(m => m.ClinicaId == usuario.ClinicaId
+                && m.CreatedAt >= de
+                && m.CreatedAt <= ate
+                && !m.IsCancelada)
+            .ToListAsync();
 }

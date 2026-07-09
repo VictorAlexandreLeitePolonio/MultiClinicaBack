@@ -2,15 +2,15 @@ using MultiClinica.API.Common;
 using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Repositories;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
 public class ProdutoService(
-    IProdutoRepository repository,
+    ProdutoRepository repository,
     IAuditoriaFinanceiraService auditoria,
-    IUsuarioLogadoService usuario) : IProdutoService
+    IUsuarioLogadoService usuario)
 {
     private ProdutoResponseDto Map(Produto p) => new()
     {

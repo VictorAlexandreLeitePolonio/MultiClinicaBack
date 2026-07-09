@@ -3,14 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Financial;
-using MultiClinica.API.Services.Interfaces;
+using MultiClinica.API.Services;
 
 namespace MultiClinica.API.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/categorias-produto")]
-public class CategoriasProdutoController(ICategoriaProdutoService service) : ControllerBase
+public class CategoriasProdutoController(CategoriaProdutoService service) : ControllerBase
 {
     [HttpGet]
     [RequirePermission(Permissions.Produtos.Visualizar)]

@@ -1,12 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Data;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Repositories;
 
-public class CategoriaProdutoRepository(AppDbContext db, IUsuarioLogadoService usuario) : ICategoriaProdutoRepository
+public class CategoriaProdutoRepository(AppDbContext db, IUsuarioLogadoService usuario)
 {
     private IQueryable<CategoriaProduto> Scoped =>
         db.CategoriasProduto.Where(c => c.ClinicaId == usuario.ClinicaId && !c.IsDeleted);

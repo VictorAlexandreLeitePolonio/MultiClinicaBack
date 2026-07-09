@@ -2,18 +2,18 @@ using MultiClinica.API.Common;
 using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Repositories;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
 public class CompraService(
-    ICompraRepository repository,
-    IProdutoRepository produtoRepository,
-    IMovimentacaoEstoqueService estoqueService,
+    CompraRepository repository,
+    ProdutoRepository produtoRepository,
+    MovimentacaoEstoqueService estoqueService,
     IContaPagarService contaPagarService,
     IAuditoriaFinanceiraService auditoria,
-    IUsuarioLogadoService usuario) : ICompraService
+    IUsuarioLogadoService usuario)
 {
     private CompraResponseDto Map(Compra c)
     {

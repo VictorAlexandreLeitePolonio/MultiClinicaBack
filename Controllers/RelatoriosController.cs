@@ -3,14 +3,14 @@ using Microsoft.AspNetCore.Mvc;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Financial;
-using MultiClinica.API.Services.Interfaces;
+using MultiClinica.API.Services;
 
 namespace MultiClinica.API.Controllers;
 
 [Authorize]
 [ApiController]
 [Route("api/relatorios")]
-public class RelatoriosController(IRelatorioService service) : ControllerBase
+public class RelatoriosController(RelatorioService service) : ControllerBase
 {
     [HttpGet("faturamento")]
     [RequirePermission(Permissions.Relatorios.Faturamento)]
