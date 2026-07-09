@@ -134,6 +134,11 @@ public static class Permissions
         public const string VisualizarStatus = "financeiro.paciente.visualizar_status";
     }
 
+    public static class Auditoria
+    {
+        public const string Visualizar = "financeiro.auditoria.visualizar";
+    }
+
     public static IReadOnlyCollection<string> All { get; } = typeof(Permissions)
         .GetNestedTypes()
         .SelectMany(t => t.GetFields(BindingFlags.Public | BindingFlags.Static))
