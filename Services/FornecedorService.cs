@@ -58,4 +58,46 @@ public class FornecedorService(
 
         return Result<FornecedorResponseDto>.Ok(depois);
     }
+
+    public async Task<Result<FornecedorResponseDto>> UpdateAsync(int id, UpdateFornecedorDto dto)
+    {
+        var nome = dto.Nome.Trim();
+        if (string.IsNullOrWhiteSpace(nome))
+            return Result<FornecedorResponseDto>.Fail(ErrorCodes.EmptyField, "O nome é obrigatório.");
+
+        var entity = await repository.GetByIdAsync(id);
+        if (entity is null)
+            return Result<FornecedorResponseDto>.Fail(ErrorCodes.NotFound, "Fornecedor não encontrado.");
+
+        var antes = Map(entity);
+        entity.Nome = nome;
+        entity.UpdatedByUserId = usuario.UserId;
+        await repository.SaveChangesAsync();
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync("Fornecedores", "Editar", "Fornecedor", entity.Id, antes, depois);
+        return Result<FornecedorResponseDto>.Ok(depois);
+    }
+
+    public async Task<Result<FornecedorResponseDto>> SetActiveAsync(int id, bool active)
+    {
+        var entity = await repository.GetByIdAsync(id);
+        if (entity is null)
+            return Result<FornecedorResponseDto>.Fail(ErrorCodes.NotFound, "Fornecedor não encontrado.");
+
+        var antes = Map(entity);
+        entity.IsActive = active;
+        entity.UpdatedByUserId = usuario.UserId;
+        await repository.SaveChangesAsync();
+
+        var depois = Map(entity);
+        await auditoria.RegistrarAsync(
+            "Fornecedores",
+            active ? "Reativar" : "Inativar",
+            "Fornecedor",
+            entity.Id,
+            antes,
+            depois);
+        return Result<FornecedorResponseDto>.Ok(depois);
+    }
 }

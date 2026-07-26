@@ -37,4 +37,6 @@ public class FornecedorRepository(AppDbContext db, IUsuarioLogadoService usuario
         await db.SaveChangesAsync();
         return entity;
     }
+
+    public Task SaveChangesAsync() => db.SaveChangesAsync();
 }

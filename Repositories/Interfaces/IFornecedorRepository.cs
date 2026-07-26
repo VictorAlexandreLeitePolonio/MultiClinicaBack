@@ -8,4 +8,5 @@ public interface IFornecedorRepository
     Task<Fornecedor?> GetByIdAsync(int id);
     Task<bool> ExistsAsync(int id);
     Task<Fornecedor> AddAsync(Fornecedor entity);
+    Task SaveChangesAsync();
 }
