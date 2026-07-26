@@ -37,4 +37,37 @@ public class FornecedoresController(IFornecedorService service) : ControllerBase
             ? CreatedAtAction(nameof(GetById), new { id = result.Value!.Id }, result.Value)
             : BadRequest(new { message = result.ErrorMessage });
     }
+
+    [HttpPut("{id:int}")]
+    [RequirePermission(Permissions.Fornecedores.Editar)]
+    public async Task<IActionResult> Update(int id, UpdateFornecedorDto dto)
+    {
+        var result = await service.UpdateAsync(id, dto);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        return result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { message = result.ErrorMessage })
+            : BadRequest(new { message = result.ErrorMessage });
+    }
+
+    [HttpPost("{id:int}/inativar")]
+    [RequirePermission(Permissions.Fornecedores.Inativar)]
+    public async Task<IActionResult> Inativar(int id)
+    {
+        var result = await service.SetActiveAsync(id, false);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : NotFound(new { message = result.ErrorMessage });
+    }
+
+    [HttpPost("{id:int}/reativar")]
+    [RequirePermission(Permissions.Fornecedores.Inativar)]
+    public async Task<IActionResult> Reativar(int id)
+    {
+        var result = await service.SetActiveAsync(id, true);
+        return result.IsSuccess
+            ? Ok(result.Value)
+            : NotFound(new { message = result.ErrorMessage });
+    }
 }
