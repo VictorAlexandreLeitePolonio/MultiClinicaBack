@@ -35,9 +35,6 @@ public class AttachmentsController(
         if (file.Length > MaxFileSize)
             return BadRequest(new { message = "Arquivo muito grande. Máximo permitido: 10MB." });
 
-        if (!IsAllowedFile(type, file))
-            return BadRequest(new { message = "Tipo de arquivo inválido para o anexo informado." });
-
         var patient = await db.Patients.FirstOrDefaultAsync(p =>
             p.Id == patientId && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted, cancellationToken);
         if (patient is null)
@@ -55,6 +52,9 @@ public class AttachmentsController(
             if (medicalRecord is null)
                 return NotFound(new { message = "Prontuário não encontrado." });
         }
+
+        if (!IsAllowedFile(type, file))
+            return BadRequest(new { message = "Tipo de arquivo inválido para o anexo informado." });
 
         var objectKey = $"clinicas/{usuario.ClinicaId}/patients/{patientId}/{Guid.NewGuid():N}{Path.GetExtension(file.FileName)}";
         await using var stream = file.OpenReadStream();
