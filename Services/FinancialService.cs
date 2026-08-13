@@ -77,6 +77,12 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             .Select(m => m.TotalValue)
             .ToListAsync();
 
+        var manualExpenses = await db.ClinicExpenses
+            .Where(e => e.ClinicaId == clinicaId && !e.IsDeleted
+                && e.Date >= start && e.Date < endExclusive)
+            .Select(e => e.Amount)
+            .ToListAsync();
+
         var appointmentIncome = paidPayments.Sum();
         var productSalesIncome = productSales.Sum(v => v ?? 0);
         var totalIncome = appointmentIncome + productSalesIncome;
@@ -85,7 +91,8 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
         var outputCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.Saida).Sum(m => m.TotalValue ?? 0);
         var lossCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.Perda).Sum(m => m.TotalValue ?? 0);
         var internalUseCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.UsoInterno).Sum(m => m.TotalValue ?? 0);
-        var totalOutcome = purchaseCost + outputCost + lossCost + internalUseCost;
+        var manualExpenseCost = manualExpenses.Sum();
+        var totalOutcome = purchaseCost + outputCost + lossCost + internalUseCost + manualExpenseCost;
 
         return new BalanceMoneySummaryDto
         {
@@ -96,11 +103,13 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             ProductOutputCost = outputCost,
             ProductLossCost = lossCost,
             ProductInternalUseCost = internalUseCost,
+            ManualExpenseCost = manualExpenseCost,
             TotalOutcome = totalOutcome,
             EstimatedProfit = totalIncome - totalOutcome,
             PaidAppointmentCount = paidPayments.Count,
             ProductSaleCount = productSales.Count,
-            StockCostMovementCount = stockCostMovements.Count
+            StockCostMovementCount = stockCostMovements.Count,
+            ManualExpenseCount = manualExpenses.Count
         };
     }
 
@@ -199,6 +208,11 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
                 && m.CreatedAt >= start && m.CreatedAt < endExclusive)
             .ToListAsync();
 
+        var manualExpenses = await db.ClinicExpenses
+            .Where(e => e.ClinicaId == clinicaId && !e.IsDeleted
+                && e.Date >= start && e.Date < endExclusive)
+            .ToListAsync();
+
         var fromPayments = payments.Select(p => new BalanceRecentMovementDto
         {
             Id = p.Id,
@@ -221,7 +235,18 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             Date = m.CreatedAt
         });
 
-        return fromPayments.Concat(fromStock)
+        var fromManualExpenses = manualExpenses.Select(e => new BalanceRecentMovementDto
+        {
+            Id = e.Id,
+            Source = "ManualExpense",
+            Type = "ClinicExpense",
+            Description = e.Title,
+            Amount = e.Amount,
+            Quantity = null,
+            Date = e.Date
+        });
+
+        return fromPayments.Concat(fromStock).Concat(fromManualExpenses)
             .OrderByDescending(m => m.Date)
             .Take(10)
             .ToList();

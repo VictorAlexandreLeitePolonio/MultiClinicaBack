@@ -10,6 +10,7 @@ public sealed class BalanceMoneySummaryDto
     public decimal ProductOutputCost { get; set; }
     public decimal ProductLossCost { get; set; }
     public decimal ProductInternalUseCost { get; set; }
+    public decimal ManualExpenseCost { get; set; }
     public decimal TotalOutcome { get; set; }
 
     public decimal EstimatedProfit { get; set; }
@@ -17,4 +18,5 @@ public sealed class BalanceMoneySummaryDto
     public int PaidAppointmentCount { get; set; }
     public int ProductSaleCount { get; set; }
     public int StockCostMovementCount { get; set; }
+    public int ManualExpenseCount { get; set; }
 }

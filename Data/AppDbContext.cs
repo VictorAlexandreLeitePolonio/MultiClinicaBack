@@ -29,6 +29,7 @@ public class AppDbContext : DbContext
     public DbSet<PatientTreatment> PatientTreatments { get; set; } = null!;
     public DbSet<PatientEvolution> PatientEvolutions { get; set; } = null!;
     public DbSet<PatientEvolutionValue> PatientEvolutionValues { get; set; } = null!;
+    public DbSet<ClinicExpense> ClinicExpenses { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -119,6 +120,13 @@ public class AppDbContext : DbContext
             .HasForeignKey(f => f.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<Fornecedor>().HasIndex(f => f.ClinicaId);
+
+        modelBuilder.Entity<ClinicExpense>()
+            .HasOne(e => e.Clinica)
+            .WithMany()
+            .HasForeignKey(e => e.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<ClinicExpense>().HasIndex(e => e.ClinicaId);
 
         modelBuilder.Entity<AuditoriaFinanceira>()
             .HasOne(a => a.Clinica)

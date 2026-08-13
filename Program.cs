@@ -41,6 +41,8 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 
 // Financial — Balanço operacional
 builder.Services.AddScoped<IFinancialService, FinancialService>();
+builder.Services.AddScoped<IClinicExpenseRepository, ClinicExpenseRepository>();
+builder.Services.AddScoped<IClinicExpenseService, ClinicExpenseService>();
 
 // Estoque/Compras — Repository e Service
 builder.Services.AddScoped<IFornecedorRepository, FornecedorRepository>();
