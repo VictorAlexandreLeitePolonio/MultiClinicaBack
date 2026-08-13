@@ -20,18 +20,6 @@ public static class PermissionMatrix
 
         var recepcao = new HashSet<string>
         {
-            Permissions.FormasPagamento.Visualizar,
-            Permissions.Categorias.Visualizar,
-            Permissions.ContasFinanceiras.Visualizar,
-            Permissions.ContasReceber.Visualizar,
-            Permissions.ContasReceber.Criar,
-            Permissions.ContasReceber.RegistrarRecebimento,
-            Permissions.ContasReceber.VisualizarInadimplencia,
-            Permissions.Caixa.Visualizar,
-            Permissions.Caixa.Abrir,
-            Permissions.Caixa.Fechar,
-            Permissions.Caixa.VisualizarResumo,
-            Permissions.Caixa.VisualizarMovimentacoes,
             Permissions.Produtos.Visualizar,
             Permissions.Produtos.VisualizarPrecoVenda,
             Permissions.Estoque.MovimentacoesVisualizar,

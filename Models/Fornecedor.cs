@@ -6,5 +6,4 @@ public class Fornecedor : AuditableEntity
     public string Nome { get; set; } = string.Empty;
 
     public Clinica Clinica { get; set; } = null!;
-    public ICollection<ContaPagar> ContasPagar { get; set; } = [];
 }

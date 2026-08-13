@@ -1,159 +1,17 @@
 using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Common;
-using MultiClinica.API.DTOs;
+using MultiClinica.API.Data;
 using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
-using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public partial class FinancialService(IFinancialRepository repository, IUsuarioLogadoService usuario) : IFinancialService
+public partial class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : IFinancialService
 {
     [GeneratedRegex(@"^\d{2}-\d{4}$")]
     private static partial Regex ReferenceMonthRegex();
-
-    // ── Expenses ─────────────────────────────────────────────────────────────
-
-    public async Task<Result<PagedResult<ExpenseResponseDto>>> GetExpensesPagedAsync(
-        string? month, string? title, int page, int pageSize)
-    {
-        // Valida formato do mês se informado
-        if (!string.IsNullOrEmpty(month) && !ReferenceMonthRegex().IsMatch(month))
-            return Result<PagedResult<ExpenseResponseDto>>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês deve ser 'MM-YYYY'.");
-
-        var (items, total) = await repository.GetExpensesPagedAsync(month, title, page, pageSize);
-
-        var data = items.Select(e => new ExpenseResponseDto
-        {
-            Id             = e.Id,
-            Title          = e.Title,
-            Value          = e.Value,
-            PaymentDate    = e.PaymentDate,
-            Description    = e.Description,
-            ReferenceMonth = e.ReferenceMonth,
-            CreatedAt      = e.CreatedAt,
-        });
-
-        return Result<PagedResult<ExpenseResponseDto>>.Ok(new PagedResult<ExpenseResponseDto>
-        {
-            Data       = data,
-            TotalCount = total,
-            Page       = page,
-            PageSize   = pageSize
-        });
-    }
-
-    public async Task<Result<ExpenseResponseDto>> GetExpenseByIdAsync(int id)
-    {
-        var expense = await repository.GetExpenseByIdAsync(id);
-        if (expense is null)
-            return Result<ExpenseResponseDto>.Fail(ErrorCodes.NotFound, "Gasto não encontrado.");
-
-        return Result<ExpenseResponseDto>.Ok(new ExpenseResponseDto
-        {
-            Id             = expense.Id,
-            Title          = expense.Title,
-            Value          = expense.Value,
-            PaymentDate    = expense.PaymentDate,
-            Description    = expense.Description,
-            ReferenceMonth = expense.ReferenceMonth,
-            CreatedAt      = expense.CreatedAt,
-        });
-    }
-
-    public async Task<Result<ExpenseResponseDto>> CreateExpenseAsync(CreateExpenseDto dto)
-    {
-        // Validações
-        if (dto.Value <= 0)
-            return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.InvalidValue, "O valor do gasto deve ser maior que zero.");
-
-        if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
-            return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
-
-        if (string.IsNullOrWhiteSpace(dto.Title))
-            return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.EmptyField, "O título do gasto é obrigatório.");
-
-        var expense = new Expense
-        {
-            ClinicaId       = usuario.ClinicaId,
-            Title          = dto.Title,
-            Value          = dto.Value,
-            PaymentDate    = dto.PaymentDate,
-            Description    = dto.Description,
-            ReferenceMonth = dto.ReferenceMonth,
-            CreatedByUserId = usuario.UserId,
-        };
-
-        await repository.AddExpenseAsync(expense);
-
-        return Result<ExpenseResponseDto>.Ok(new ExpenseResponseDto
-        {
-            Id             = expense.Id,
-            Title          = expense.Title,
-            Value          = expense.Value,
-            PaymentDate    = expense.PaymentDate,
-            Description    = expense.Description,
-            ReferenceMonth = expense.ReferenceMonth,
-            CreatedAt      = expense.CreatedAt,
-        });
-    }
-
-    public async Task<Result<ExpenseResponseDto>> UpdateExpenseAsync(int id, UpdateExpenseDto dto)
-    {
-        // Validações
-        if (dto.Value <= 0)
-            return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.InvalidValue, "O valor do gasto deve ser maior que zero.");
-
-        if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
-            return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
-
-        if (string.IsNullOrWhiteSpace(dto.Title))
-            return Result<ExpenseResponseDto>.Fail(
-                ErrorCodes.EmptyField, "O título do gasto é obrigatório.");
-
-        var expense = await repository.GetExpenseByIdAsync(id);
-        if (expense is null)
-            return Result<ExpenseResponseDto>.Fail(ErrorCodes.NotFound, "Gasto não encontrado.");
-
-        expense.Title          = dto.Title;
-        expense.Value          = dto.Value;
-        expense.PaymentDate    = dto.PaymentDate;
-        expense.Description    = dto.Description;
-        expense.ReferenceMonth = dto.ReferenceMonth;
-        expense.UpdatedByUserId = usuario.UserId;
-
-        await repository.SaveChangesAsync();
-
-        return Result<ExpenseResponseDto>.Ok(new ExpenseResponseDto
-        {
-            Id             = expense.Id,
-            Title          = expense.Title,
-            Value          = expense.Value,
-            PaymentDate    = expense.PaymentDate,
-            Description    = expense.Description,
-            ReferenceMonth = expense.ReferenceMonth,
-            CreatedAt      = expense.CreatedAt,
-        });
-    }
-
-    public async Task<Result<bool>> DeleteExpenseAsync(int id)
-    {
-        var expense = await repository.GetExpenseByIdAsync(id);
-        if (expense is null)
-            return Result<bool>.Fail(ErrorCodes.NotFound, "Gasto não encontrado.");
-
-        await repository.DeleteExpenseAsync(expense);
-        return Result<bool>.Ok(true);
-    }
-
-    // ── Balance ───────────────────────────────────────────────────────────────
 
     public async Task<Result<FinancialBalanceDto>> GetBalanceAsync(string month)
     {
@@ -161,21 +19,11 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
             return Result<FinancialBalanceDto>.Fail(
                 ErrorCodes.InvalidFormat, "O formato do mês deve ser 'MM-YYYY'. Exemplo: 03-2026");
 
-        var totalExpenses = await repository.GetTotalExpensesByMonthAsync(month);
-        var totalIncome = await repository.GetTotalIncomeByMonthAsync(month);
-
-        return Result<FinancialBalanceDto>.Ok(new FinancialBalanceDto
-        {
-            ReferenceMonth = month,
-            TotalExpenses  = totalExpenses,
-            TotalIncome    = totalIncome,
-            NetBalance     = totalIncome - totalExpenses,
-        });
+        return Result<FinancialBalanceDto>.Ok(await BuildBalanceAsync(month));
     }
 
     public async Task<Result<List<FinancialBalanceDto>>> GetBalanceHistoryAsync(int months)
     {
-        // Limita o período máximo a 24 meses
         if (months < 1 || months > 24)
             return Result<List<FinancialBalanceDto>>.Fail(
                 ErrorCodes.InvalidValue, "O período deve ser entre 1 e 24 meses.");
@@ -185,21 +33,59 @@ public partial class FinancialService(IFinancialRepository repository, IUsuarioL
 
         for (int i = months - 1; i >= 0; i--)
         {
-            var date  = now.AddMonths(-i);
-            var month = date.ToString("MM-yyyy");
-
-            var totalExpenses = await repository.GetTotalExpensesByMonthAsync(month);
-            var totalIncome = await repository.GetTotalIncomeByMonthAsync(month);
-
-            result.Add(new FinancialBalanceDto
-            {
-                ReferenceMonth = month,
-                TotalExpenses  = totalExpenses,
-                TotalIncome    = totalIncome,
-                NetBalance     = totalIncome - totalExpenses,
-            });
+            var month = now.AddMonths(-i).ToString("MM-yyyy");
+            result.Add(await BuildBalanceAsync(month));
         }
 
         return Result<List<FinancialBalanceDto>>.Ok(result);
+    }
+
+    private async Task<FinancialBalanceDto> BuildBalanceAsync(string month)
+    {
+        var parts = month.Split('-');
+        var monthStart = new DateTime(int.Parse(parts[1]), int.Parse(parts[0]), 1, 0, 0, 0, DateTimeKind.Utc);
+        var nextMonthStart = monthStart.AddMonths(1);
+        var clinicaId = usuario.ClinicaId;
+
+        var activePatients = await db.Patients.CountAsync(p =>
+            p.ClinicaId == clinicaId && !p.IsDeleted && p.IsActive);
+
+        var newPatients = await db.Patients.CountAsync(p =>
+            p.ClinicaId == clinicaId && !p.IsDeleted
+            && p.CreatedAt >= monthStart && p.CreatedAt < nextMonthStart);
+
+        var appointmentsInMonth = db.Appointments.Where(a =>
+            a.ClinicaId == clinicaId
+            && a.AppointmentDate >= monthStart && a.AppointmentDate < nextMonthStart);
+
+        var scheduledAppointments = await appointmentsInMonth.CountAsync(a => a.Status == AppointmentStatus.Scheduled);
+        var completedAppointments = await appointmentsInMonth.CountAsync(a => a.Status == AppointmentStatus.Completed);
+        var cancelledAppointments = await appointmentsInMonth.CountAsync(a => a.Status == AppointmentStatus.Cancelled);
+
+        var completedEvolutions = await db.PatientEvolutions.CountAsync(e =>
+            e.ClinicaId == clinicaId && !e.IsDeleted
+            && e.Status == EvolutionStatus.Completed
+            && e.Date >= monthStart && e.Date < nextMonthStart);
+
+        var lowStockProducts = await db.Produtos.CountAsync(p =>
+            p.ClinicaId == clinicaId && !p.IsDeleted
+            && p.QuantidadeAtual < p.QuantidadeMinima);
+
+        var stockMovements = await db.MovimentacoesEstoque.CountAsync(m =>
+            m.ClinicaId == clinicaId && !m.IsCancelada
+            && m.CreatedAt >= monthStart && m.CreatedAt < nextMonthStart);
+
+        return new FinancialBalanceDto
+        {
+            ReferenceMonth = month,
+            ActivePatients = activePatients,
+            NewPatients = newPatients,
+            ScheduledAppointments = scheduledAppointments,
+            CompletedAppointments = completedAppointments,
+            CancelledAppointments = cancelledAppointments,
+            CompletedEvolutions = completedEvolutions,
+            LowStockProducts = lowStockProducts,
+            StockMovements = stockMovements,
+        };
     }
 }

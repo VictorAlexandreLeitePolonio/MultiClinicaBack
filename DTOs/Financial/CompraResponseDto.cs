@@ -10,8 +10,6 @@ public class CompraResponseDto
     public decimal? ValorTotal { get; set; }
     public StatusCompra Status { get; set; }
     public string? Observacao { get; set; }
-    public bool GerouContaPagar { get; set; }
-    public int? ContaPagarId { get; set; }
     public List<CompraItemResponseDto> Itens { get; set; } = [];
     public DateTime CreatedAt { get; set; }
 }

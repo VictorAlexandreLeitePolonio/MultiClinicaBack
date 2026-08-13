@@ -1,18 +1,17 @@
 namespace MultiClinica.API.DTOs.Financial;
 
-// Balanço financeiro mensal — calculado dinamicamente a partir dos gastos e pagamentos do mês.
+// Balanço operacional mensal — indicadores de atividade da clínica (sem dados financeiros).
 public class FinancialBalanceDto
 {
     // Mês de referência no formato "MM-YYYY".
     public string ReferenceMonth { get; set; } = string.Empty;
 
-    // Soma de todos os gastos inseridos para este mês.
-    public decimal TotalExpenses { get; set; }
-
-    // Soma dos payments com status "Paid" para este mês.
-    public decimal TotalIncome { get; set; }
-
-    // Saldo líquido: TotalIncome - TotalExpenses.
-    // Positivo = lucro, Negativo = prejuízo.
-    public decimal NetBalance { get; set; }
+    public int ActivePatients { get; set; }
+    public int NewPatients { get; set; }
+    public int ScheduledAppointments { get; set; }
+    public int CompletedAppointments { get; set; }
+    public int CancelledAppointments { get; set; }
+    public int CompletedEvolutions { get; set; }
+    public int LowStockProducts { get; set; }
+    public int StockMovements { get; set; }
 }

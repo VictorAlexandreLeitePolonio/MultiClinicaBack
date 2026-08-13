@@ -16,12 +16,9 @@ public class Compra : AuditableEntity
     public decimal ValorTotal { get; set; }
     public StatusCompra Status { get; set; } = StatusCompra.Aberta;
     public string? Observacao { get; set; }
-    public bool GerouContaPagar { get; set; }
-    public int? ContaPagarId { get; set; }
 
     public Clinica Clinica { get; set; } = null!;
     public Fornecedor Fornecedor { get; set; } = null!;
-    public ContaPagar? ContaPagar { get; set; }
     public ICollection<CompraItem> Itens { get; set; } = [];
 }
 

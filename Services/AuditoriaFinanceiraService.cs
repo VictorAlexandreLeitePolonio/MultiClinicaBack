@@ -1,8 +1,5 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using MultiClinica.API.Common;
-using MultiClinica.API.DTOs;
-using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
@@ -46,39 +43,4 @@ public class AuditoriaFinanceiraService(
             UserAgent = http?.Request.Headers.UserAgent.ToString()
         });
     }
-
-    public async Task<Result<PagedResult<AuditoriaFinanceiraResponseDto>>> GetPagedAsync(
-        string? modulo,
-        string? entidade,
-        int? usuarioId,
-        DateTime? de,
-        DateTime? ate,
-        int page,
-        int pageSize)
-    {
-        var (items, total) = await repository.GetPagedAsync(modulo, entidade, usuarioId, de, ate, page, pageSize);
-        return Result<PagedResult<AuditoriaFinanceiraResponseDto>>.Ok(new PagedResult<AuditoriaFinanceiraResponseDto>
-        {
-            Data = items.Select(Map),
-            TotalCount = total,
-            Page = page,
-            PageSize = pageSize
-        });
-    }
-
-    private static AuditoriaFinanceiraResponseDto Map(AuditoriaFinanceira a) => new()
-    {
-        Id = a.Id,
-        UsuarioId = a.UsuarioId,
-        Modulo = a.Modulo,
-        Acao = a.Acao,
-        Entidade = a.Entidade,
-        EntidadeId = a.EntidadeId,
-        DadosAntes = a.DadosAntes,
-        DadosDepois = a.DadosDepois,
-        Motivo = a.Motivo,
-        DataAcao = a.DataAcao,
-        Ip = a.Ip,
-        UserAgent = a.UserAgent
-    };
 }

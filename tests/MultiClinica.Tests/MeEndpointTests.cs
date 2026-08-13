@@ -42,9 +42,9 @@ public class MeEndpointTests
             .EnumerateArray()
             .Select(e => e.GetString())
             .ToList();
-        Assert.Contains("financeiro.contas_receber.registrar_recebimento", perms);
         Assert.Contains("estoque.movimentacoes.visualizar", perms);
-        Assert.DoesNotContain("financeiro.contas_receber.estornar_recebimento", perms);
-        Assert.Equal(15, perms.Count);
+        Assert.Contains("estoque.produtos.visualizar", perms);
+        Assert.DoesNotContain("compras.aprovar", perms);
+        Assert.Equal(3, perms.Count);
     }
 }

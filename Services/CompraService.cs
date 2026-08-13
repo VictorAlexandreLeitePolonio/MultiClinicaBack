@@ -11,7 +11,6 @@ public class CompraService(
     CompraRepository repository,
     ProdutoRepository produtoRepository,
     MovimentacaoEstoqueService estoqueService,
-    IContaPagarService contaPagarService,
     IAuditoriaFinanceiraService auditoria,
     IUsuarioLogadoService usuario)
 {
@@ -26,8 +25,6 @@ public class CompraService(
             ValorTotal = podeVerValores ? c.ValorTotal : null,
             Status = c.Status,
             Observacao = c.Observacao,
-            GerouContaPagar = c.GerouContaPagar,
-            ContaPagarId = c.ContaPagarId,
             CreatedAt = c.CreatedAt,
             Itens = c.Itens.Select(i => new CompraItemResponseDto
             {
@@ -148,42 +145,6 @@ public class CompraService(
 
         var depois = Map(entity);
         await auditoria.RegistrarAsync("Compras", "Receber", "Compra", entity.Id, antes, depois);
-
-        return Result<CompraResponseDto>.Ok(depois);
-    }
-
-    public async Task<Result<CompraResponseDto>> GerarContaPagarAsync(int id, GerarContaPagarDto dto)
-    {
-        var entity = await repository.GetByIdAsync(id);
-        if (entity is null)
-            return Result<CompraResponseDto>.Fail(ErrorCodes.NotFound, "Compra não encontrada.");
-        if (entity.Status == StatusCompra.Cancelada)
-            return Result<CompraResponseDto>.Fail(ErrorCodes.CannotModify, "Compra cancelada não gera conta a pagar.");
-        if (entity.GerouContaPagar)
-            return Result<CompraResponseDto>.Fail(ErrorCodes.CannotModify, "Esta compra já gerou uma conta a pagar.");
-
-        var contaPagarResult = await contaPagarService.CreateAsync(new CreateContaPagarDto
-        {
-            FornecedorId = entity.FornecedorId,
-            CategoriaFinanceiraId = dto.CategoriaFinanceiraId,
-            Descricao = $"Compra #{entity.Id}",
-            ValorOriginal = entity.ValorTotal,
-            DataEmissao = DateTime.UtcNow,
-            DataVencimento = dto.DataVencimento,
-            Origem = OrigemContaPagar.Compra,
-            OrigemId = entity.Id
-        });
-        if (!contaPagarResult.IsSuccess)
-            return Result<CompraResponseDto>.Fail(contaPagarResult.ErrorCode!, contaPagarResult.ErrorMessage!);
-
-        var antes = Map(entity);
-        entity.GerouContaPagar = true;
-        entity.ContaPagarId = contaPagarResult.Value!.Id;
-        entity.UpdatedByUserId = usuario.UserId;
-        await repository.SaveChangesAsync();
-
-        var depois = Map(entity);
-        await auditoria.RegistrarAsync("Compras", "GerarContaPagar", "Compra", entity.Id, antes, depois);
 
         return Result<CompraResponseDto>.Ok(depois);
     }

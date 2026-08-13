@@ -144,7 +144,7 @@ public class CompraTests
     }
 
     [Fact]
-    public async Task AprovarReceberEGerarContaPagar_FluxoValido_AtualizaEstoqueEFinanceiro()
+    public async Task AprovarEReceberCompra_FluxoValido_AtualizaEstoque()
     {
         await using var app = new MultiClinicaFactory();
         var (fornecedorId, produtoId) = await SeedAsync(app);
@@ -157,17 +157,11 @@ public class CompraTests
         var aprovada = await aprovarResponse.Content.ReadFromJsonAsync<CompraResponseDto>(JsonOptions);
         var receberResponse = await client.PostAsync($"/api/compras/{criada.Id}/receber", null);
         var recebida = await receberResponse.Content.ReadFromJsonAsync<CompraResponseDto>(JsonOptions);
-        var contaResponse = await client.PostAsJsonAsync($"/api/compras/{criada.Id}/gerar-conta-pagar",
-            new GerarContaPagarDto { DataVencimento = DateTime.UtcNow.AddDays(30) });
-        var compraComConta = await contaResponse.Content.ReadFromJsonAsync<CompraResponseDto>(JsonOptions);
 
         Assert.Equal(HttpStatusCode.OK, aprovarResponse.StatusCode);
         Assert.Equal(StatusCompra.Aprovada, aprovada!.Status);
         Assert.Equal(HttpStatusCode.OK, receberResponse.StatusCode);
         Assert.Equal(StatusCompra.Recebida, recebida!.Status);
-        Assert.Equal(HttpStatusCode.OK, contaResponse.StatusCode);
-        Assert.True(compraComConta!.GerouContaPagar);
-        Assert.NotNull(compraComConta.ContaPagarId);
 
         var produtoResponse = await client.GetAsync($"/api/produtos/{produtoId}");
         var produto = await produtoResponse.Content.ReadFromJsonAsync<ProdutoResponseDto>(JsonOptions);
@@ -177,30 +171,6 @@ public class CompraTests
         var movimentacoes = await movimentacoesResponse.Content
             .ReadFromJsonAsync<PagedResult<MovimentacaoEstoqueResponseDto>>(JsonOptions);
         Assert.Contains(movimentacoes!.Data, m => m.Tipo == TipoMovimentacaoEstoque.Compra && m.OrigemId == criada.Id);
-
-        var contaPagarResponse = await client.GetAsync($"/api/contas-pagar/{compraComConta.ContaPagarId}");
-        var contaPagar = await contaPagarResponse.Content.ReadFromJsonAsync<ContaPagarResponseDto>(JsonOptions);
-        Assert.Equal(80, contaPagar!.ValorTotal);
-        Assert.Equal(OrigemContaPagar.Compra, contaPagar.Origem);
-        Assert.Equal(criada.Id, contaPagar.OrigemId);
-    }
-
-    [Fact]
-    public async Task GerarContaPagar_JaGerada_RetornaBadRequest()
-    {
-        await using var app = new MultiClinicaFactory();
-        var (fornecedorId, produtoId) = await SeedAsync(app);
-        using var client = app.CreateClient();
-        await LoginAsync(client, "admin.compra@a.local");
-        var createResponse = await client.PostAsJsonAsync("/api/compras", ValidDto(fornecedorId, produtoId));
-        var criada = await createResponse.Content.ReadFromJsonAsync<CompraResponseDto>(JsonOptions);
-        await client.PostAsJsonAsync($"/api/compras/{criada!.Id}/gerar-conta-pagar",
-            new GerarContaPagarDto { DataVencimento = DateTime.UtcNow.AddDays(30) });
-
-        var response = await client.PostAsJsonAsync($"/api/compras/{criada.Id}/gerar-conta-pagar",
-            new GerarContaPagarDto { DataVencimento = DateTime.UtcNow.AddDays(30) });
-
-        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 
     [Fact]

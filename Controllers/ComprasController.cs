@@ -69,14 +69,6 @@ public class ComprasController(CompraService service) : ControllerBase
         return ToActionResult(result);
     }
 
-    [HttpPost("{id:int}/gerar-conta-pagar")]
-    [RequirePermission(Permissions.Compras.GerarContaPagar)]
-    public async Task<IActionResult> GerarContaPagar(int id, GerarContaPagarDto dto)
-    {
-        var result = await service.GerarContaPagarAsync(id, dto);
-        return ToActionResult(result);
-    }
-
     [HttpPost("{id:int}/cancelar")]
     [RequirePermission(Permissions.Compras.Cancelar)]
     public async Task<IActionResult> Cancelar(int id, MotivoDto dto)

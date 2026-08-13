@@ -39,28 +39,12 @@ if (!builder.Environment.IsEnvironment("Testing"))
 builder.Services.AddScoped<IPaymentRepository, PaymentRepository>();
 builder.Services.AddScoped<IPaymentService, PaymentService>();
 
-// Financial — Repository e Service
-builder.Services.AddScoped<IFinancialRepository, FinancialRepository>();
+// Financial — Balanço operacional
 builder.Services.AddScoped<IFinancialService, FinancialService>();
-builder.Services.AddScoped<IFormaPagamentoRepository, FormaPagamentoRepository>();
-builder.Services.AddScoped<IFormaPagamentoService, FormaPagamentoService>();
-builder.Services.AddScoped<ICategoriaFinanceiraRepository, CategoriaFinanceiraRepository>();
-builder.Services.AddScoped<ICategoriaFinanceiraService, CategoriaFinanceiraService>();
-builder.Services.AddScoped<IContaFinanceiraRepository, ContaFinanceiraRepository>();
-builder.Services.AddScoped<IContaFinanceiraService, ContaFinanceiraService>();
-builder.Services.AddScoped<IContaReceberRepository, ContaReceberRepository>();
-builder.Services.AddScoped<IContaReceberService, ContaReceberService>();
-builder.Services.AddScoped<IRecebimentoRepository, RecebimentoRepository>();
-builder.Services.AddScoped<IRecebimentoService, RecebimentoService>();
-builder.Services.AddScoped<IMovimentacaoFinanceiraRepository, MovimentacaoFinanceiraRepository>();
-builder.Services.AddScoped<ICaixaRepository, CaixaRepository>();
-builder.Services.AddScoped<ICaixaService, CaixaService>();
+
+// Estoque/Compras — Repository e Service
 builder.Services.AddScoped<IFornecedorRepository, FornecedorRepository>();
 builder.Services.AddScoped<IFornecedorService, FornecedorService>();
-builder.Services.AddScoped<IContaPagarRepository, ContaPagarRepository>();
-builder.Services.AddScoped<IContaPagarService, ContaPagarService>();
-builder.Services.AddScoped<IPagamentoContaPagarRepository, PagamentoContaPagarRepository>();
-builder.Services.AddScoped<IPagamentoContaPagarService, PagamentoContaPagarService>();
 builder.Services.AddScoped<IAuditoriaFinanceiraRepository, AuditoriaFinanceiraRepository>();
 builder.Services.AddScoped<IAuditoriaFinanceiraService, AuditoriaFinanceiraService>();
 builder.Services.AddScoped<CategoriaProdutoRepository>();
@@ -71,7 +55,6 @@ builder.Services.AddScoped<MovimentacaoEstoqueRepository>();
 builder.Services.AddScoped<MovimentacaoEstoqueService>();
 builder.Services.AddScoped<CompraRepository>();
 builder.Services.AddScoped<CompraService>();
-builder.Services.AddScoped<RelatorioService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();

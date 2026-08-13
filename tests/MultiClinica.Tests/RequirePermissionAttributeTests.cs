@@ -28,7 +28,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_RecepcaoSemPermissao_Retorna403()
     {
-        var attr = new RequirePermissionAttribute(Permissions.ContasReceber.EstornarRecebimento);
+        var attr = new RequirePermissionAttribute(Permissions.Compras.Aprovar);
         var ctx = ContextFor("Recepcao");
 
         attr.OnAuthorization(ctx);
@@ -40,7 +40,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_RecepcaoComPermissao_NaoBloqueia()
     {
-        var attr = new RequirePermissionAttribute(Permissions.ContasReceber.RegistrarRecebimento);
+        var attr = new RequirePermissionAttribute(Permissions.Estoque.MovimentacoesVisualizar);
         var ctx = ContextFor("Recepcao");
 
         attr.OnAuthorization(ctx);
@@ -51,7 +51,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_SemClaimRole_Retorna403()
     {
-        var attr = new RequirePermissionAttribute(Permissions.Caixa.Abrir);
+        var attr = new RequirePermissionAttribute(Permissions.Compras.Aprovar);
         var ctx = ContextFor(null);
 
         attr.OnAuthorization(ctx);

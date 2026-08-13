@@ -11,8 +11,8 @@ public class PermissionMatrixTests
     {
         var all = Permissions.All;
 
-        Assert.Contains("financeiro.contas_receber.registrar_recebimento", all);
-        Assert.True(all.Count > 50);
+        Assert.Contains(Permissions.Compras.Aprovar, all);
+        Assert.True(all.Count > 20);
     }
 
     [Fact]
@@ -24,19 +24,19 @@ public class PermissionMatrixTests
     }
 
     [Fact]
-    public void Has_RecepcaoRegistrarRecebimento_RetornaVerdadeiro()
+    public void Has_RecepcaoMovimentacoesVisualizar_RetornaVerdadeiro()
     {
         Assert.True(PermissionMatrix.Has(
             UserRole.Recepcao,
-            Permissions.ContasReceber.RegistrarRecebimento));
+            Permissions.Estoque.MovimentacoesVisualizar));
     }
 
     [Fact]
-    public void Has_RecepcaoEstornoRecebimento_RetornaFalso()
+    public void Has_RecepcaoAprovarCompra_RetornaFalso()
     {
         Assert.False(PermissionMatrix.Has(
             UserRole.Recepcao,
-            Permissions.ContasReceber.EstornarRecebimento));
+            Permissions.Compras.Aprovar));
     }
 
     [Fact]
@@ -48,11 +48,11 @@ public class PermissionMatrixTests
     }
 
     [Fact]
-    public void PermissionsFor_Recepcao_ContemExatamente15Permissoes()
+    public void PermissionsFor_Recepcao_ContemExatamente3Permissoes()
     {
         var perms = PermissionMatrix.PermissionsFor(UserRole.Recepcao);
 
-        Assert.Equal(15, perms.Count);
+        Assert.Equal(3, perms.Count);
         Assert.Contains(Permissions.Estoque.MovimentacoesVisualizar, perms);
     }
 
