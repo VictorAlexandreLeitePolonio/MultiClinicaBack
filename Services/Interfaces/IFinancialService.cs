@@ -5,7 +5,5 @@ namespace MultiClinica.API.Services.Interfaces;
 
 public interface IFinancialService
 {
-    Task<Result<FinancialBalanceDto>> GetBalanceAsync(string month);
-
-    Task<Result<List<FinancialBalanceDto>>> GetBalanceHistoryAsync(int months);
+    Task<Result<FinancialBalanceDto>> GetBalanceAsync(FinancialBalanceQueryDto query);
 }

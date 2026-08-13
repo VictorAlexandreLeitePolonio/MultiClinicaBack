@@ -1,17 +1,13 @@
 namespace MultiClinica.API.DTOs.Financial;
 
-// Balanço operacional mensal — indicadores de atividade da clínica (sem dados financeiros).
-public class FinancialBalanceDto
+// Balanço operacional da clínica — dashboard, não um financeiro completo (ver plano de simplificação).
+public sealed class FinancialBalanceDto
 {
-    // Mês de referência no formato "MM-YYYY".
-    public string ReferenceMonth { get; set; } = string.Empty;
-
-    public int ActivePatients { get; set; }
-    public int NewPatients { get; set; }
-    public int ScheduledAppointments { get; set; }
-    public int CompletedAppointments { get; set; }
-    public int CancelledAppointments { get; set; }
-    public int CompletedEvolutions { get; set; }
-    public int LowStockProducts { get; set; }
-    public int StockMovements { get; set; }
+    public BalancePeriodDto Period { get; set; } = null!;
+    public BalanceMoneySummaryDto Money { get; set; } = null!;
+    public BalanceAppointmentsSummaryDto Appointments { get; set; } = null!;
+    public BalancePatientsSummaryDto Patients { get; set; } = null!;
+    public BalanceStockSummaryDto Stock { get; set; } = null!;
+    public BalanceEvolutionSummaryDto Evolutions { get; set; } = null!;
+    public List<BalanceRecentMovementDto> RecentMovements { get; set; } = [];
 }
