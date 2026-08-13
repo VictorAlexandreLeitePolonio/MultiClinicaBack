@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Financial;
+using MultiClinica.API.DTOs.Stock;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services;
 
@@ -42,6 +43,17 @@ public class EstoqueController(MovimentacaoEstoqueService service) : ControllerB
     public async Task<IActionResult> Saida(RegistrarMovimentacaoEstoqueDto dto)
     {
         var result = await service.RegistrarSaidaAsync(dto, TipoMovimentacaoEstoque.Saida);
+        return result.IsSuccess
+            ? StatusCode(StatusCodes.Status201Created, result.Value)
+            : BadRequest(new { message = result.ErrorMessage });
+    }
+
+    // Rota nova em inglês — venda de produto não depende do financeiro pesado.
+    [HttpPost("~/api/stock/movements/sale")]
+    [RequirePermission(Permissions.Estoque.Saida)]
+    public async Task<IActionResult> RegisterSale(CreateStockMovementRequest request)
+    {
+        var result = await service.RegisterProductSaleAsync(request);
         return result.IsSuccess
             ? StatusCode(StatusCodes.Status201Created, result.Value)
             : BadRequest(new { message = result.ErrorMessage });

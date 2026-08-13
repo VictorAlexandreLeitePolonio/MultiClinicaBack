@@ -1,6 +1,7 @@
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Financial;
+using MultiClinica.API.DTOs.Stock;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories;
 using MultiClinica.API.Services.Interfaces;
@@ -21,6 +22,8 @@ public class MovimentacaoEstoqueService(
         Quantidade = m.Quantidade,
         QuantidadeAnterior = m.QuantidadeAnterior,
         QuantidadeAtual = m.QuantidadeAtual,
+        UnitValue = m.UnitValue,
+        TotalValue = m.TotalValue,
         Origem = m.Origem,
         OrigemId = m.OrigemId,
         Observacao = m.Observacao,
@@ -174,6 +177,17 @@ public class MovimentacaoEstoqueService(
         return Result<MovimentacaoEstoqueResponseDto>.Ok(depois);
     }
 
+    private static decimal? UnitValueFor(TipoMovimentacaoEstoque tipo, Produto produto) => tipo switch
+    {
+        TipoMovimentacaoEstoque.Venda => produto.ValorVenda,
+        TipoMovimentacaoEstoque.Compra => produto.ValorCompra,
+        TipoMovimentacaoEstoque.Saida => produto.ValorCompra,
+        TipoMovimentacaoEstoque.Perda => produto.ValorCompra,
+        TipoMovimentacaoEstoque.UsoInterno => produto.ValorCompra,
+        TipoMovimentacaoEstoque.Entrada => produto.ValorCompra,
+        _ => null
+    };
+
     private async Task<Result<MovimentacaoEstoqueResponseDto>> RegistrarAsync(
         Produto produto,
         TipoMovimentacaoEstoque tipo,
@@ -186,6 +200,8 @@ public class MovimentacaoEstoqueService(
         produto.QuantidadeAtual += delta;
         produto.UpdatedByUserId = usuario.UserId;
 
+        var unitValue = UnitValueFor(tipo, produto);
+
         var movimentacao = new MovimentacaoEstoque
         {
             ClinicaId = usuario.ClinicaId,
@@ -194,6 +210,8 @@ public class MovimentacaoEstoqueService(
             Quantidade = Math.Abs(delta),
             QuantidadeAnterior = anterior,
             QuantidadeAtual = produto.QuantidadeAtual,
+            UnitValue = unitValue,
+            TotalValue = unitValue is null ? null : unitValue * Math.Abs(delta),
             Origem = origem,
             OrigemId = origemId,
             Observacao = observacao,
@@ -220,4 +238,40 @@ public class MovimentacaoEstoqueService(
 
         return await RegistrarAsync(produto, TipoMovimentacaoEstoque.Compra, quantidade, null, "Compra", compraId);
     }
+
+    public async Task<Result<StockMovementResponseDto>> RegisterProductSaleAsync(CreateStockMovementRequest request)
+    {
+        if (request.Quantity <= 0)
+            return Result<StockMovementResponseDto>.Fail(ErrorCodes.InvalidValue, "A quantidade deve ser maior que zero.");
+
+        var produto = await repository.GetProdutoAsync(request.ProductId);
+        if (produto is null)
+            return Result<StockMovementResponseDto>.Fail(ErrorCodes.NotFound, "Produto não encontrado.");
+        if (request.Quantity > produto.QuantidadeAtual)
+            return Result<StockMovementResponseDto>.Fail(ErrorCodes.CannotModify, "Quantidade maior que o estoque disponível.");
+
+        var result = await RegistrarAsync(produto, TipoMovimentacaoEstoque.Venda, -request.Quantity, request.Note);
+        if (!result.IsSuccess)
+            return Result<StockMovementResponseDto>.Fail(result.ErrorCode!, result.ErrorMessage!);
+
+        return Result<StockMovementResponseDto>.Ok(MapToStockMovementResponse(result.Value!));
+    }
+
+    private static StockMovementResponseDto MapToStockMovementResponse(MovimentacaoEstoqueResponseDto m) => new()
+    {
+        Id = m.Id,
+        ProductId = m.ProdutoId,
+        Type = m.Tipo.ToString(),
+        Quantity = m.Quantidade,
+        PreviousQuantity = m.QuantidadeAnterior,
+        CurrentQuantity = m.QuantidadeAtual,
+        UnitValue = m.UnitValue,
+        TotalValue = m.TotalValue,
+        Source = m.Origem,
+        SourceId = m.OrigemId,
+        Note = m.Observacao,
+        IsCancelled = m.IsCancelada,
+        CancellationReason = m.MotivoCancelamento,
+        CreatedAt = m.CreatedAt
+    };
 }

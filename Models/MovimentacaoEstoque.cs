@@ -20,6 +20,8 @@ public class MovimentacaoEstoque
     public int Quantidade { get; set; }
     public int QuantidadeAnterior { get; set; }
     public int QuantidadeAtual { get; set; }
+    public decimal? UnitValue { get; set; }
+    public decimal? TotalValue { get; set; }
     public string? Origem { get; set; }
     public int? OrigemId { get; set; }
     public string? Observacao { get; set; }
