@@ -44,7 +44,8 @@ public class MeEndpointTests
             .ToList();
         Assert.Contains("estoque.movimentacoes.visualizar", perms);
         Assert.Contains("estoque.produtos.visualizar", perms);
+        Assert.Contains("clinic.settings.view", perms);
         Assert.DoesNotContain("compras.aprovar", perms);
-        Assert.Equal(3, perms.Count);
+        Assert.Equal(4, perms.Count);
     }
 }

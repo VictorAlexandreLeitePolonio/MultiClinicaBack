@@ -23,11 +23,13 @@ public static class PermissionMatrix
             Permissions.Produtos.Visualizar,
             Permissions.Produtos.VisualizarPrecoVenda,
             Permissions.Estoque.MovimentacoesVisualizar,
+            Permissions.ClinicSettings.View,
         };
 
         var profissional = new HashSet<string>
         {
             Permissions.Paciente.VisualizarStatus,
+            Permissions.ClinicSettings.View,
         };
 
         return new Dictionary<UserRole, HashSet<string>>

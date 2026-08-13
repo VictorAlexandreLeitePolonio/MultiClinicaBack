@@ -22,6 +22,14 @@ public class Clinica : AuditableEntity
     public string? BillingBlockReason { get; set; }
     public DateTime? BillingBlockedAt { get; set; }
 
+    public string? DisplayName { get; set; }
+    public string? LogoUrl { get; set; }
+    public string? PrimaryColor { get; set; }
+    public string? SecondaryColor { get; set; }
+    public string? AccentColor { get; set; }
+    public string? ContactEmail { get; set; }
+    public string? ContactPhone { get; set; }
+
     public ICollection<User> Users { get; set; } = [];
     public ICollection<Patient> Patients { get; set; } = [];
     public ICollection<ClinicCharge> Charges { get; set; } = [];

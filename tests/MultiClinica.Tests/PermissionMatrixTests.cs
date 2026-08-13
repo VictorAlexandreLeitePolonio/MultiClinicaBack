@@ -48,20 +48,22 @@ public class PermissionMatrixTests
     }
 
     [Fact]
-    public void PermissionsFor_Recepcao_ContemExatamente3Permissoes()
+    public void PermissionsFor_Recepcao_ContemExatamente4Permissoes()
     {
         var perms = PermissionMatrix.PermissionsFor(UserRole.Recepcao);
 
-        Assert.Equal(3, perms.Count);
+        Assert.Equal(4, perms.Count);
         Assert.Contains(Permissions.Estoque.MovimentacoesVisualizar, perms);
+        Assert.Contains(Permissions.ClinicSettings.View, perms);
     }
 
     [Fact]
-    public void PermissionsFor_Profissional_ContemApenasStatusPaciente()
+    public void PermissionsFor_Profissional_ContemStatusPacienteEClinicSettingsView()
     {
         var perms = PermissionMatrix.PermissionsFor(UserRole.Profissional);
 
-        Assert.Single(perms);
+        Assert.Equal(2, perms.Count);
         Assert.Contains(Permissions.Paciente.VisualizarStatus, perms);
+        Assert.Contains(Permissions.ClinicSettings.View, perms);
     }
 }

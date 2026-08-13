@@ -67,19 +67,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvi
             Expires = DateTimeOffset.UtcNow.AddHours(8)
         });
 
-        return Ok(new
-        {
-            message = "Login realizado com sucesso.",
-            user = new
-            {
-                id    = user.Id,
-                name  = user.Name,
-                email = user.Email,
-                role  = user.Role.ToString(),
-                clinicaId = user.ClinicaId,
-                clinicaNome = user.Clinica.Nome
-            }
-        });
+        return Ok(BuildAuthResponse(user));
     }
 
     [Authorize]
@@ -103,15 +91,43 @@ public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvi
         if (user.Clinica.IsBlockedByBilling && user.Role != UserRole.SuperAdmin)
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "Clínica bloqueada por pendência financeira." });
 
-        return Ok(new
+        return Ok(BuildAuthResponse(user));
+    }
+
+    private static AuthResponseDto BuildAuthResponse(User user) => new()
+    {
+        User = new UserDto
         {
-            id = user.Id,
-            name = user.Name,
-            email = user.Email,
-            role = user.Role.ToString(),
-            clinicaId = user.ClinicaId,
-            clinicaNome = user.Clinica.Nome,
-            permissions = PermissionMatrix.PermissionsFor(user.Role)
-        });
+            Id = user.Id,
+            Name = user.Name,
+            Email = user.Email,
+            Role = user.Role.ToString()
+        },
+        Tenant = user.Role == UserRole.SuperAdmin ? null : MapTenant(user.Clinica),
+        Permissions = [.. PermissionMatrix.PermissionsFor(user.Role)]
+    };
+
+    private static AuthTenantDto MapTenant(Clinica clinic)
+    {
+        var name = clinic.NomeFantasia;
+
+        return new AuthTenantDto
+        {
+            Id = clinic.Id,
+            Name = name,
+            DisplayName = string.IsNullOrWhiteSpace(clinic.DisplayName)
+                ? name
+                : clinic.DisplayName,
+            LogoUrl = clinic.LogoUrl,
+            PrimaryColor = clinic.PrimaryColor,
+            SecondaryColor = clinic.SecondaryColor,
+            AccentColor = clinic.AccentColor,
+            ContactEmail = string.IsNullOrWhiteSpace(clinic.ContactEmail)
+                ? clinic.Email
+                : clinic.ContactEmail,
+            ContactPhone = string.IsNullOrWhiteSpace(clinic.ContactPhone)
+                ? clinic.Telefone
+                : clinic.ContactPhone
+        };
     }
 }

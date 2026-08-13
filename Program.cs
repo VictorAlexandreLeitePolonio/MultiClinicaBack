@@ -43,6 +43,7 @@ builder.Services.AddScoped<IPaymentService, PaymentService>();
 builder.Services.AddScoped<IFinancialService, FinancialService>();
 builder.Services.AddScoped<IClinicExpenseRepository, ClinicExpenseRepository>();
 builder.Services.AddScoped<IClinicExpenseService, ClinicExpenseService>();
+builder.Services.AddScoped<IClinicSettingsService, ClinicSettingsService>();
 
 // Estoque/Compras — Repository e Service
 builder.Services.AddScoped<IFornecedorRepository, FornecedorRepository>();
