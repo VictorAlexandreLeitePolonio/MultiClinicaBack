@@ -67,7 +67,7 @@ public class CompraService(
         {
             ClinicaId = usuario.ClinicaId,
             FornecedorId = dto.FornecedorId,
-            DataCompra = dto.DataCompra,
+            DataCompra = DateTime.SpecifyKind(dto.DataCompra, DateTimeKind.Utc),
             Observacao = dto.Observacao,
             CreatedByUserId = usuario.UserId
         };
@@ -94,7 +94,7 @@ public class CompraService(
             return Result<CompraResponseDto>.Fail(ErrorCodes.CannotModify, "Só é possível editar uma compra em aberto.");
 
         entity.FornecedorId = dto.FornecedorId;
-        entity.DataCompra = dto.DataCompra;
+        entity.DataCompra = DateTime.SpecifyKind(dto.DataCompra, DateTimeKind.Utc);
         entity.Observacao = dto.Observacao;
         entity.Itens.Clear();
         ReplaceItems(entity, dto.Itens);
