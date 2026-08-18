@@ -69,6 +69,8 @@ builder.Services.AddScoped<IPatientAccountService, PatientAccountService>();
 // Patient portal auth (BACK-2): tokens, notificação e e-mail.
 builder.Services.AddScoped<IPatientTokenService, PatientTokenService>();
 builder.Services.AddScoped<IPatientNotificationService, PatientNotificationService>();
+builder.Services.AddScoped<IPatientAccountLoggedService, PatientAccountLoggedService>();
+builder.Services.AddScoped<IPatientPortalService, PatientPortalService>();
 
 var smtpOptions = SmtpOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(smtpOptions);
