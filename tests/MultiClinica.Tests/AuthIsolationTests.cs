@@ -277,6 +277,7 @@ public class AuthIsolationTests
         var response = await client.PostAsJsonAsync("/api/patients", new
         {
             name = "Paciente A",
+            email = "paciente-a@test.local",
             cpf = "123.456.789-00",
             phone = "(11) 99999-9999"
         });

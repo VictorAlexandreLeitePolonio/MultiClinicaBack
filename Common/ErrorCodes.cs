@@ -21,4 +21,5 @@ public static class ErrorCodes
     public const string FileTooLarge       = "FILE_TOO_LARGE";
     public const string Forbidden          = "FORBIDDEN";
     public const string AlreadyOpen        = "ALREADY_OPEN";
+    public const string AlreadyLinked      = "ALREADY_LINKED";
 }

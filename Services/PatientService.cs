@@ -7,7 +7,10 @@ using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class PatientService(IPatientRepository repository, IUsuarioLogadoService usuario) : IPatientService
+public class PatientService(
+    IPatientRepository repository,
+    IPatientAccountService accountService,
+    IUsuarioLogadoService usuario) : IPatientService
 {
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
@@ -151,24 +154,53 @@ public class PatientService(IPatientRepository repository, IUsuarioLogadoService
 
     // ── Criação ──────────────────────────────────────────────────────────────
 
-    public async Task<Result<PatientResponseDto>> CreateAsync(CreatePatientDto dto)
+    public async Task<Result<PatientCreatedResponseDto>> CreateAsync(CreatePatientDto dto)
     {
-        var normalizedEmail = NormalizeOptional(dto.Email);
-        var normalizedCpf = DigitsOnly(dto.CPF);
+        var email = accountService.NormalizeEmail(dto.Email);
+        var cpf   = accountService.NormalizeCpf(dto.CPF);
+        var phone = DigitsOnly(dto.Phone);
 
-        // Validações de unicidade
-        if (await repository.EmailExistsAsync(normalizedEmail))
-            return Result<PatientResponseDto>.Fail(ErrorCodes.DuplicateEmail, "Email já cadastrado por outro paciente.");
+        // Novo contrato: e-mail, CPF e telefone obrigatórios para todo novo paciente.
+        if (email is null)
+            return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.EmptyField, "E-mail é obrigatório.");
+        if (cpf is null)
+            return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.EmptyField, "CPF é obrigatório.");
+        if (phone is null)
+            return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.EmptyField, "Telefone é obrigatório.");
 
-        if (await repository.CpfExistsAsync(normalizedCpf))
-            return Result<PatientResponseDto>.Fail(ErrorCodes.DuplicateCpf, "CPF já cadastrado por outro paciente.");
+        // Resolve a identidade global pelo e-mail (chave de identidade da pessoa).
+        var account = await accountService.FindByEmailAsync(email);
+        PatientPortalLinkResult linkResult;
+
+        if (account is not null)
+        {
+            // Conta já existe globalmente: no máximo um Patient por (conta, clínica).
+            if (await repository.LinkExistsAsync(account.Id))
+                return Result<PatientCreatedResponseDto>.Fail(
+                    ErrorCodes.AlreadyLinked, "Este paciente já está vinculado a esta clínica.");
+
+            linkResult = PatientPortalLinkResult.LinkedExistingAccount;
+        }
+        else
+        {
+            // Conta nova: preserva unicidade dentro da clínica + unicidade global de CPF.
+            if (await repository.EmailExistsAsync(email))
+                return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.DuplicateEmail, "Email já cadastrado por outro paciente.");
+            if (await repository.CpfExistsAsync(cpf))
+                return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.DuplicateCpf, "CPF já cadastrado por outro paciente.");
+            if (await accountService.CpfExistsAsync(cpf))
+                return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.DuplicateCpf, "CPF já vinculado a outra conta global.");
+
+            account = accountService.CreatePending(NormalizeOptional(dto.Name), email, cpf, phone, usuario.UserId);
+            linkResult = PatientPortalLinkResult.CreatedAccount;
+        }
 
         var patient = new Patient
         {
             ClinicaId = usuario.ClinicaId,
             Name   = NormalizeOptional(dto.Name),
-            Email  = normalizedEmail,
-            CPF    = normalizedCpf,
+            Email  = email,
+            CPF    = cpf,
             Rg     = NormalizeOptional(dto.Rg),
             Rua    = NormalizeOptional(dto.Rua),
             Numero = NormalizeOptional(dto.Numero),
@@ -176,30 +208,81 @@ public class PatientService(IPatientRepository repository, IUsuarioLogadoService
             Cidade = NormalizeOptional(dto.Cidade),
             Estado = NormalizeOptional(dto.Estado),
             Cep    = DigitsOnly(dto.Cep),
-            Phone  = DigitsOnly(dto.Phone),
+            Phone  = phone,
             CreatedByUserId = usuario.UserId,
         };
 
+        // Vínculo identidade + registro clínico num único SaveChanges (atômico).
+        if (linkResult == PatientPortalLinkResult.CreatedAccount)
+            patient.PatientAccount = account;   // insere a conta em cascata
+        else
+            patient.PatientAccountId = account.Id;
+
         await repository.AddAsync(patient);
 
-        return Result<PatientResponseDto>.Ok(new PatientResponseDto
+        return Result<PatientCreatedResponseDto>.Ok(new PatientCreatedResponseDto
         {
-            Id                = patient.Id,
-            Name              = patient.Name,
-            Email             = patient.Email,
-            CPF               = patient.CPF,
-            Rg                = patient.Rg,
-            Rua               = patient.Rua,
-            Numero            = patient.Numero,
-            Bairro            = patient.Bairro,
-            Cidade            = patient.Cidade,
-            Estado            = patient.Estado,
-            Cep               = patient.Cep,
-            Phone             = patient.Phone,
-            IsActive          = patient.IsActive,
-            appointmentStatus = AppointmentStatus.Scheduled,
-            paymentStatus     = PaymentStatus.Pending,
-            CreatedAt         = patient.CreatedAt,
+            Id                   = patient.Id,
+            PatientId            = patient.Id,
+            PatientAccountId     = account.Id,
+            PatientAccountStatus = account.Status,
+            LinkResult           = linkResult,
+            InvitationSent       = false, // stub — envio real do convite em BACK-2
+        });
+    }
+
+    // ── Provisionamento de acesso (pacientes legados) ────────────────────────
+
+    public async Task<Result<PatientCreatedResponseDto>> ProvisionPortalAccessAsync(int id)
+    {
+        var patient = await repository.GetByIdAsync(id);
+        if (patient is null)
+            return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
+
+        if (patient.PatientAccountId is not null)
+            return Result<PatientCreatedResponseDto>.Fail(
+                ErrorCodes.AlreadyLinked, "Paciente já possui identidade global vinculada.");
+
+        var email = accountService.NormalizeEmail(patient.Email);
+        if (email is null)
+            return Result<PatientCreatedResponseDto>.Fail(
+                ErrorCodes.EmptyField, "Paciente sem e-mail: cadastre um e-mail antes de provisionar o acesso ao portal.");
+
+        var cpf = accountService.NormalizeCpf(patient.CPF);
+        var account = await accountService.FindByEmailAsync(email);
+        PatientPortalLinkResult linkResult;
+
+        if (account is not null)
+        {
+            if (await repository.LinkExistsAsync(account.Id))
+                return Result<PatientCreatedResponseDto>.Fail(
+                    ErrorCodes.AlreadyLinked, "Esta clínica já possui um paciente vinculado a esta conta.");
+
+            patient.PatientAccountId = account.Id;
+            linkResult = PatientPortalLinkResult.LinkedExistingAccount;
+        }
+        else
+        {
+            if (await accountService.CpfExistsAsync(cpf))
+                return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.DuplicateCpf, "CPF já vinculado a outra conta global.");
+
+            account = accountService.CreatePending(patient.Name, email, cpf, patient.Phone, usuario.UserId);
+            patient.PatientAccount = account;
+            linkResult = PatientPortalLinkResult.CreatedAccount;
+        }
+
+        patient.Email = email; // normaliza o e-mail do registro clínico ao provisionar
+        patient.UpdatedByUserId = usuario.UserId;
+        await repository.SaveChangesAsync();
+
+        return Result<PatientCreatedResponseDto>.Ok(new PatientCreatedResponseDto
+        {
+            Id                   = patient.Id,
+            PatientId            = patient.Id,
+            PatientAccountId     = account.Id,
+            PatientAccountStatus = account.Status,
+            LinkResult           = linkResult,
+            InvitationSent       = false, // stub — envio real do convite em BACK-2
         });
     }
 

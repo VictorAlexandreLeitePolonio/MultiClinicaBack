@@ -25,6 +25,9 @@ public interface IPatientRepository
     /// <summary>Verifica se o CPF já está cadastrado.</summary>
     Task<bool> CpfExistsAsync(string? cpf, int? excludeId = null);
 
+    /// <summary>Verifica se a clínica atual já possui um paciente vinculado à conta global.</summary>
+    Task<bool> LinkExistsAsync(int patientAccountId);
+
     /// <summary>Verifica se o paciente tem agendamentos ou pagamentos associados.</summary>
     Task<bool> HasAssociatedRecordsAsync(int id);
 

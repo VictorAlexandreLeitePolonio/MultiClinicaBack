@@ -54,10 +54,27 @@ public class PatientsController(IPatientService service) : ControllerBase
             {
                 ErrorCodes.DuplicateEmail => Conflict(new { message = result.ErrorMessage }),
                 ErrorCodes.DuplicateCpf   => Conflict(new { message = result.ErrorMessage }),
+                ErrorCodes.AlreadyLinked  => Conflict(new { message = result.ErrorMessage }),
                 _                         => BadRequest(new { message = result.ErrorMessage })
             };
 
         return CreatedAtAction(nameof(GetPatient), new { id = result.Value!.Id }, result.Value);
+    }
+
+    [HttpPost("{id}/portal-access")]
+    public async Task<IActionResult> ProvisionPortalAccess(int id)
+    {
+        var result = await service.ProvisionPortalAccessAsync(id);
+        if (!result.IsSuccess)
+            return result.ErrorCode switch
+            {
+                ErrorCodes.NotFound      => NotFound(new { message = result.ErrorMessage }),
+                ErrorCodes.DuplicateCpf  => Conflict(new { message = result.ErrorMessage }),
+                ErrorCodes.AlreadyLinked => Conflict(new { message = result.ErrorMessage }),
+                _                        => BadRequest(new { message = result.ErrorMessage })
+            };
+
+        return Ok(result.Value);
     }
 
     [HttpPut("{id}")]

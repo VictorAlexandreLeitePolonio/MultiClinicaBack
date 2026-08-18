@@ -3,6 +3,11 @@ namespace MultiClinica.API.Models;
 public class Patient : AuditableEntity
 {
     public int ClinicaId { get; set; }
+
+    /// <summary>Vínculo com a identidade global. Nullable para pacientes legados.</summary>
+    public int? PatientAccountId { get; set; }
+    public PatientAccount? PatientAccount { get; set; }
+
     public string? Name { get; set; }
     public string? Email { get; set; }
     public string? CPF { get; set; }
