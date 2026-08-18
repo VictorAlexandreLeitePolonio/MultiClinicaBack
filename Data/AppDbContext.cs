@@ -19,6 +19,7 @@ public class AppDbContext : DbContext
     public DbSet<ClinicCategory> ClinicCategories { get; set; } = null!;
     public DbSet<ClinicBusinessHour> ClinicBusinessHours { get; set; } = null!;
     public DbSet<ClinicMedia> ClinicMedia { get; set; } = null!;
+    public DbSet<ClinicLike> ClinicLikes { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
@@ -439,6 +440,23 @@ public class AppDbContext : DbContext
             .HasForeignKey(m => m.ClinicaId)
             .OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ClinicMedia>().HasIndex(m => m.ClinicaId);
+
+        // ── Likes de clínica (BACK-6) ────────────────────────────────────────
+        modelBuilder.Entity<ClinicLike>()
+            .HasIndex(l => new { l.PatientAccountId, l.ClinicaId })
+            .IsUnique();
+
+        modelBuilder.Entity<ClinicLike>()
+            .HasOne(l => l.PatientAccount)
+            .WithMany()
+            .HasForeignKey(l => l.PatientAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<ClinicLike>()
+            .HasOne(l => l.Clinica)
+            .WithMany()
+            .HasForeignKey(l => l.ClinicaId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

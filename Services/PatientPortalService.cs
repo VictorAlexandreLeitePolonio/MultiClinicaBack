@@ -75,8 +75,14 @@ public class PatientPortalService(AppDbContext db, IPatientAccountLoggedService 
             .Distinct()
             .ToListAsync();
 
-        // slug/coverUrl/categories/likeCount/likedByMe: BACK-5/BACK-6.
-        // Contrato mantém os campos ("quando disponível") com defaults por ora.
+        // Clínicas que o paciente autenticado já curtiu (BACK-6).
+        var likedClinicIds = (await db.ClinicLikes
+            .Where(l => l.PatientAccountId == logged.PatientAccountId)
+            .Select(l => l.ClinicaId)
+            .ToListAsync()).ToHashSet();
+
+        // slug/coverUrl/categories: BACK-5 (mantidos com defaults aqui pois "Minhas
+        // Clínicas" ainda não carrega mídia/categorias; likeCount/likedByMe: BACK-6).
         var result = clinics.Select(c => new PatientClinicDto
         {
             Id          = c.Id,
@@ -86,11 +92,11 @@ public class PatientPortalService(AppDbContext db, IPatientAccountLoggedService 
             LogoUrl    = c.LogoUrl,
             City       = c.Cidade,
             State      = c.Estado,
-            Slug       = null,
+            Slug       = c.PublicSlug,
             CoverUrl   = null,
             Categories = [],
-            LikeCount  = 0,
-            LikedByMe  = false,
+            LikeCount  = c.LikeCount,
+            LikedByMe  = likedClinicIds.Contains(c.Id),
         }).ToList();
 
         return Result<IReadOnlyList<PatientClinicDto>>.Ok(result);
