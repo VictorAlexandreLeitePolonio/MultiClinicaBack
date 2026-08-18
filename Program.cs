@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Text.Json.Serialization;
+using MultiClinica.API.Authorization;
 using MultiClinica.API.Data;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services;
@@ -65,6 +66,17 @@ builder.Services.AddScoped<IPatientService, PatientService>();
 builder.Services.AddScoped<IPatientAccountRepository, PatientAccountRepository>();
 builder.Services.AddScoped<IPatientAccountService, PatientAccountService>();
 
+// Patient portal auth (BACK-2): tokens, notificação e e-mail.
+builder.Services.AddScoped<IPatientTokenService, PatientTokenService>();
+builder.Services.AddScoped<IPatientNotificationService, PatientNotificationService>();
+
+var smtpOptions = SmtpOptions.FromConfiguration(builder.Configuration);
+builder.Services.AddSingleton(smtpOptions);
+if (smtpOptions.IsConfigured)
+    builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
+else
+    builder.Services.AddScoped<IEmailSender, LogEmailSender>();
+
 // Appointment — Repository e Service
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
@@ -112,18 +124,22 @@ var jwtKey = builder.Configuration["Jwt:Key"]!;
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
 var jwtAudience = builder.Configuration["Jwt:Audience"]!;
 
-// Configura o esquema de autenticação JWT Bearer.
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(options =>
+// Audiência dedicada do paciente (JWT sem vínculo de tenant).
+var jwtPatientAudience = builder.Configuration["Jwt:PatientAudience"] ?? "MultiClinica.Patient";
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
+
+// Dois esquemas JWT: ClinicAuth (padrão, cookie auth_token) e PatientAuth (cookie patient_auth_token).
+builder.Services.AddAuthentication(AuthSchemes.ClinicAuth)
+    .AddJwtBearer(AuthSchemes.ClinicAuth, options =>
     {
-         options.Events = new JwtBearerEvents
-  {
-        OnMessageReceived = context =>
+        options.Events = new JwtBearerEvents
         {
-            context.Token = context.Request.Cookies["auth_token"];
-            return Task.CompletedTask;
-        }
-  };
+            OnMessageReceived = context =>
+            {
+                context.Token = context.Request.Cookies["auth_token"];
+                return Task.CompletedTask;
+            }
+        };
 
         options.TokenValidationParameters = new TokenValidationParameters
         {
@@ -133,7 +149,29 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true, // Verifica a assinatura do token com a chave secreta.
             ValidIssuer = jwtIssuer,
             ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey))
+            IssuerSigningKey = signingKey
+        };
+    })
+    .AddJwtBearer(AuthSchemes.PatientAuth, options =>
+    {
+        options.Events = new JwtBearerEvents
+        {
+            OnMessageReceived = context =>
+            {
+                context.Token = context.Request.Cookies["patient_auth_token"];
+                return Task.CompletedTask;
+            }
+        };
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer = jwtIssuer,
+            ValidAudience = jwtPatientAudience, // audiência distinta impede uso cruzado de tokens
+            IssuerSigningKey = signingKey
         };
     });
 
