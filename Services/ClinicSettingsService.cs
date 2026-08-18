@@ -14,6 +14,9 @@ public partial class ClinicSettingsService(AppDbContext db, IUsuarioLogadoServic
     [GeneratedRegex(@"^#[A-Fa-f0-9]{6}$")]
     private static partial Regex HexColorRegex();
 
+    [GeneratedRegex(@"^[a-z0-9]+(?:-[a-z0-9]+)*$")]
+    private static partial Regex SlugRegex();
+
     public async Task<Result<ClinicSettingsDto>> GetCurrentClinicSettingsAsync()
     {
         var clinic = await FindClinicAsync(usuario.ClinicaId);
@@ -53,6 +56,36 @@ public partial class ClinicSettingsService(AppDbContext db, IUsuarioLogadoServic
         clinic.AccentColor = request.AccentColor?.Trim();
         clinic.ContactEmail = request.ContactEmail?.Trim();
         clinic.ContactPhone = request.ContactPhone?.Trim();
+
+        // ── Presença pública ─────────────────────────────────────────────────
+        var slug = request.PublicSlug?.Trim().ToLowerInvariant();
+        if (!string.IsNullOrEmpty(slug))
+        {
+            if (await db.Clinicas.AnyAsync(c => c.PublicSlug == slug && c.Id != clinicId && !c.IsDeleted))
+                return Result<ClinicSettingsDto>.Fail(ErrorCodes.DuplicateName, "Este slug público já está em uso.");
+            clinic.PublicSlug = slug;
+        }
+        else if (request.PublicSlug is not null)
+        {
+            clinic.PublicSlug = null;
+        }
+
+        if (request.Description is not null) clinic.Description = request.Description.Trim();
+        if (request.IsPublic.HasValue) clinic.IsPublic = request.IsPublic.Value;
+        if (request.AcceptsAppointmentRequests.HasValue) clinic.AcceptsAppointmentRequests = request.AcceptsAppointmentRequests.Value;
+        if (request.Latitude.HasValue) clinic.Latitude = request.Latitude;
+        if (request.Longitude.HasValue) clinic.Longitude = request.Longitude;
+
+        if (request.Address is not null)
+        {
+            clinic.Rua = request.Address.Rua?.Trim() ?? clinic.Rua;
+            clinic.Numero = request.Address.Numero?.Trim() ?? clinic.Numero;
+            clinic.Bairro = request.Address.Bairro?.Trim() ?? clinic.Bairro;
+            clinic.Cidade = request.Address.Cidade?.Trim() ?? clinic.Cidade;
+            clinic.Estado = request.Address.Estado?.Trim() ?? clinic.Estado;
+            clinic.Cep = request.Address.Cep?.Trim() ?? clinic.Cep;
+        }
+
         clinic.UpdatedByUserId = usuario.IsSuperAdmin ? null : usuario.UserId;
 
         await db.SaveChangesAsync();
@@ -97,6 +130,23 @@ public partial class ClinicSettingsService(AppDbContext db, IUsuarioLogadoServic
         if (request.ContactPhone?.Trim().Length > 30)
             return "O telefone de contato deve ter no máximo 30 caracteres.";
 
+        if (!string.IsNullOrWhiteSpace(request.PublicSlug))
+        {
+            var slug = request.PublicSlug.Trim().ToLowerInvariant();
+            if (slug.Length is < 3 or > 60)
+                return "O slug público deve ter entre 3 e 60 caracteres.";
+            if (!SlugRegex().IsMatch(slug))
+                return "O slug público deve conter apenas letras minúsculas, números e hífens.";
+        }
+
+        if (request.Description?.Trim().Length > 2000)
+            return "A descrição deve ter no máximo 2000 caracteres.";
+
+        if (request.Latitude is < -90 or > 90)
+            return "Latitude inválida.";
+        if (request.Longitude is < -180 or > 180)
+            return "Longitude inválida.";
+
         return null;
     }
 
@@ -116,7 +166,23 @@ public partial class ClinicSettingsService(AppDbContext db, IUsuarioLogadoServic
             SecondaryColor = clinic.SecondaryColor,
             AccentColor = clinic.AccentColor,
             ContactEmail = string.IsNullOrWhiteSpace(clinic.ContactEmail) ? clinic.Email : clinic.ContactEmail,
-            ContactPhone = string.IsNullOrWhiteSpace(clinic.ContactPhone) ? clinic.Telefone : clinic.ContactPhone
+            ContactPhone = string.IsNullOrWhiteSpace(clinic.ContactPhone) ? clinic.Telefone : clinic.ContactPhone,
+            PublicSlug = clinic.PublicSlug,
+            Description = clinic.Description,
+            IsPublic = clinic.IsPublic,
+            AcceptsAppointmentRequests = clinic.AcceptsAppointmentRequests,
+            Latitude = clinic.Latitude,
+            Longitude = clinic.Longitude,
+            LikeCount = clinic.LikeCount,
+            Address = new ClinicAddressDto
+            {
+                Rua = clinic.Rua,
+                Numero = clinic.Numero,
+                Bairro = clinic.Bairro,
+                Cidade = clinic.Cidade,
+                Estado = clinic.Estado,
+                Cep = clinic.Cep,
+            }
         };
     }
 }

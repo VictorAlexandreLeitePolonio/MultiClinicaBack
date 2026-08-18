@@ -73,6 +73,7 @@ builder.Services.AddScoped<IPatientAccountLoggedService, PatientAccountLoggedSer
 builder.Services.AddScoped<IPatientPortalService, PatientPortalService>();
 builder.Services.AddScoped<IAppointmentRequestRepository, AppointmentRequestRepository>();
 builder.Services.AddScoped<IAppointmentRequestService, AppointmentRequestService>();
+builder.Services.AddScoped<IClinicProfileService, ClinicProfileService>();
 
 var smtpOptions = SmtpOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(smtpOptions);
@@ -333,11 +334,38 @@ internal static class AppBootstrapper
                 });
                 await db.SaveChangesAsync();
             }
+
+            await SeedClinicCategoriesAsync(db);
         }
         catch (Exception ex)
         {
             app.Logger.LogError(ex, "SuperAdmin bootstrap failed.");
         }
+    }
+
+    // Seed inicial controlado de categorias (idempotente por slug).
+    private static async Task SeedClinicCategoriesAsync(AppDbContext db)
+    {
+        (string Name, string Slug)[] seed =
+        [
+            ("Fisioterapia", "fisioterapia"),
+            ("Psicologia", "psicologia"),
+            ("Nutrição", "nutricao"),
+            ("Odontologia", "odontologia"),
+            ("Ortopedia", "ortopedia"),
+            ("Dermatologia", "dermatologia"),
+            ("Estética", "estetica"),
+            ("Pilates", "pilates"),
+            ("Clínica Geral", "clinica-geral"),
+            ("Outros", "outros"),
+        ];
+
+        var existing = await db.ClinicCategories.Select(c => c.Slug).ToListAsync();
+        var missing = seed.Where(s => !existing.Contains(s.Slug))
+            .Select(s => new ClinicCategory { Name = s.Name, Slug = s.Slug, IsActive = true });
+
+        db.ClinicCategories.AddRange(missing);
+        await db.SaveChangesAsync();
     }
 }
 

@@ -16,6 +16,9 @@ public class AppDbContext : DbContext
     public DbSet<PatientAccount> PatientAccounts { get; set; } = null!;
     public DbSet<PatientAuthToken> PatientAuthTokens { get; set; } = null!;
     public DbSet<AppointmentRequest> AppointmentRequests { get; set; } = null!;
+    public DbSet<ClinicCategory> ClinicCategories { get; set; } = null!;
+    public DbSet<ClinicBusinessHour> ClinicBusinessHours { get; set; } = null!;
+    public DbSet<ClinicMedia> ClinicMedia { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
@@ -404,6 +407,38 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(r => r.AppointmentId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // ── Presença pública da clínica (BACK-5) ─────────────────────────────
+        modelBuilder.Entity<Clinica>()
+            .HasIndex(c => c.PublicSlug)
+            .IsUnique()
+            .HasFilter("\"PublicSlug\" IS NOT NULL");
+
+        modelBuilder.Entity<ClinicCategory>()
+            .HasIndex(c => c.Slug)
+            .IsUnique();
+
+        // N:N Clinica <-> ClinicCategory (join implícito por skip navigation).
+        modelBuilder.Entity<Clinica>()
+            .HasMany(c => c.Categories)
+            .WithMany(cat => cat.Clinicas);
+
+        modelBuilder.Entity<ClinicBusinessHour>()
+            .HasOne(h => h.Clinica)
+            .WithMany(c => c.BusinessHours)
+            .HasForeignKey(h => h.ClinicaId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicBusinessHour>().HasIndex(h => h.ClinicaId);
+
+        modelBuilder.Entity<ClinicMedia>()
+            .Property(m => m.Type)
+            .HasConversion<string>();
+        modelBuilder.Entity<ClinicMedia>()
+            .HasOne(m => m.Clinica)
+            .WithMany(c => c.Media)
+            .HasForeignKey(m => m.ClinicaId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ClinicMedia>().HasIndex(m => m.ClinicaId);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
