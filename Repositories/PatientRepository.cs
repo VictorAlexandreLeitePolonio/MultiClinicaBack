@@ -79,6 +79,12 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
         return await query.AnyAsync();
     }
 
+    public async Task<bool> LinkExistsAsync(int patientAccountId)
+        => await db.Patients.AnyAsync(p =>
+            p.PatientAccountId == patientAccountId
+            && p.ClinicaId == usuario.ClinicaId
+            && !p.IsDeleted);
+
     public async Task<bool> HasAssociatedRecordsAsync(int id)
         => await db.Appointments.AnyAsync(a => a.PatientId == id && a.ClinicaId == usuario.ClinicaId)
            || await db.Payments.AnyAsync(p => p.PatientId == id && p.ClinicaId == usuario.ClinicaId);

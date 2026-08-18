@@ -19,7 +19,10 @@ public interface IPatientService
 
     Task<Result<PatientProfileDto>> GetProfileAsync(int id);
 
-    Task<Result<PatientResponseDto>> CreateAsync(CreatePatientDto dto);
+    Task<Result<PatientCreatedResponseDto>> CreateAsync(CreatePatientDto dto);
+
+    /// <summary>Provisiona acesso ao portal para um paciente legado (sem identidade global).</summary>
+    Task<Result<PatientCreatedResponseDto>> ProvisionPortalAccessAsync(int id);
 
     Task<Result<bool>> UpdateAsync(int id, UpdatePatientDto dto);
 

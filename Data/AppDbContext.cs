@@ -13,6 +13,7 @@ public class AppDbContext : DbContext
     public DbSet<MedicalRecord> MedicalRecords { get; set; } = null!;
     public DbSet<Payment> Payments { get; set; } = null!;
     public DbSet<Patient> Patients { get; set; } = null!;
+    public DbSet<PatientAccount> PatientAccounts { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
@@ -325,6 +326,36 @@ public class AppDbContext : DbContext
             .WithMany(f => f.Values)
             .HasForeignKey(v => v.FieldId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // ── Identidade global do paciente (PatientAccount) ───────────────────
+        modelBuilder.Entity<PatientAccount>()
+            .Property(a => a.Status)
+            .HasConversion<string>();
+
+        // Unicidade global de e-mail (apenas contas ativas/não deletadas).
+        modelBuilder.Entity<PatientAccount>()
+            .HasIndex(a => a.Email)
+            .IsUnique()
+            .HasFilter("\"Email\" IS NOT NULL AND \"IsDeleted\" = false");
+
+        // Unicidade global de CPF quando informado.
+        modelBuilder.Entity<PatientAccount>()
+            .HasIndex(a => a.CPF)
+            .IsUnique()
+            .HasFilter("\"CPF\" IS NOT NULL AND \"IsDeleted\" = false");
+
+        // Vínculo Patient → PatientAccount (nullable p/ legados).
+        modelBuilder.Entity<Patient>()
+            .HasOne(p => p.PatientAccount)
+            .WithMany(a => a.Patients)
+            .HasForeignKey(p => p.PatientAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // No máximo um Patient por (conta, clínica).
+        modelBuilder.Entity<Patient>()
+            .HasIndex(p => new { p.PatientAccountId, p.ClinicaId })
+            .IsUnique()
+            .HasFilter("\"PatientAccountId\" IS NOT NULL AND \"IsDeleted\" = false");
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -62,6 +62,8 @@ builder.Services.AddScoped<CompraService>();
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IPatientAccountRepository, PatientAccountRepository>();
+builder.Services.AddScoped<IPatientAccountService, PatientAccountService>();
 
 // Appointment — Repository e Service
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
