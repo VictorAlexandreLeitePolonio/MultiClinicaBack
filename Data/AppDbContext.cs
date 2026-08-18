@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Patient> Patients { get; set; } = null!;
     public DbSet<PatientAccount> PatientAccounts { get; set; } = null!;
     public DbSet<PatientAuthToken> PatientAuthTokens { get; set; } = null!;
+    public DbSet<AppointmentRequest> AppointmentRequests { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
@@ -371,6 +372,38 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(t => t.PatientAccountId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ── Solicitações de consulta (AppointmentRequest) ────────────────────
+        modelBuilder.Entity<AppointmentRequest>()
+            .Property(r => r.Status)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<AppointmentRequest>()
+            .Property(r => r.CancelledBy)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<AppointmentRequest>().HasIndex(r => r.PatientAccountId);
+        modelBuilder.Entity<AppointmentRequest>().HasIndex(r => r.ClinicaId);
+        modelBuilder.Entity<AppointmentRequest>().HasIndex(r => r.Status);
+        modelBuilder.Entity<AppointmentRequest>().HasIndex(r => r.RequestedDate);
+
+        modelBuilder.Entity<AppointmentRequest>()
+            .HasOne(r => r.PatientAccount)
+            .WithMany()
+            .HasForeignKey(r => r.PatientAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AppointmentRequest>()
+            .HasOne(r => r.Clinica)
+            .WithMany()
+            .HasForeignKey(r => r.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<AppointmentRequest>()
+            .HasOne(r => r.Appointment)
+            .WithMany()
+            .HasForeignKey(r => r.AppointmentId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

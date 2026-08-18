@@ -30,6 +30,9 @@ public class Clinica : AuditableEntity
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
 
+    /// <summary>Se a clínica aceita solicitações de consulta do portal do paciente (BACK-4/BACK-5).</summary>
+    public bool AcceptsAppointmentRequests { get; set; }
+
     public ICollection<User> Users { get; set; } = [];
     public ICollection<Patient> Patients { get; set; } = [];
     public ICollection<ClinicCharge> Charges { get; set; } = [];

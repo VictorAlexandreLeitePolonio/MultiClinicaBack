@@ -12,4 +12,10 @@ public interface IPatientNotificationService
     Task<bool> SendActivationInviteAsync(PatientAccount account);
     Task<bool> SendNewLinkNoticeAsync(PatientAccount account, string clinicName);
     Task<bool> SendPasswordResetAsync(PatientAccount account);
+
+    // ── Solicitações de consulta (BACK-4) ────────────────────────────────────
+    Task NotifyRequestCreatedAsync(Clinica clinic, PatientAccount account, AppointmentRequest request);
+    Task NotifyRequestAcceptedAsync(PatientAccount account, Clinica clinic, AppointmentRequest request);
+    Task NotifyRequestRejectedAsync(PatientAccount account, Clinica clinic, AppointmentRequest request);
+    Task NotifyRequestCancelledAsync(PatientAccount account, Clinica clinic, AppointmentRequest request);
 }
