@@ -78,7 +78,7 @@ public class PatientAccountTests
         Assert.True(body!.PatientAccountId > 0);
         Assert.Equal(PatientAccountStatus.PendingActivation, body.PatientAccountStatus);
         Assert.Equal(PatientPortalLinkResult.CreatedAccount, body.LinkResult);
-        Assert.False(body.InvitationSent); // stub — envio real em BACK-2
+        Assert.True(body.InvitationSent); // BACK-2: convite de ativação enviado (LogEmailSender em Testing)
 
         await app.SeedAsync(async db =>
         {

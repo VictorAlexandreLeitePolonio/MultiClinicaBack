@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using MultiClinica.API.Data;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace MultiClinica.API.Migrations
 {
     [DbContext(typeof(AppDbContext))]
-    partial class AppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260818184440_AddPatientAuthTokens")]
+    partial class AddPatientAuthTokens
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -21,21 +24,6 @@ namespace MultiClinica.API.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("ClinicCategoryClinica", b =>
-                {
-                    b.Property<int>("CategoriesId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("ClinicasId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("CategoriesId", "ClinicasId");
-
-                    b.HasIndex("ClinicasId");
-
-                    b.ToTable("ClinicCategoryClinica");
-                });
 
             modelBuilder.Entity("MultiClinica.API.Models.Appointment", b =>
                 {
@@ -94,81 +82,6 @@ namespace MultiClinica.API.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("Appointments");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.AppointmentRequest", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int?>("AppointmentId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("CancelledBy")
-                        .HasColumnType("text");
-
-                    b.Property<int>("ClinicaId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DeletedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("PatientAccountId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Reason")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("RequestedDate")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<DateTime?>("RespondedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("ResponseReason")
-                        .HasColumnType("text");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("AppointmentId");
-
-                    b.HasIndex("ClinicaId");
-
-                    b.HasIndex("PatientAccountId");
-
-                    b.HasIndex("RequestedDate");
-
-                    b.HasIndex("Status");
-
-                    b.ToTable("AppointmentRequests");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.AuditoriaFinanceira", b =>
@@ -269,105 +182,6 @@ namespace MultiClinica.API.Migrations
                     b.HasIndex("ClinicaId");
 
                     b.ToTable("CategoriasProduto");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicBusinessHour", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClinicaId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("DayOfWeek")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DeletedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<TimeOnly>("EndTime")
-                        .HasColumnType("time without time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<TimeOnly>("StartTime")
-                        .HasColumnType("time without time zone");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicaId");
-
-                    b.ToTable("ClinicBusinessHours");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicCategory", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DeletedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Slug")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("Slug")
-                        .IsUnique();
-
-                    b.ToTable("ClinicCategories");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.ClinicCharge", b =>
@@ -492,92 +306,6 @@ namespace MultiClinica.API.Migrations
                     b.ToTable("ClinicExpenses");
                 });
 
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicLike", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClinicaId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int>("PatientAccountId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicaId");
-
-                    b.HasIndex("PatientAccountId", "ClinicaId")
-                        .IsUnique();
-
-                    b.ToTable("ClinicLikes");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicMedia", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClinicaId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("ContentType")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DeletedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("ObjectKey")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<long>("Size")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("SortOrder")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Type")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicaId");
-
-                    b.ToTable("ClinicMedia");
-                });
-
             modelBuilder.Entity("MultiClinica.API.Models.Clinica", b =>
                 {
                     b.Property<int>("Id")
@@ -588,9 +316,6 @@ namespace MultiClinica.API.Migrations
 
                     b.Property<string>("AccentColor")
                         .HasColumnType("text");
-
-                    b.Property<bool>("AcceptsAppointmentRequests")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Bairro")
                         .IsRequired()
@@ -638,9 +363,6 @@ namespace MultiClinica.API.Migrations
                     b.Property<int?>("DeletedByUserId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
                     b.Property<int>("DiaVencimento")
                         .HasColumnType("integer");
 
@@ -664,20 +386,8 @@ namespace MultiClinica.API.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<bool>("IsPublic")
-                        .HasColumnType("boolean");
-
-                    b.Property<double?>("Latitude")
-                        .HasColumnType("double precision");
-
-                    b.Property<int>("LikeCount")
-                        .HasColumnType("integer");
-
                     b.Property<string>("LogoUrl")
                         .HasColumnType("text");
-
-                    b.Property<double?>("Longitude")
-                        .HasColumnType("double precision");
 
                     b.Property<string>("Nome")
                         .IsRequired()
@@ -696,9 +406,6 @@ namespace MultiClinica.API.Migrations
                         .HasColumnType("text");
 
                     b.Property<string>("PrimaryColor")
-                        .HasColumnType("text");
-
-                    b.Property<string>("PublicSlug")
                         .HasColumnType("text");
 
                     b.Property<string>("Rua")
@@ -724,10 +431,6 @@ namespace MultiClinica.API.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("Cnpj");
-
-                    b.HasIndex("PublicSlug")
-                        .IsUnique()
-                        .HasFilter("\"PublicSlug\" IS NOT NULL");
 
                     b.ToTable("Clinicas");
                 });
@@ -2054,21 +1757,6 @@ namespace MultiClinica.API.Migrations
                     b.ToTable("Users");
                 });
 
-            modelBuilder.Entity("ClinicCategoryClinica", b =>
-                {
-                    b.HasOne("MultiClinica.API.Models.ClinicCategory", null)
-                        .WithMany()
-                        .HasForeignKey("CategoriesId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("MultiClinica.API.Models.Clinica", null)
-                        .WithMany()
-                        .HasForeignKey("ClinicasId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-                });
-
             modelBuilder.Entity("MultiClinica.API.Models.Appointment", b =>
                 {
                     b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
@@ -2096,32 +1784,6 @@ namespace MultiClinica.API.Migrations
                     b.Navigation("User");
                 });
 
-            modelBuilder.Entity("MultiClinica.API.Models.AppointmentRequest", b =>
-                {
-                    b.HasOne("MultiClinica.API.Models.Appointment", "Appointment")
-                        .WithMany()
-                        .HasForeignKey("AppointmentId")
-                        .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
-                        .WithMany()
-                        .HasForeignKey("ClinicaId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("MultiClinica.API.Models.PatientAccount", "PatientAccount")
-                        .WithMany()
-                        .HasForeignKey("PatientAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Appointment");
-
-                    b.Navigation("Clinica");
-
-                    b.Navigation("PatientAccount");
-                });
-
             modelBuilder.Entity("MultiClinica.API.Models.AuditoriaFinanceira", b =>
                 {
                     b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
@@ -2144,17 +1806,6 @@ namespace MultiClinica.API.Migrations
                     b.Navigation("Clinica");
                 });
 
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicBusinessHour", b =>
-                {
-                    b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
-                        .WithMany("BusinessHours")
-                        .HasForeignKey("ClinicaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Clinica");
-                });
-
             modelBuilder.Entity("MultiClinica.API.Models.ClinicCharge", b =>
                 {
                     b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
@@ -2172,36 +1823,6 @@ namespace MultiClinica.API.Migrations
                         .WithMany()
                         .HasForeignKey("ClinicaId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Clinica");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicLike", b =>
-                {
-                    b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
-                        .WithMany()
-                        .HasForeignKey("ClinicaId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("MultiClinica.API.Models.PatientAccount", "PatientAccount")
-                        .WithMany()
-                        .HasForeignKey("PatientAccountId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Clinica");
-
-                    b.Navigation("PatientAccount");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.ClinicMedia", b =>
-                {
-                    b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
-                        .WithMany("Media")
-                        .HasForeignKey("ClinicaId")
-                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Clinica");
@@ -2547,15 +2168,11 @@ namespace MultiClinica.API.Migrations
 
             modelBuilder.Entity("MultiClinica.API.Models.Clinica", b =>
                 {
-                    b.Navigation("BusinessHours");
-
                     b.Navigation("Charges");
 
                     b.Navigation("CommercialHistory");
 
                     b.Navigation("EvolutionTemplates");
-
-                    b.Navigation("Media");
 
                     b.Navigation("Patients");
 

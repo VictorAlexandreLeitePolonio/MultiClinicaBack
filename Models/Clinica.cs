@@ -30,6 +30,23 @@ public class Clinica : AuditableEntity
     public string? ContactEmail { get; set; }
     public string? ContactPhone { get; set; }
 
+    /// <summary>Se a clínica aceita solicitações de consulta do portal do paciente (BACK-4/BACK-5).</summary>
+    public bool AcceptsAppointmentRequests { get; set; }
+
+    // ── Presença pública (BACK-5) ────────────────────────────────────────────
+    public string? PublicSlug { get; set; }
+    public string? Description { get; set; }
+    public bool IsPublic { get; set; }
+    public double? Latitude { get; set; }
+    public double? Longitude { get; set; }
+
+    /// <summary>Contador materializado de likes (BACK-6) — leitura rápida, sem COUNT(*).</summary>
+    public int LikeCount { get; set; }
+
+    public ICollection<ClinicCategory> Categories { get; set; } = [];
+    public ICollection<ClinicBusinessHour> BusinessHours { get; set; } = [];
+    public ICollection<ClinicMedia> Media { get; set; } = [];
+
     public ICollection<User> Users { get; set; } = [];
     public ICollection<Patient> Patients { get; set; } = [];
     public ICollection<ClinicCharge> Charges { get; set; } = [];

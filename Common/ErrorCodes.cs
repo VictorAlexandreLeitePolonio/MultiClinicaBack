@@ -22,4 +22,7 @@ public static class ErrorCodes
     public const string Forbidden          = "FORBIDDEN";
     public const string AlreadyOpen        = "ALREADY_OPEN";
     public const string AlreadyLinked      = "ALREADY_LINKED";
+    public const string RequestsDisabled   = "REQUESTS_DISABLED";
+    public const string InvalidStatus      = "INVALID_STATUS";
+    public const string NotLinked          = "NOT_LINKED";
 }
