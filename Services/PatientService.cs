@@ -10,8 +10,22 @@ namespace MultiClinica.API.Services;
 public class PatientService(
     IPatientRepository repository,
     IPatientAccountService accountService,
+    IPatientNotificationService notifications,
     IUsuarioLogadoService usuario) : IPatientService
 {
+    // Dispara o e-mail apropriado após o vínculo já persistido. Falha de envio
+    // nunca reverte o cadastro. Retorna se um convite de ATIVAÇÃO foi enviado.
+    private async Task<bool> NotifyLinkAsync(PatientAccount account, PatientPortalLinkResult linkResult)
+    {
+        if (linkResult == PatientPortalLinkResult.CreatedAccount
+            || account.Status == PatientAccountStatus.PendingActivation)
+            return await notifications.SendActivationInviteAsync(account);
+
+        var clinicName = await repository.GetCurrentClinicNameAsync() ?? "sua clínica";
+        await notifications.SendNewLinkNoticeAsync(account, clinicName);
+        return false; // aviso de vínculo, não convite de ativação
+    }
+
     private static string? NormalizeOptional(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
@@ -220,6 +234,8 @@ public class PatientService(
 
         await repository.AddAsync(patient);
 
+        var invitationSent = await NotifyLinkAsync(account, linkResult);
+
         return Result<PatientCreatedResponseDto>.Ok(new PatientCreatedResponseDto
         {
             Id                   = patient.Id,
@@ -227,7 +243,7 @@ public class PatientService(
             PatientAccountId     = account.Id,
             PatientAccountStatus = account.Status,
             LinkResult           = linkResult,
-            InvitationSent       = false, // stub — envio real do convite em BACK-2
+            InvitationSent       = invitationSent,
         });
     }
 
@@ -275,6 +291,8 @@ public class PatientService(
         patient.UpdatedByUserId = usuario.UserId;
         await repository.SaveChangesAsync();
 
+        var invitationSent = await NotifyLinkAsync(account, linkResult);
+
         return Result<PatientCreatedResponseDto>.Ok(new PatientCreatedResponseDto
         {
             Id                   = patient.Id,
@@ -282,7 +300,7 @@ public class PatientService(
             PatientAccountId     = account.Id,
             PatientAccountStatus = account.Status,
             LinkResult           = linkResult,
-            InvitationSent       = false, // stub — envio real do convite em BACK-2
+            InvitationSent       = invitationSent,
         });
     }
 

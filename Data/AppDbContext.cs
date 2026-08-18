@@ -14,6 +14,7 @@ public class AppDbContext : DbContext
     public DbSet<Payment> Payments { get; set; } = null!;
     public DbSet<Patient> Patients { get; set; } = null!;
     public DbSet<PatientAccount> PatientAccounts { get; set; } = null!;
+    public DbSet<PatientAuthToken> PatientAuthTokens { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
@@ -356,6 +357,20 @@ public class AppDbContext : DbContext
             .HasIndex(p => new { p.PatientAccountId, p.ClinicaId })
             .IsUnique()
             .HasFilter("\"PatientAccountId\" IS NOT NULL AND \"IsDeleted\" = false");
+
+        // ── Tokens de autenticação do paciente ───────────────────────────────
+        modelBuilder.Entity<PatientAuthToken>()
+            .Property(t => t.Type)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<PatientAuthToken>()
+            .HasIndex(t => t.TokenHash);
+
+        modelBuilder.Entity<PatientAuthToken>()
+            .HasOne(t => t.PatientAccount)
+            .WithMany()
+            .HasForeignKey(t => t.PatientAccountId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
