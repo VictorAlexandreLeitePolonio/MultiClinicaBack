@@ -71,6 +71,8 @@ builder.Services.AddScoped<IPatientTokenService, PatientTokenService>();
 builder.Services.AddScoped<IPatientNotificationService, PatientNotificationService>();
 builder.Services.AddScoped<IPatientAccountLoggedService, PatientAccountLoggedService>();
 builder.Services.AddScoped<IPatientPortalService, PatientPortalService>();
+builder.Services.AddScoped<IAppointmentRequestRepository, AppointmentRequestRepository>();
+builder.Services.AddScoped<IAppointmentRequestService, AppointmentRequestService>();
 
 var smtpOptions = SmtpOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(smtpOptions);

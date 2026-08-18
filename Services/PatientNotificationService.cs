@@ -64,6 +64,77 @@ public class PatientNotificationService(
         return await TrySendAsync(account.Email, "Redefinição de senha", body);
     }
 
+    // ── Solicitações de consulta (BACK-4) ────────────────────────────────────
+
+    public async Task NotifyRequestCreatedAsync(Clinica clinic, PatientAccount account, AppointmentRequest request)
+    {
+        var to = ClinicEmail(clinic);
+        if (to is null) return;
+
+        var body = $"""
+            <p>Nova solicitação de consulta de <strong>{account.Name ?? account.Email}</strong>.</p>
+            <p>Data desejada: {request.RequestedDate:dd/MM/yyyy HH:mm}</p>
+            <p>Motivo: {request.Reason ?? "-"}</p>
+            """;
+        await TrySendAsync(to, "Nova solicitação de consulta", body);
+    }
+
+    public async Task NotifyRequestAcceptedAsync(PatientAccount account, Clinica clinic, AppointmentRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(account.Email)) return;
+        var body = $"""
+            <p>Olá{NamePart(account)},</p>
+            <p>Sua solicitação de consulta na clínica <strong>{ClinicName(clinic)}</strong> foi <strong>aceita</strong>.</p>
+            <p>Data: {request.RequestedDate:dd/MM/yyyy HH:mm}</p>
+            """;
+        await TrySendAsync(account.Email, "Sua consulta foi confirmada", body);
+    }
+
+    public async Task NotifyRequestRejectedAsync(PatientAccount account, Clinica clinic, AppointmentRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(account.Email)) return;
+        var body = $"""
+            <p>Olá{NamePart(account)},</p>
+            <p>Sua solicitação de consulta na clínica <strong>{ClinicName(clinic)}</strong> foi recusada.</p>
+            <p>Motivo: {request.ResponseReason ?? "-"}</p>
+            """;
+        await TrySendAsync(account.Email, "Solicitação de consulta recusada", body);
+    }
+
+    public async Task NotifyRequestCancelledAsync(PatientAccount account, Clinica clinic, AppointmentRequest request)
+    {
+        // Cancelamento pelo paciente → avisa a clínica; pela clínica → avisa o paciente.
+        if (request.CancelledBy == CancellationOrigin.Patient)
+        {
+            var to = ClinicEmail(clinic);
+            if (to is null) return;
+            var body = $"""
+                <p>O paciente <strong>{account.Name ?? account.Email}</strong> cancelou uma solicitação de consulta.</p>
+                <p>Data: {request.RequestedDate:dd/MM/yyyy HH:mm}</p>
+                <p>Motivo: {request.ResponseReason ?? "-"}</p>
+                """;
+            await TrySendAsync(to, "Solicitação de consulta cancelada pelo paciente", body);
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(account.Email)) return;
+            var body = $"""
+                <p>Olá{NamePart(account)},</p>
+                <p>A clínica <strong>{ClinicName(clinic)}</strong> cancelou sua solicitação de consulta.</p>
+                <p>Motivo: {request.ResponseReason ?? "-"}</p>
+                """;
+            await TrySendAsync(account.Email, "Solicitação de consulta cancelada", body);
+        }
+    }
+
+    private static string? ClinicEmail(Clinica clinic)
+        => !string.IsNullOrWhiteSpace(clinic.ContactEmail) ? clinic.ContactEmail
+         : !string.IsNullOrWhiteSpace(clinic.Email) ? clinic.Email
+         : null;
+
+    private static string ClinicName(Clinica clinic)
+        => string.IsNullOrWhiteSpace(clinic.NomeFantasia) ? clinic.Nome : clinic.NomeFantasia;
+
     private static string NamePart(PatientAccount account)
         => string.IsNullOrWhiteSpace(account.Name) ? "" : $" {account.Name}";
 
