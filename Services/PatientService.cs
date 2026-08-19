@@ -96,6 +96,7 @@ public class PatientService(
             appointmentStatus = patient.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status ?? AppointmentStatus.Scheduled,
             paymentStatus     = patient.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status ?? PaymentStatus.Pending,
             CreatedAt         = patient.CreatedAt,
+            PortalAccessStatus = patient.PatientAccount?.Status,
         });
     }
 
@@ -123,6 +124,7 @@ public class PatientService(
             Cep       = patient.Cep,
             IsActive  = patient.IsActive,
             CreatedAt = patient.CreatedAt,
+            PortalAccessStatus = patient.PatientAccount?.Status,
 
             Appointments = patient.Appointments
                 .OrderByDescending(a => a.AppointmentDate)
@@ -300,6 +302,36 @@ public class PatientService(
             PatientAccountId     = account.Id,
             PatientAccountStatus = account.Status,
             LinkResult           = linkResult,
+            InvitationSent       = invitationSent,
+        });
+    }
+
+    // ── Reenvio de convite (paciente com conta pendente) ─────────────────────
+
+    public async Task<Result<PatientCreatedResponseDto>> ResendPortalInviteAsync(int id)
+    {
+        var patient = await repository.GetByIdAsync(id);
+        if (patient is null)
+            return Result<PatientCreatedResponseDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
+
+        var account = patient.PatientAccount;
+        if (account is null)
+            return Result<PatientCreatedResponseDto>.Fail(
+                ErrorCodes.NotFound, "Paciente sem acesso ao portal. Provisione o acesso antes de reenviar o convite.");
+
+        if (account.Status != PatientAccountStatus.PendingActivation)
+            return Result<PatientCreatedResponseDto>.Fail(
+                ErrorCodes.AlreadyLinked, "A conta deste paciente já está ativa; não há convite pendente para reenviar.");
+
+        var invitationSent = await notifications.SendActivationInviteAsync(account);
+
+        return Result<PatientCreatedResponseDto>.Ok(new PatientCreatedResponseDto
+        {
+            Id                   = patient.Id,
+            PatientId            = patient.Id,
+            PatientAccountId     = account.Id,
+            PatientAccountStatus = account.Status,
+            LinkResult           = PatientPortalLinkResult.AlreadyLinked,
             InvitationSent       = invitationSent,
         });
     }

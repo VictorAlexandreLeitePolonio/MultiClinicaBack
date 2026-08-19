@@ -48,6 +48,7 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
         => await db.Patients
             .Include(p => p.Appointments)
             .Include(p => p.Payments)
+            .Include(p => p.PatientAccount)
             .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<Patient?> GetByIdWithDetailsAsync(int id)
@@ -55,6 +56,7 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             .Include(p => p.Appointments).ThenInclude(a => a.User)
             .Include(p => p.MedicalRecords).ThenInclude(m => m.User)
             .Include(p => p.Payments).ThenInclude(p => p.Plan)
+            .Include(p => p.PatientAccount)
             .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<bool> EmailExistsAsync(string? email, int? excludeId = null)
