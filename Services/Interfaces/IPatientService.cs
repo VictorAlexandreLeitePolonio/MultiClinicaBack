@@ -24,6 +24,9 @@ public interface IPatientService
     /// <summary>Provisiona acesso ao portal para um paciente legado (sem identidade global).</summary>
     Task<Result<PatientCreatedResponseDto>> ProvisionPortalAccessAsync(int id);
 
+    /// <summary>Reenvia o convite de ativação para um paciente com conta pendente.</summary>
+    Task<Result<PatientCreatedResponseDto>> ResendPortalInviteAsync(int id);
+
     Task<Result<bool>> UpdateAsync(int id, UpdatePatientDto dto);
 
     Task<Result<bool>> ToggleStatusAsync(int id);

@@ -264,4 +264,95 @@ public class PatientAccountTests
         var response = await clientB.GetAsync($"/api/patients/{patientAId}");
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    // ── 10. Leitura expõe o estado de acesso ao portal ───────────────────────
+
+    private sealed record PatientRead(int Id, PatientAccountStatus? PortalAccessStatus);
+
+    [Fact]
+    public async Task Patient_read_exposes_portal_access_status()
+    {
+        await using var app = new MultiClinicaFactory();
+        int legacyId = 0;
+        await app.SeedAsync(async db =>
+        {
+            await SeedClinicAsync(db, "Clinica A", "admin-a@test.local");
+            var clinic = await db.Clinicas.SingleAsync();
+            var legacy = new Patient { ClinicaId = clinic.Id, Name = "Legado", Email = "legado@example.com", CPF = "12345678900" };
+            db.Patients.Add(legacy);
+            await db.SaveChangesAsync();
+            legacyId = legacy.Id;
+        });
+
+        using var client = await LoginAsync(app, "admin-a@test.local");
+
+        // Legado sem conta → PortalAccessStatus null ("Sem acesso").
+        var before = await (await client.GetAsync($"/api/patients/{legacyId}")).Content.ReadFromJsonAsync<PatientRead>(Json);
+        Assert.Null(before!.PortalAccessStatus);
+
+        await client.PostAsync($"/api/patients/{legacyId}/portal-access", null);
+
+        // Após provisionar → PendingActivation ("Convite pendente"), em ambas as leituras.
+        var afterDetail = await (await client.GetAsync($"/api/patients/{legacyId}")).Content.ReadFromJsonAsync<PatientRead>(Json);
+        Assert.Equal(PatientAccountStatus.PendingActivation, afterDetail!.PortalAccessStatus);
+
+        var afterProfile = await (await client.GetAsync($"/api/patients/{legacyId}/profile")).Content.ReadFromJsonAsync<PatientRead>(Json);
+        Assert.Equal(PatientAccountStatus.PendingActivation, afterProfile!.PortalAccessStatus);
+    }
+
+    // ── 11. Reenvio de convite ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task Resend_invite_succeeds_for_pending_account_and_conflicts_when_active()
+    {
+        await using var app = new MultiClinicaFactory();
+        int patientId = 0;
+        await app.SeedAsync(async db =>
+        {
+            await SeedClinicAsync(db, "Clinica A", "admin-a@test.local");
+        });
+
+        using var client = await LoginAsync(app, "admin-a@test.local");
+
+        var created = await (await client.PostAsJsonAsync("/api/patients", NewPatient("pending@example.com", "123.456.789-00")))
+            .Content.ReadFromJsonAsync<CreatedResponse>(Json);
+        patientId = created!.PatientId;
+
+        // Conta pendente → reenvio OK e convite enviado.
+        var resend = await client.PostAsync($"/api/patients/{patientId}/resend-invite", null);
+        Assert.Equal(HttpStatusCode.OK, resend.StatusCode);
+        var resendBody = await resend.Content.ReadFromJsonAsync<CreatedResponse>(Json);
+        Assert.True(resendBody!.InvitationSent);
+
+        // Ativa a conta e tenta reenviar → conflito.
+        await app.SeedAsync(async db =>
+        {
+            var account = await db.PatientAccounts.SingleAsync();
+            account.Status = PatientAccountStatus.Active;
+            await db.SaveChangesAsync();
+        });
+
+        var again = await client.PostAsync($"/api/patients/{patientId}/resend-invite", null);
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
+    }
+
+    [Fact]
+    public async Task Resend_invite_for_legacy_patient_without_account_returns_not_found()
+    {
+        await using var app = new MultiClinicaFactory();
+        int legacyId = 0;
+        await app.SeedAsync(async db =>
+        {
+            await SeedClinicAsync(db, "Clinica A", "admin-a@test.local");
+            var clinic = await db.Clinicas.SingleAsync();
+            var legacy = new Patient { ClinicaId = clinic.Id, Name = "Legado", Email = "legado@example.com" };
+            db.Patients.Add(legacy);
+            await db.SaveChangesAsync();
+            legacyId = legacy.Id;
+        });
+
+        using var client = await LoginAsync(app, "admin-a@test.local");
+        var response = await client.PostAsync($"/api/patients/{legacyId}/resend-invite", null);
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

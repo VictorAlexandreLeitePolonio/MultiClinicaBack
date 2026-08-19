@@ -20,6 +20,11 @@ namespace MultiClinica.API.DTOs.Patient
         public AppointmentStatus appointmentStatus { get; set; }
         public PaymentStatus paymentStatus { get; set; }
         public DateTime CreatedAt { get; set; }
-       
+
+        /// <summary>
+        /// Estado do acesso ao portal deste paciente. <c>null</c> quando não há
+        /// identidade global vinculada (paciente legado "Sem acesso").
+        /// </summary>
+        public PatientAccountStatus? PortalAccessStatus { get; set; }
     }
 }

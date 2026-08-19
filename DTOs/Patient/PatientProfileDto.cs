@@ -22,6 +22,12 @@ public class PatientProfileDto
     public bool   IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 
+    /// <summary>
+    /// Estado do acesso ao portal deste paciente. <c>null</c> quando não há
+    /// identidade global vinculada (paciente legado "Sem acesso").
+    /// </summary>
+    public PatientAccountStatus? PortalAccessStatus { get; set; }
+
     // ── Históricos ──────────────────────────────────────────────────────────
     public List<AppointmentSummary>   Appointments   { get; set; } = [];
     public List<MedicalRecordSummary> MedicalRecords { get; set; } = [];

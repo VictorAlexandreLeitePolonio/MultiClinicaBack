@@ -77,6 +77,21 @@ public class PatientsController(IPatientService service) : ControllerBase
         return Ok(result.Value);
     }
 
+    [HttpPost("{id}/resend-invite")]
+    public async Task<IActionResult> ResendPortalInvite(int id)
+    {
+        var result = await service.ResendPortalInviteAsync(id);
+        if (!result.IsSuccess)
+            return result.ErrorCode switch
+            {
+                ErrorCodes.NotFound      => NotFound(new { message = result.ErrorMessage }),
+                ErrorCodes.AlreadyLinked => Conflict(new { message = result.ErrorMessage }),
+                _                        => BadRequest(new { message = result.ErrorMessage })
+            };
+
+        return Ok(result.Value);
+    }
+
     [HttpPut("{id}")]
     public async Task<IActionResult> UpdatePatient(int id, UpdatePatientDto dto)
     {
