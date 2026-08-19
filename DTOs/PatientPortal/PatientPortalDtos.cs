@@ -45,4 +45,6 @@ public class PatientClinicDto
     public string? State { get; set; }
     public int LikeCount { get; set; }
     public bool LikedByMe { get; set; }
+    /// <summary>Se a clínica aceita solicitações de consulta online (gate do CTA "Solicitar consulta").</summary>
+    public bool AcceptsAppointmentRequests { get; set; }
 }

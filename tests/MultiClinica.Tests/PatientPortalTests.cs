@@ -22,7 +22,7 @@ public class PatientPortalTests
     private sealed record ApptDto(int AppointmentId, int ClinicId, string? ClinicName, string? ProfessionalName,
         DateTime AppointmentDate, AppointmentStatus Status);
     private sealed record ClinicDto(int Id, string? DisplayName, string? City, string? State,
-        IReadOnlyList<string> Categories, int LikeCount, bool LikedByMe);
+        IReadOnlyList<string> Categories, int LikeCount, bool LikedByMe, bool AcceptsAppointmentRequests);
 
     // ── Seeding ──────────────────────────────────────────────────────────────
 
@@ -200,6 +200,11 @@ public class PatientPortalTests
             var accountId = await SeedAccountAsync(db, "clin@example.com");
             await SeedClinicWithPatientAsync(db, "Clinica A", accountId);
             await SeedClinicWithPatientAsync(db, "Clinica B", accountId);
+
+            // Só a Clinica A aceita solicitações online.
+            var clinicA = await db.Clinicas.FirstAsync(c => c.Nome == "Clinica A");
+            clinicA.AcceptsAppointmentRequests = true;
+            await db.SaveChangesAsync();
         });
 
         using var client = await LoginPatientAsync(app, "clin@example.com");
@@ -208,6 +213,9 @@ public class PatientPortalTests
         Assert.Equal(2, clinics!.Count);
         Assert.All(clinics, c => Assert.Empty(c.Categories));  // BACK-5/6 ainda não disponível
         Assert.All(clinics, c => Assert.Equal(0, c.LikeCount));
+        // O flag acceptsAppointmentRequests é refletido por clínica (gate do CTA).
+        Assert.True(clinics.Single(c => c.DisplayName == "Clinica A").AcceptsAppointmentRequests);
+        Assert.False(clinics.Single(c => c.DisplayName == "Clinica B").AcceptsAppointmentRequests);
     }
 
     // ── privacidade ──────────────────────────────────────────────────────────

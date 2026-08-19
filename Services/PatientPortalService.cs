@@ -97,6 +97,7 @@ public class PatientPortalService(AppDbContext db, IPatientAccountLoggedService 
             Categories = [],
             LikeCount  = c.LikeCount,
             LikedByMe  = likedClinicIds.Contains(c.Id),
+            AcceptsAppointmentRequests = c.AcceptsAppointmentRequests,
         }).ToList();
 
         return Result<IReadOnlyList<PatientClinicDto>>.Ok(result);
