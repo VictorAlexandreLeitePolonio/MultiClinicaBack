@@ -7,7 +7,7 @@ namespace MultiClinica.API.DTOs.AppointmentRequest;
 public class CreateAppointmentRequestDto
 {
     public int ClinicId { get; set; }
-    public DateTime RequestedDate { get; set; }
+    public DateTimeOffset RequestedDate { get; set; }
     public string? Reason { get; set; }
 }
 
@@ -32,6 +32,7 @@ public class AppointmentRequestDto
     public string? ClinicName { get; set; }
     public string? PatientName { get; set; }
     public DateTime RequestedDate { get; set; }
+    public int DurationMinutes { get; set; }
     public string? Reason { get; set; }
     public AppointmentRequestStatus Status { get; set; }
     public string? ResponseReason { get; set; }

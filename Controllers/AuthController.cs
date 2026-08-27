@@ -15,6 +15,8 @@ using MultiClinica.API.Models;
 [Route("api/[controller]")]
 public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvironment environment) : ControllerBase
 {
+    private const string CookieName = "auth_token";
+
     [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
@@ -57,17 +59,17 @@ public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvi
 
         var tokenString = new JwtSecurityTokenHandler().WriteToken(token);
 
-        Response.Cookies.Append("auth_token", tokenString, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = !environment.IsDevelopment() && !environment.IsEnvironment("Testing"),
-            SameSite = environment.IsDevelopment() || environment.IsEnvironment("Testing")
-                ? SameSiteMode.Lax
-                : SameSiteMode.None,
-            Expires = DateTimeOffset.UtcNow.AddHours(8)
-        });
+        Response.Cookies.Append(CookieName, tokenString, BuildCookieOptions(DateTimeOffset.UtcNow.AddHours(8)));
 
         return Ok(BuildAuthResponse(user));
+    }
+
+    [AllowAnonymous]
+    [HttpPost("logout")]
+    public IActionResult Logout()
+    {
+        Response.Cookies.Delete(CookieName, BuildCookieOptions());
+        return Ok(new { message = "Sessão encerrada." });
     }
 
     [Authorize]
@@ -130,4 +132,15 @@ public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvi
                 : clinic.ContactPhone
         };
     }
+
+    private CookieOptions BuildCookieOptions(DateTimeOffset? expires = null) => new()
+    {
+        HttpOnly = true,
+        Secure = !environment.IsDevelopment() && !environment.IsEnvironment("Testing"),
+        SameSite = environment.IsDevelopment() || environment.IsEnvironment("Testing")
+            ? SameSiteMode.Lax
+            : SameSiteMode.None,
+        Path = "/",
+        Expires = expires,
+    };
 }

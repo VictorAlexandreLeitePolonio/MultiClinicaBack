@@ -31,4 +31,5 @@ public class User : AuditableEntity
     public ICollection<Payment> Payments { get; set; } = [];
     public ICollection<PatientTreatment> PatientTreatments { get; set; } = [];
     public ICollection<PatientEvolution> PatientEvolutions { get; set; } = [];
+    public ICollection<ProfessionalAvailability> ProfessionalAvailabilities { get; set; } = [];
 }

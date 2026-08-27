@@ -21,7 +21,8 @@ public class PatientAppointmentRequestsController(IAppointmentRequestService ser
             {
                 ErrorCodes.NotFound         => NotFound(new { message = result.ErrorMessage }),
                 ErrorCodes.NotLinked        => StatusCode(StatusCodes.Status403Forbidden, new { message = result.ErrorMessage }),
-                ErrorCodes.RequestsDisabled => Conflict(new { message = result.ErrorMessage }),
+                ErrorCodes.RequestsDisabled => Conflict(new { code = result.ErrorCode, message = result.ErrorMessage }),
+                ErrorCodes.SlotUnavailable  => Conflict(new { code = result.ErrorCode, message = result.ErrorMessage }),
                 _                           => BadRequest(new { message = result.ErrorMessage })
             };
 

@@ -10,32 +10,27 @@ public class AppointmentRequestService(
     IAppointmentRequestRepository repository,
     IPatientAccountLoggedService patient,
     IUsuarioLogadoService usuario,
-    IPatientNotificationService notifications) : IAppointmentRequestService
+    IPatientNotificationService notifications,
+    IAvailabilityService availability) : IAppointmentRequestService
 {
     // ── Paciente ─────────────────────────────────────────────────────────────
 
     public async Task<Result<AppointmentRequestDto>> CreateAsync(CreateAppointmentRequestDto dto)
     {
+        var slot = await availability.ValidateRequestedSlotAsync(dto.ClinicId, dto.RequestedDate);
+        if (!slot.IsSuccess)
+            return Fail(slot.ErrorCode!, slot.ErrorMessage!);
+
         var clinic = await repository.GetClinicAsync(dto.ClinicId);
-        if (clinic is null || !clinic.IsActive)
+        if (clinic is null)
             return Fail(ErrorCodes.NotFound, "Clínica não encontrada ou inativa.");
-
-        if (!clinic.AcceptsAppointmentRequests)
-            return Fail(ErrorCodes.RequestsDisabled, "Esta clínica não aceita solicitações de consulta.");
-
-        if (dto.RequestedDate <= DateTime.UtcNow)
-            return Fail(ErrorCodes.InvalidDate, "A data solicitada deve ser futura.");
-
-        // MVP: paciente precisa já estar vinculado à clínica.
-        var link = await repository.GetPatientLinkAsync(patient.PatientAccountId, dto.ClinicId);
-        if (link is null)
-            return Fail(ErrorCodes.NotLinked, "Você não possui vínculo com esta clínica.");
 
         var request = new AppointmentRequest
         {
             PatientAccountId = patient.PatientAccountId,
             ClinicaId        = dto.ClinicId,
-            RequestedDate    = dto.RequestedDate,
+            RequestedDate    = dto.RequestedDate.UtcDateTime,
+            DurationMinutes  = slot.Value,
             Reason           = string.IsNullOrWhiteSpace(dto.Reason) ? null : dto.Reason.Trim(),
             Status           = AppointmentRequestStatus.Pending,
         };
@@ -105,6 +100,11 @@ public class AppointmentRequestService(
         if (!await repository.ProfessionalBelongsToClinicAsync(dto.ProfessionalId, usuario.ClinicaId))
             return Fail(ErrorCodes.Forbidden, "Profissional inválido para esta clínica.");
 
+        var professional = await availability.ValidateProfessionalAsync(
+            usuario.ClinicaId, dto.ProfessionalId, request.RequestedDate, request.DurationMinutes);
+        if (!professional.IsSuccess)
+            return Fail(professional.ErrorCode!, professional.ErrorMessage!);
+
         var account = request.PatientAccount ?? await repository.GetAccountAsync(request.PatientAccountId);
 
         // Vínculo Patient da clínica (cria se necessário) — tudo num único SaveChanges.
@@ -126,6 +126,7 @@ public class AppointmentRequestService(
             UserId          = dto.ProfessionalId,
             Patient         = link,
             AppointmentDate = request.RequestedDate,
+            DurationMinutes = request.DurationMinutes,
             Status          = AppointmentStatus.Scheduled,
             CreatedByUserId = usuario.UserId,
         };
@@ -209,6 +210,7 @@ public class AppointmentRequestService(
             : string.IsNullOrWhiteSpace(r.Clinica.NomeFantasia) ? r.Clinica.Nome : r.Clinica.NomeFantasia,
         PatientName      = r.PatientAccount?.Name,
         RequestedDate    = r.RequestedDate,
+        DurationMinutes  = r.DurationMinutes,
         Reason           = r.Reason,
         Status           = r.Status,
         ResponseReason   = r.ResponseReason,
