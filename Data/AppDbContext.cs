@@ -20,6 +20,7 @@ public class AppDbContext : DbContext
     public DbSet<ClinicBusinessHour> ClinicBusinessHours { get; set; } = null!;
     public DbSet<ClinicMedia> ClinicMedia { get; set; } = null!;
     public DbSet<ClinicLike> ClinicLikes { get; set; } = null!;
+    public DbSet<ProfessionalAvailability> ProfessionalAvailabilities { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
@@ -42,6 +43,12 @@ public class AppDbContext : DbContext
     {
         modelBuilder.Entity<Clinica>()
             .HasIndex(c => c.Cnpj);
+        modelBuilder.Entity<Clinica>()
+            .Property(c => c.AppointmentSlotDurationMinutes)
+            .HasDefaultValue(60);
+        modelBuilder.Entity<Clinica>()
+            .Property(c => c.TimeZoneId)
+            .HasDefaultValue("America/Sao_Paulo");
 
         modelBuilder.Entity<User>()
             .HasIndex(u => u.Email)
@@ -54,6 +61,12 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Appointment>()
             .Property(a => a.Status)
             .HasConversion<string>();
+        modelBuilder.Entity<Appointment>()
+            .Property(a => a.DurationMinutes)
+            .HasDefaultValue(60);
+        modelBuilder.Entity<AppointmentRequest>()
+            .Property(a => a.DurationMinutes)
+            .HasDefaultValue(60);
 
         modelBuilder.Entity<Payment>()
             .Property(p => p.Status)
@@ -430,6 +443,19 @@ public class AppDbContext : DbContext
             .HasForeignKey(h => h.ClinicaId)
             .OnDelete(DeleteBehavior.Cascade);
         modelBuilder.Entity<ClinicBusinessHour>().HasIndex(h => h.ClinicaId);
+
+        modelBuilder.Entity<ProfessionalAvailability>()
+            .HasOne(a => a.Clinica)
+            .WithMany(c => c.ProfessionalAvailabilities)
+            .HasForeignKey(a => a.ClinicaId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProfessionalAvailability>()
+            .HasOne(a => a.User)
+            .WithMany(u => u.ProfessionalAvailabilities)
+            .HasForeignKey(a => a.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+        modelBuilder.Entity<ProfessionalAvailability>()
+            .HasIndex(a => new { a.ClinicaId, a.UserId, a.DayOfWeek });
 
         modelBuilder.Entity<ClinicMedia>()
             .Property(m => m.Type)

@@ -28,18 +28,24 @@ public class AppointmentRequestTests
         public int ClinicId;
         public int ProfessionalId;
         public int AccountId;
+        public DateTimeOffset RequestedDate;
         public string AdminEmail = "";
         public string PatientEmail = "";
     }
 
     // ── Seeding ──────────────────────────────────────────────────────────────
 
-    private static async Task<Scenario> SeedAsync(MultiClinicaFactory app, string suffix, bool acceptsRequests = true)
+    private static async Task<Scenario> SeedAsync(
+        MultiClinicaFactory app,
+        string suffix,
+        bool acceptsRequests = true,
+        bool createLink = true)
     {
         var s = new Scenario
         {
             AdminEmail = $"admin-{suffix}@test.local",
-            PatientEmail = $"patient-{suffix}@example.com"
+            PatientEmail = $"patient-{suffix}@example.com",
+            RequestedDate = new DateTimeOffset(DateTime.UtcNow.Date.AddDays(3).AddHours(10), TimeSpan.Zero),
         };
 
         await app.SeedAsync(async db =>
@@ -47,7 +53,8 @@ public class AppointmentRequestTests
             var clinic = new Clinica
             {
                 Nome = $"Clinica {suffix}", NomeFantasia = $"Clinica {suffix}", NomeResponsavel = "Victor",
-                Email = $"clinic-{suffix}@test.local", AcceptsAppointmentRequests = acceptsRequests
+                Email = $"clinic-{suffix}@test.local", AcceptsAppointmentRequests = acceptsRequests,
+                IsPublic = true, TimeZoneId = "UTC",
             };
             db.Clinicas.Add(clinic);
             await db.SaveChangesAsync();
@@ -76,8 +83,33 @@ public class AppointmentRequestTests
             s.ProfessionalId = professional.Id;
             s.AccountId = account.Id;
 
-            db.Patients.Add(new Patient { ClinicaId = clinic.Id, PatientAccountId = account.Id, Name = "Paciente" });
+            db.ClinicBusinessHours.Add(new ClinicBusinessHour
+            {
+                ClinicaId = clinic.Id,
+                DayOfWeek = s.RequestedDate.DayOfWeek,
+                StartTime = new TimeOnly(8, 0),
+                EndTime = new TimeOnly(18, 0),
+            });
+            db.ProfessionalAvailabilities.Add(new ProfessionalAvailability
+            {
+                ClinicaId = clinic.Id,
+                UserId = professional.Id,
+                DayOfWeek = s.RequestedDate.DayOfWeek,
+                StartTime = new TimeOnly(8, 0),
+                EndTime = new TimeOnly(18, 0),
+            });
             await db.SaveChangesAsync();
+
+            if (createLink)
+            {
+                db.Patients.Add(new Patient
+                {
+                    ClinicaId = clinic.Id,
+                    PatientAccountId = account.Id,
+                    Name = "Paciente",
+                });
+                await db.SaveChangesAsync();
+            }
         });
 
         return s;
@@ -97,10 +129,10 @@ public class AppointmentRequestTests
         return client;
     }
 
-    private static async Task<int> CreateRequestAsync(HttpClient patient, int clinicId)
+    private static async Task<int> CreateRequestAsync(HttpClient patient, Scenario scenario)
     {
         var response = await patient.PostAsJsonAsync("/api/patient/appointment-requests",
-            new { clinicId, requestedDate = DateTime.UtcNow.AddDays(3), reason = "Avaliação" });
+            new { clinicId = scenario.ClinicId, requestedDate = scenario.RequestedDate, reason = "Avaliação" });
         response.EnsureSuccessStatusCode();
         var dto = await response.Content.ReadFromJsonAsync<RequestDto>(Json);
         return dto!.Id;
@@ -116,12 +148,34 @@ public class AppointmentRequestTests
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
 
         var response = await patient.PostAsJsonAsync("/api/patient/appointment-requests",
-            new { clinicId = s.ClinicId, requestedDate = DateTime.UtcNow.AddDays(3), reason = "Avaliação" });
+            new { clinicId = s.ClinicId, requestedDate = s.RequestedDate, reason = "Avaliação" });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var dto = await response.Content.ReadFromJsonAsync<RequestDto>(Json);
         Assert.Equal(AppointmentRequestStatus.Pending, dto!.Status);
         Assert.Null(dto.AppointmentId);
+    }
+
+    [Fact]
+    public async Task Patient_without_clinic_link_creates_request_without_creating_link()
+    {
+        await using var app = new MultiClinicaFactory();
+        var scenario = await SeedAsync(app, "unlinked", createLink: false);
+        using var patient = await LoginPatientAsync(app, scenario.PatientEmail);
+
+        var response = await patient.PostAsJsonAsync("/api/patient/appointment-requests", new
+        {
+            clinicId = scenario.ClinicId,
+            requestedDate = scenario.RequestedDate,
+            reason = "Primeira avaliação",
+        });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await app.SeedAsync(async db =>
+        {
+            Assert.Equal(0, await db.Patients.CountAsync());
+            Assert.Equal(1, await db.AppointmentRequests.CountAsync());
+        });
     }
 
     [Fact]
@@ -132,7 +186,7 @@ public class AppointmentRequestTests
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
 
         var response = await patient.PostAsJsonAsync("/api/patient/appointment-requests",
-            new { clinicId = s.ClinicId, requestedDate = DateTime.UtcNow.AddDays(3), reason = "x" });
+            new { clinicId = s.ClinicId, requestedDate = s.RequestedDate, reason = "x" });
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
     }
@@ -145,8 +199,8 @@ public class AppointmentRequestTests
         var s2 = await SeedAsync(app, "2");
         using var p1 = await LoginPatientAsync(app, s1.PatientEmail);
         using var p2 = await LoginPatientAsync(app, s2.PatientEmail);
-        await CreateRequestAsync(p1, s1.ClinicId);
-        await CreateRequestAsync(p2, s2.ClinicId);
+        await CreateRequestAsync(p1, s1);
+        await CreateRequestAsync(p2, s2);
 
         var list = await p1.GetFromJsonAsync<List<RequestDto>>("/api/patient/appointment-requests", Json);
         Assert.Single(list!);
@@ -161,8 +215,8 @@ public class AppointmentRequestTests
         var s2 = await SeedAsync(app, "2");
         using var p1 = await LoginPatientAsync(app, s1.PatientEmail);
         using var p2 = await LoginPatientAsync(app, s2.PatientEmail);
-        await CreateRequestAsync(p1, s1.ClinicId);
-        await CreateRequestAsync(p2, s2.ClinicId);
+        await CreateRequestAsync(p1, s1);
+        await CreateRequestAsync(p2, s2);
 
         using var clinic1 = await LoginClinicAsync(app, s1.AdminEmail);
         var list = await clinic1.GetFromJsonAsync<List<RequestDto>>("/api/appointment-requests", Json);
@@ -177,7 +231,7 @@ public class AppointmentRequestTests
         await using var app = new MultiClinicaFactory();
         var s = await SeedAsync(app, "1");
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
-        var id = await CreateRequestAsync(patient, s.ClinicId);
+        var id = await CreateRequestAsync(patient, s);
 
         var response = await patient.PatchAsJsonAsync($"/api/patient/appointment-requests/{id}/cancel",
             new { reason = "Mudei de ideia" });
@@ -194,7 +248,7 @@ public class AppointmentRequestTests
         await using var app = new MultiClinicaFactory();
         var s = await SeedAsync(app, "1");
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
-        var id = await CreateRequestAsync(patient, s.ClinicId);
+        var id = await CreateRequestAsync(patient, s);
 
         using var clinic = await LoginClinicAsync(app, s.AdminEmail);
         var noReason = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{id}/reject", new { reason = "" });
@@ -214,7 +268,7 @@ public class AppointmentRequestTests
         await using var app = new MultiClinicaFactory();
         var s = await SeedAsync(app, "1");
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
-        var id = await CreateRequestAsync(patient, s.ClinicId);
+        var id = await CreateRequestAsync(patient, s);
 
         using var clinic = await LoginClinicAsync(app, s.AdminEmail);
         var response = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{id}/cancel",
@@ -232,7 +286,7 @@ public class AppointmentRequestTests
         await using var app = new MultiClinicaFactory();
         var s = await SeedAsync(app, "1");
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
-        var id = await CreateRequestAsync(patient, s.ClinicId);
+        var id = await CreateRequestAsync(patient, s);
 
         using var clinic = await LoginClinicAsync(app, s.AdminEmail);
         var response = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{id}/accept",
@@ -252,12 +306,50 @@ public class AppointmentRequestTests
     }
 
     [Fact]
+    public async Task Accepting_unlinked_request_creates_patient_link_and_appointment_together()
+    {
+        await using var app = new MultiClinicaFactory();
+        var scenario = await SeedAsync(app, "accept-unlinked", createLink: false);
+        using var patient = await LoginPatientAsync(app, scenario.PatientEmail);
+        var requestId = await CreateRequestAsync(patient, scenario);
+        using var clinic = await LoginClinicAsync(app, scenario.AdminEmail);
+
+        var response = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{requestId}/accept",
+            new { professionalId = scenario.ProfessionalId });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await app.SeedAsync(async db =>
+        {
+            var link = await db.Patients.SingleAsync();
+            Assert.Equal(scenario.AccountId, link.PatientAccountId);
+            Assert.Equal(scenario.ClinicId, link.ClinicaId);
+            Assert.Equal(1, await db.Appointments.CountAsync());
+        });
+    }
+
+    [Fact]
+    public async Task Rejecting_unlinked_request_does_not_create_patient_link()
+    {
+        await using var app = new MultiClinicaFactory();
+        var scenario = await SeedAsync(app, "reject-unlinked", createLink: false);
+        using var patient = await LoginPatientAsync(app, scenario.PatientEmail);
+        var requestId = await CreateRequestAsync(patient, scenario);
+        using var clinic = await LoginClinicAsync(app, scenario.AdminEmail);
+
+        var response = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{requestId}/reject",
+            new { reason = "Sem disponibilidade" });
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await app.SeedAsync(async db => Assert.Equal(0, await db.Patients.CountAsync()));
+    }
+
+    [Fact]
     public async Task Accepted_request_cannot_be_accepted_twice()
     {
         await using var app = new MultiClinicaFactory();
         var s = await SeedAsync(app, "1");
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
-        var id = await CreateRequestAsync(patient, s.ClinicId);
+        var id = await CreateRequestAsync(patient, s);
 
         using var clinic = await LoginClinicAsync(app, s.AdminEmail);
         var first = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{id}/accept", new { professionalId = s.ProfessionalId });
@@ -274,7 +366,7 @@ public class AppointmentRequestTests
         await using var app = new MultiClinicaFactory();
         var s = await SeedAsync(app, "1");
         using var patient = await LoginPatientAsync(app, s.PatientEmail);
-        var id = await CreateRequestAsync(patient, s.ClinicId);
+        var id = await CreateRequestAsync(patient, s);
 
         using var clinic = await LoginClinicAsync(app, s.AdminEmail);
         (await clinic.PatchAsJsonAsync($"/api/appointment-requests/{id}/accept", new { professionalId = s.ProfessionalId })).EnsureSuccessStatusCode();
@@ -293,7 +385,7 @@ public class AppointmentRequestTests
         var s1 = await SeedAsync(app, "1");
         var s2 = await SeedAsync(app, "2");
         using var patient = await LoginPatientAsync(app, s1.PatientEmail);
-        var id = await CreateRequestAsync(patient, s1.ClinicId);
+        var id = await CreateRequestAsync(patient, s1);
 
         using var clinic = await LoginClinicAsync(app, s1.AdminEmail);
         var response = await clinic.PatchAsJsonAsync($"/api/appointment-requests/{id}/accept",
@@ -316,7 +408,7 @@ public class AppointmentRequestTests
         var s1 = await SeedAsync(app, "1");
         var s2 = await SeedAsync(app, "2");
         using var patient = await LoginPatientAsync(app, s1.PatientEmail);
-        var id = await CreateRequestAsync(patient, s1.ClinicId);
+        var id = await CreateRequestAsync(patient, s1);
 
         using var otherClinic = await LoginClinicAsync(app, s2.AdminEmail);
         var get = await otherClinic.GetAsync($"/api/appointment-requests/{id}");

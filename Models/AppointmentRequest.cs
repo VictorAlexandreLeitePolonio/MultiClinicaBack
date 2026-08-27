@@ -28,6 +28,7 @@ public class AppointmentRequest : AuditableEntity
     public Clinica Clinica { get; set; } = null!;
 
     public DateTime RequestedDate { get; set; }
+    public int DurationMinutes { get; set; } = 60;
     public string? Reason { get; set; }
 
     public AppointmentRequestStatus Status { get; set; } = AppointmentRequestStatus.Pending;

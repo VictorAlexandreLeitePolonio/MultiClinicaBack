@@ -32,6 +32,8 @@ public class Clinica : AuditableEntity
 
     /// <summary>Se a clínica aceita solicitações de consulta do portal do paciente (BACK-4/BACK-5).</summary>
     public bool AcceptsAppointmentRequests { get; set; }
+    public int AppointmentSlotDurationMinutes { get; set; } = 60;
+    public string TimeZoneId { get; set; } = "America/Sao_Paulo";
 
     // ── Presença pública (BACK-5) ────────────────────────────────────────────
     public string? PublicSlug { get; set; }
@@ -46,6 +48,7 @@ public class Clinica : AuditableEntity
     public ICollection<ClinicCategory> Categories { get; set; } = [];
     public ICollection<ClinicBusinessHour> BusinessHours { get; set; } = [];
     public ICollection<ClinicMedia> Media { get; set; } = [];
+    public ICollection<ProfessionalAvailability> ProfessionalAvailabilities { get; set; } = [];
 
     public ICollection<User> Users { get; set; } = [];
     public ICollection<Patient> Patients { get; set; } = [];

@@ -20,6 +20,7 @@ public class Appointment : AuditableEntity
 
     // Data e hora da consulta.
     public DateTime AppointmentDate { get; set; }
+    public int DurationMinutes { get; set; } = 60;
 
     // Estado da consulta — inicia como "Scheduled" por padrão.
     public AppointmentStatus Status { get; set; } = AppointmentStatus.Scheduled;
