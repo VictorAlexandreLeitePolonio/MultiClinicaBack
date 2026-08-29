@@ -3,6 +3,7 @@ using System.Security.Claims;
 using System.Text;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using MultiClinica.API.Authorization;
@@ -28,6 +29,7 @@ public class PatientAuthController(
     // ── Login ────────────────────────────────────────────────────────────────
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("login")]
     public async Task<IActionResult> Login(PatientLoginDto dto)
     {
@@ -72,6 +74,7 @@ public class PatientAuthController(
     // ── Ativação ─────────────────────────────────────────────────────────────
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("activate")]
     public async Task<IActionResult> Activate(ActivateAccountDto dto)
     {
@@ -94,6 +97,7 @@ public class PatientAuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("resend-activation")]
     public async Task<IActionResult> ResendActivation(ResendActivationDto dto)
     {
@@ -110,6 +114,7 @@ public class PatientAuthController(
     // ── Redefinição de senha ─────────────────────────────────────────────────
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(ForgotPasswordDto dto)
     {
@@ -124,6 +129,7 @@ public class PatientAuthController(
     }
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("reset-password")]
     public async Task<IActionResult> ResetPassword(ResetPasswordDto dto)
     {

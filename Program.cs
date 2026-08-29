@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Text.Json.Serialization;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Data;
@@ -132,6 +134,16 @@ var jwtKey = builder.Configuration["Jwt:Key"]!;
 var jwtIssuer = builder.Configuration["Jwt:Issuer"]!;
 var jwtAudience = builder.Configuration["Jwt:Audience"]!;
 
+// Guarda de produção: a chave default do appsettings.json está pública no repositório —
+// se ela (ou qualquer chave curta) chegar em produção, qualquer pessoa forja tokens.
+if (!builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing"))
+{
+    const string defaultJwtKey = "chave-secreta-para-gerar-o-token";
+    if (jwtKey == defaultJwtKey || Encoding.UTF8.GetBytes(jwtKey).Length < 32)
+        throw new InvalidOperationException(
+            "Jwt:Key inseguro para produção: defina a env var Jwt__Key com uma chave aleatória de pelo menos 32 bytes.");
+}
+
 // Audiência dedicada do paciente (JWT sem vínculo de tenant).
 var jwtPatientAudience = builder.Configuration["Jwt:PatientAudience"] ?? "MultiClinica.Patient";
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtKey));
@@ -183,6 +195,33 @@ builder.Services.AddAuthentication(AuthSchemes.ClinicAuth)
         };
     });
 
+// Rate limiting fixo por IP nos endpoints de credencial (login, ativação, reset de senha).
+// Desligado em Testing para não estrangular os testes de integração.
+// ponytail: janela fixa por IP; atrás do proxy o IP vem de X-Forwarded-For (spoofável) —
+// se precisar de precisão, trocar a partição para uma chave por conta/e-mail.
+var rateLimitingEnabled = !builder.Environment.IsEnvironment("Testing");
+if (rateLimitingEnabled)
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.ContentType = "application/json";
+            await context.HttpContext.Response.WriteAsync(
+                """{"message":"Muitas tentativas. Aguarde um minuto e tente novamente."}""",
+                cancellationToken);
+        };
+        options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+    });
+}
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
@@ -231,6 +270,8 @@ if (app.Environment.IsDevelopment())
 app.UseForwardedHeaders();
 app.UseRouting();
 app.UseCors("Frontend");
+if (rateLimitingEnabled)
+    app.UseRateLimiter();
 app.UseAuthentication();
 app.Use(async (context, next) =>
 {
