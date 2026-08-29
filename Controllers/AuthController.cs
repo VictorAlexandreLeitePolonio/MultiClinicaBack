@@ -9,6 +9,7 @@ using System.Text;
 using MultiClinica.API.Common;
 using MultiClinica.API.DTOs.Auth;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.RateLimiting;
 using MultiClinica.API.Models;
 
 [ApiController]
@@ -18,6 +19,7 @@ public class AuthController(AppDbContext db, IConfiguration config, IWebHostEnvi
     private const string CookieName = "auth_token";
 
     [AllowAnonymous]
+    [EnableRateLimiting("auth")]
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginDto dto)
     {

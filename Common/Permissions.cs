@@ -53,6 +53,11 @@ public static class Permissions
         public const string VisualizarStatus = "financeiro.paciente.visualizar_status";
     }
 
+    public static class Auditoria
+    {
+        public const string Visualizar = "financeiro.auditoria.visualizar";
+    }
+
     public static class ClinicSettings
     {
         public const string View = "clinic.settings.view";
