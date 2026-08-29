@@ -82,7 +82,22 @@ builder.Services.AddScoped<IAvailabilityService, AvailabilityService>();
 
 var smtpOptions = SmtpOptions.FromConfiguration(builder.Configuration);
 builder.Services.AddSingleton(smtpOptions);
-if (smtpOptions.IsConfigured)
+
+// Transporte de e-mail, em ordem de preferência:
+// RESEND_API_KEY → API HTTP do Resend (Railway bloqueia SMTP em alguns planos);
+// SMTP_HOST → SMTP genérico; nada configurado → só loga (dev).
+var resendApiKey = builder.Configuration["RESEND_API_KEY"];
+if (!string.IsNullOrWhiteSpace(resendApiKey))
+{
+    builder.Services.AddHttpClient<IEmailSender, ResendEmailSender>(client =>
+    {
+        client.BaseAddress = new Uri("https://api.resend.com/");
+        client.DefaultRequestHeaders.Authorization =
+            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", resendApiKey);
+        client.Timeout = TimeSpan.FromSeconds(10);
+    });
+}
+else if (smtpOptions.IsConfigured)
     builder.Services.AddScoped<IEmailSender, SmtpEmailSender>();
 else
     builder.Services.AddScoped<IEmailSender, LogEmailSender>();

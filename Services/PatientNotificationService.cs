@@ -20,7 +20,7 @@ public class PatientNotificationService(
             return false;
 
         var token = await tokenService.IssueAsync(account.Id, PatientAuthTokenType.Activation, ActivationTtl);
-        var link = $"{FrontendUrl}/ativar-conta?token={token}";
+        var link = $"{FrontendUrl}/paciente/ativar?token={token}";
         var body = $"""
             <p>Olá{NamePart(account)},</p>
             <p>Você recebeu acesso ao portal do paciente. Clique no link abaixo para ativar sua conta e definir sua senha:</p>
@@ -36,7 +36,7 @@ public class PatientNotificationService(
         if (string.IsNullOrWhiteSpace(account.Email))
             return false;
 
-        var link = $"{FrontendUrl}/login";
+        var link = $"{FrontendUrl}/paciente/login";
         var body = $"""
             <p>Olá{NamePart(account)},</p>
             <p>Sua conta foi vinculada à clínica <strong>{clinicName}</strong>.</p>
@@ -53,7 +53,7 @@ public class PatientNotificationService(
             return false;
 
         var token = await tokenService.IssueAsync(account.Id, PatientAuthTokenType.PasswordReset, ResetTtl);
-        var link = $"{FrontendUrl}/redefinir-senha?token={token}";
+        var link = $"{FrontendUrl}/paciente/redefinir-senha?token={token}";
         var body = $"""
             <p>Olá{NamePart(account)},</p>
             <p>Recebemos um pedido para redefinir sua senha. Clique no link abaixo:</p>
