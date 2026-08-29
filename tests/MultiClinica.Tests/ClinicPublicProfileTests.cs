@@ -279,4 +279,24 @@ public class ClinicPublicProfileTests
         Assert.Equal(2, root.GetProperty("categories").GetArrayLength());
         Assert.Equal(1, root.GetProperty("gallery").GetArrayLength());
     }
+    // ── vitrine pública ───────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task Showcase_lists_only_public_active_clinics_anonymously()
+    {
+        await using var app = new MultiClinicaFactory();
+        await SeedClinicAsync(app, "vitrine-pub", isPublic: true, slug: "vitrine-publica");
+        await SeedClinicAsync(app, "vitrine-priv", isPublic: false, slug: "vitrine-privada");
+        await SeedClinicAsync(app, "vitrine-inativa", isPublic: true, isActive: false, slug: "vitrine-inativa");
+
+        using var client = app.CreateClient();
+        var response = await client.GetAsync("/api/public/clinics");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var clinics = await response.Content.ReadFromJsonAsync<List<JsonElement>>();
+        var slugs = clinics!.Select(c => c.GetProperty("slug").GetString()).ToList();
+        Assert.Contains("vitrine-publica", slugs);
+        Assert.DoesNotContain("vitrine-privada", slugs);
+        Assert.DoesNotContain("vitrine-inativa", slugs);
+    }
 }

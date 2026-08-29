@@ -17,7 +17,7 @@ public class AppointmentRequestService(
 
     public async Task<Result<AppointmentRequestDto>> CreateAsync(CreateAppointmentRequestDto dto)
     {
-        var slot = await availability.ValidateRequestedSlotAsync(dto.ClinicId, dto.RequestedDate);
+        var slot = await availability.ValidateRequestedSlotAsync(dto.ClinicId, dto.RequestedDate, patient.PatientAccountId);
         if (!slot.IsSuccess)
             return Fail(slot.ErrorCode!, slot.ErrorMessage!);
 

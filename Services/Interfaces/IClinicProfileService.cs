@@ -17,4 +17,5 @@ public interface IClinicProfileService
 
     // Perfil público
     Task<Result<PublicClinicDto>> GetPublicBySlugAsync(string slug);
+    Task<Result<IReadOnlyList<PublicClinicSummaryDto>>> GetPublicShowcaseAsync(int limit);
 }

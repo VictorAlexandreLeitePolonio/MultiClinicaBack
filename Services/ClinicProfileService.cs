@@ -156,6 +156,36 @@ public class ClinicProfileService(
         return Result<PublicClinicDto>.Ok(dto);
     }
 
+    public async Task<Result<IReadOnlyList<PublicClinicSummaryDto>>> GetPublicShowcaseAsync(int limit)
+    {
+        limit = Math.Clamp(limit, 1, 24);
+        var clinics = await db.Clinicas
+            .AsNoTracking()
+            .Include(c => c.Categories)
+            .Where(c => c.IsPublic && c.IsActive && !c.IsDeleted && c.PublicSlug != null)
+            .OrderByDescending(c => c.LikeCount)
+            .ThenBy(c => c.Id)
+            .Take(limit)
+            .ToListAsync();
+
+        var result = clinics.Select(c => new PublicClinicSummaryDto
+        {
+            Id          = c.Id,
+            Slug        = c.PublicSlug,
+            DisplayName = string.IsNullOrWhiteSpace(c.DisplayName)
+                ? (string.IsNullOrWhiteSpace(c.NomeFantasia) ? c.Nome : c.NomeFantasia)
+                : c.DisplayName,
+            LogoUrl     = c.LogoUrl,
+            City        = c.Cidade,
+            State       = c.Estado,
+            Categories  = MapCategories(c.Categories),
+            LikeCount   = c.LikeCount,
+            AcceptsAppointmentRequests = c.AcceptsAppointmentRequests,
+        }).ToList();
+
+        return Result<IReadOnlyList<PublicClinicSummaryDto>>.Ok(result);
+    }
+
     // ── Helpers ────────────────────────────────────────────────────────────────
 
     private Task<List<ClinicBusinessHour>> LoadHours(int clinicaId)

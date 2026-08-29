@@ -11,7 +11,8 @@ namespace MultiClinica.API.Controllers;
 [Authorize(AuthenticationSchemes = AuthSchemes.PatientAuth)]
 public sealed class PatientMarketplaceController(
     IMarketplaceService service,
-    IAvailabilityService availability) : ControllerBase
+    IAvailabilityService availability,
+    IPatientAccountLoggedService patient) : ControllerBase
 {
     [HttpGet("categories")]
     public async Task<IActionResult> GetCategories()
@@ -33,7 +34,7 @@ public sealed class PatientMarketplaceController(
     [HttpGet("clinics/{clinicId:int}/availability")]
     public async Task<IActionResult> GetAvailability(int clinicId, [FromQuery] DateOnly date)
     {
-        var result = await availability.GetClinicAvailabilityAsync(clinicId, date);
+        var result = await availability.GetClinicAvailabilityAsync(clinicId, date, patient.PatientAccountId);
         return result.IsSuccess
             ? Ok(result.Value)
             : NotFound(new { code = result.ErrorCode, message = result.ErrorMessage });

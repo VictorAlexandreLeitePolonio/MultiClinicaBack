@@ -98,11 +98,12 @@ public sealed class AvailabilityService(AppDbContext db, IUsuarioLogadoService u
         return Result<IReadOnlyList<ProfessionalAvailabilityRangeDto>>.Ok(response);
     }
 
-    public async Task<Result<ClinicAvailabilityDto>> GetClinicAvailabilityAsync(int clinicId, DateOnly date)
+    public async Task<Result<ClinicAvailabilityDto>> GetClinicAvailabilityAsync(int clinicId, DateOnly date, int patientAccountId)
     {
         var clinic = await db.Clinicas.AsNoTracking().FirstOrDefaultAsync(c =>
-            c.Id == clinicId && c.IsActive && c.IsPublic && !c.IsDeleted && c.AcceptsAppointmentRequests);
-        if (clinic is null)
+            c.Id == clinicId && c.IsActive && !c.IsDeleted && c.AcceptsAppointmentRequests);
+        // Clínica fora do marketplace (IsPublic=false) continua agendável para pacientes já vinculados.
+        if (clinic is null || (!clinic.IsPublic && !await IsLinkedAsync(clinicId, patientAccountId)))
             return Result<ClinicAvailabilityDto>.Fail(ErrorCodes.NotFound, "Clínica indisponível para agendamento.");
 
         if (!TryGetTimeZone(clinic.TimeZoneId, out var timeZone))
@@ -180,12 +181,12 @@ public sealed class AvailabilityService(AppDbContext db, IUsuarioLogadoService u
         });
     }
 
-    public async Task<Result<int>> ValidateRequestedSlotAsync(int clinicId, DateTimeOffset start)
+    public async Task<Result<int>> ValidateRequestedSlotAsync(int clinicId, DateTimeOffset start, int patientAccountId)
     {
         var clinic = await db.Clinicas.AsNoTracking().FirstOrDefaultAsync(c => c.Id == clinicId && !c.IsDeleted);
-        if (clinic is null)
+        if (clinic is null || !clinic.IsActive)
             return Result<int>.Fail(ErrorCodes.NotFound, "Clínica não encontrada ou inativa.");
-        if (!clinic.IsActive || !clinic.IsPublic)
+        if (!clinic.IsPublic && !await IsLinkedAsync(clinicId, patientAccountId))
             return Result<int>.Fail(ErrorCodes.NotFound, "Clínica não encontrada ou inativa.");
         if (!clinic.AcceptsAppointmentRequests)
             return Result<int>.Fail(ErrorCodes.RequestsDisabled, "Esta clínica não aceita solicitações de consulta.");
@@ -193,7 +194,7 @@ public sealed class AvailabilityService(AppDbContext db, IUsuarioLogadoService u
             return Result<int>.Fail(ErrorCodes.InvalidValue, "Fuso horário da clínica é inválido.");
 
         var localStart = TimeZoneInfo.ConvertTime(start, timeZone);
-        var availability = await GetClinicAvailabilityAsync(clinicId, DateOnly.FromDateTime(localStart.DateTime));
+        var availability = await GetClinicAvailabilityAsync(clinicId, DateOnly.FromDateTime(localStart.DateTime), patientAccountId);
         var found = availability.Value?.Slots.Any(slot => slot.Start.ToUniversalTime() == start.ToUniversalTime()) == true;
         return found
             ? Result<int>.Ok(clinic.AppointmentSlotDurationMinutes)
@@ -229,6 +230,9 @@ public sealed class AvailabilityService(AppDbContext db, IUsuarioLogadoService u
 
     private Task<Clinica?> CurrentClinicAsync() => db.Clinicas.FirstOrDefaultAsync(c =>
         c.Id == usuario.ClinicaId && !c.IsDeleted);
+
+    private Task<bool> IsLinkedAsync(int clinicId, int patientAccountId) => db.Patients.AnyAsync(p =>
+        p.ClinicaId == clinicId && p.PatientAccountId == patientAccountId && !p.IsDeleted);
 
     private Task<bool> ProfessionalBelongsToCurrentClinicAsync(int professionalId) => db.Users.AnyAsync(u =>
         u.Id == professionalId && u.ClinicaId == usuario.ClinicaId && u.IsActive && !u.IsDeleted

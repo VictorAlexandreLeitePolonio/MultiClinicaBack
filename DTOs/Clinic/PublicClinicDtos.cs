@@ -24,6 +24,20 @@ public sealed class PublicClinicDto
     public bool AcceptsAppointmentRequests { get; set; }
 }
 
+/// <summary>Resumo para a vitrine pública (landing page) — sem dados de contato.</summary>
+public sealed class PublicClinicSummaryDto
+{
+    public int Id { get; set; }
+    public string? Slug { get; set; }
+    public string? DisplayName { get; set; }
+    public string? LogoUrl { get; set; }
+    public string? City { get; set; }
+    public string? State { get; set; }
+    public IReadOnlyList<ClinicCategoryDto> Categories { get; set; } = [];
+    public int LikeCount { get; set; }
+    public bool AcceptsAppointmentRequests { get; set; }
+}
+
 // ── Categorias ───────────────────────────────────────────────────────────────
 
 public sealed class ClinicCategoryDto

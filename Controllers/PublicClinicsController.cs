@@ -9,6 +9,11 @@ namespace MultiClinica.API.Controllers;
 [AllowAnonymous]
 public class PublicClinicsController(IClinicProfileService service) : ControllerBase
 {
+    /// <summary>Vitrine pública — clínicas IsPublic ativas, ordenadas por curtidas.</summary>
+    [HttpGet]
+    public async Task<IActionResult> GetShowcase([FromQuery] int limit = 12)
+        => Ok((await service.GetPublicShowcaseAsync(limit)).Value);
+
     /// <summary>Perfil público — apenas clínicas IsPublic, ativas e não excluídas.</summary>
     [HttpGet("{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
