@@ -1,5 +1,8 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using MultiClinica.API.Common;
+using MultiClinica.API.DTOs;
+using MultiClinica.API.DTOs.Financial;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
@@ -15,6 +18,24 @@ public class AuditoriaFinanceiraService(
     {
         Converters = { new JsonStringEnumConverter() }
     };
+
+    public async Task<Result<PagedResult<AuditoriaFinanceiraDto>>> ListarAsync(
+        string? modulo, string? entidade, DateTime? dataInicio, DateTime? dataFim, int page, int pageSize)
+    {
+        page = page < 1 ? 1 : page;
+        pageSize = Math.Clamp(pageSize, 1, 100);
+
+        var (items, total) = await repository.GetPagedAsync(
+            usuario.ClinicaId, modulo, entidade, dataInicio, dataFim, page, pageSize);
+
+        return Result<PagedResult<AuditoriaFinanceiraDto>>.Ok(new PagedResult<AuditoriaFinanceiraDto>
+        {
+            Data = items,
+            TotalCount = total,
+            Page = page,
+            PageSize = pageSize
+        });
+    }
 
     public async Task RegistrarAsync(
         string modulo,

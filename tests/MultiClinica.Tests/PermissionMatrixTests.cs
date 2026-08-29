@@ -58,6 +58,30 @@ public class PermissionMatrixTests
     }
 
     [Fact]
+    public void Has_AdministradorAuditoriaVisualizar_RetornaVerdadeiro()
+    {
+        Assert.True(PermissionMatrix.Has(
+            UserRole.Administrador,
+            Permissions.Auditoria.Visualizar));
+    }
+
+    [Fact]
+    public void Has_RecepcaoAuditoriaVisualizar_RetornaFalso()
+    {
+        Assert.False(PermissionMatrix.Has(
+            UserRole.Recepcao,
+            Permissions.Auditoria.Visualizar));
+    }
+
+    [Fact]
+    public void Has_ProfissionalAuditoriaVisualizar_RetornaFalso()
+    {
+        Assert.False(PermissionMatrix.Has(
+            UserRole.Profissional,
+            Permissions.Auditoria.Visualizar));
+    }
+
+    [Fact]
     public void PermissionsFor_Profissional_ContemStatusPacienteEClinicSettingsView()
     {
         var perms = PermissionMatrix.PermissionsFor(UserRole.Profissional);
