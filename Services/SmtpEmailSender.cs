@@ -51,8 +51,8 @@ public class SmtpOptions
     public bool UseSsl { get; init; } = true;
     public string? User { get; init; }
     public string? Password { get; init; }
-    public string From { get; init; } = "no-reply@multiclinica.local";
-    public string FromName { get; init; } = "MultiClínica";
+    public string From { get; init; } = "no-reply@cliniqcare.com.br";
+    public string FromName { get; init; } = "Cliniq Care";
 
     public bool IsConfigured => !string.IsNullOrWhiteSpace(Host);
 
@@ -63,7 +63,7 @@ public class SmtpOptions
         UseSsl   = !bool.TryParse(config["SMTP_USE_SSL"], out var ssl) || ssl,
         User     = config["SMTP_USER"],
         Password = config["SMTP_PASSWORD"],
-        From     = config["SMTP_FROM"] ?? "no-reply@multiclinica.local",
-        FromName = config["SMTP_FROM_NAME"] ?? "MultiClínica",
+        From     = config["SMTP_FROM"] ?? "no-reply@cliniqcare.com.br",
+        FromName = config["SMTP_FROM_NAME"] ?? "Cliniq Care",
     };
 }

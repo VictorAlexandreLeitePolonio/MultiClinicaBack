@@ -12,7 +12,7 @@ public class PatientNotificationService(
     private static readonly TimeSpan ActivationTtl = TimeSpan.FromHours(72);
     private static readonly TimeSpan ResetTtl = TimeSpan.FromHours(1);
 
-    private string FrontendUrl => (config["FRONTEND_URL"] ?? "http://localhost:3000").TrimEnd('/');
+    private string FrontendUrl => (config["FRONTEND_URL"] ?? "https://cliniqcare.com.br").TrimEnd('/');
 
     public async Task<bool> SendActivationInviteAsync(PatientAccount account)
     {
