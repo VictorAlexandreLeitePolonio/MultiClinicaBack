@@ -1,14 +1,5 @@
 namespace MultiClinica.API.Models;
 
-public enum TipoSessao
-{
-    Fisioterapia,
-    Pilates,
-    Massagem,
-    Hidrolipo,
-    Lipedema,
-    Linfedema,
-}
 public enum TipoPlano
 {
     Mensal,
@@ -20,7 +11,8 @@ public class Plans : AuditableEntity
     public string Name { get; set; } = string.Empty;
     public decimal Valor { get; set; }
     public TipoPlano TipoPlano { get; set; }
-    public TipoSessao TipoSessao { get; set; }
+    public int TipoSessaoId { get; set; }
     public Clinica Clinica { get; set; } = null!;
+    public SessionType TipoSessao { get; set; } = null!;
     public ICollection<Payment> Payments { get; set; } = [];
 }

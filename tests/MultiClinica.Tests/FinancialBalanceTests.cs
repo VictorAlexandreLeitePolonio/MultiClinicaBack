@@ -40,13 +40,17 @@ public class FinancialBalanceTests
             };
             db.Users.Add(admin);
 
+            var sessionType = new SessionType { ClinicaId = clinica.Id, Name = "Fisioterapia" };
+            db.SessionTypes.Add(sessionType);
+            await db.SaveChangesAsync();
+
             plan = new Plans
             {
                 ClinicaId = clinica.Id,
                 Name = "Mensal",
                 Valor = 150,
                 TipoPlano = TipoPlano.Mensal,
-                TipoSessao = TipoSessao.Fisioterapia
+                TipoSessaoId = sessionType.Id
             };
             db.Plans.Add(plan);
             await db.SaveChangesAsync();

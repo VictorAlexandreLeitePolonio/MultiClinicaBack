@@ -9,7 +9,7 @@ public interface IPlanService
 {
     Task<Result<PagedResult<PlanResponseDto>>> GetPagedAsync(
         TipoPlano? tipoPlano,
-        TipoSessao? tipoSessao,
+        int? tipoSessaoId,
         bool? isActive,
         int page,
         int pageSize);

@@ -109,6 +109,8 @@ builder.Services.AddScoped<IAppointmentService, AppointmentService>();
 // Plan — Repository e Service
 builder.Services.AddScoped<IPlanRepository, PlanRepository>();
 builder.Services.AddScoped<IPlanService, PlanService>();
+builder.Services.AddScoped<SessionTypeRepository>();
+builder.Services.AddScoped<SessionTypeService>();
 
 // User — Repository e Service
 builder.Services.AddScoped<IUserRepository, UserRepository>();

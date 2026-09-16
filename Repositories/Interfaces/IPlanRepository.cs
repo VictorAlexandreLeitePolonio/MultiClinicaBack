@@ -7,7 +7,7 @@ public interface IPlanRepository
     /// <summary>Retorna planos paginados com filtros opcionais.</summary>
     Task<(List<Plans> Items, int TotalCount)> GetPagedAsync(
         TipoPlano? tipoPlano,
-        TipoSessao? tipoSessao,
+        int? tipoSessaoId,
         bool? isActive,
         int page,
         int pageSize);

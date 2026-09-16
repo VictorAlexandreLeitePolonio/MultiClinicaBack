@@ -22,6 +22,7 @@ public class AppDbContext : DbContext
     public DbSet<ClinicLike> ClinicLikes { get; set; } = null!;
     public DbSet<ProfessionalAvailability> ProfessionalAvailabilities { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
+    public DbSet<SessionType> SessionTypes { get; set; } = null!;
     public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
     public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
     public DbSet<CategoriaProduto> CategoriasProduto { get; set; } = null!;
@@ -161,6 +162,21 @@ public class AppDbContext : DbContext
             .HasForeignKey(c => c.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<CategoriaProduto>().HasIndex(c => c.ClinicaId);
+
+        modelBuilder.Entity<SessionType>()
+            .Property(item => item.Name)
+            .HasMaxLength(100);
+        modelBuilder.Entity<SessionType>()
+            .HasOne(item => item.Clinica)
+            .WithMany()
+            .HasForeignKey(item => item.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<SessionType>().HasIndex(item => item.ClinicaId);
+        modelBuilder.Entity<Plans>()
+            .HasOne(plan => plan.TipoSessao)
+            .WithMany()
+            .HasForeignKey(plan => plan.TipoSessaoId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<Produto>()
             .HasOne(p => p.Clinica)

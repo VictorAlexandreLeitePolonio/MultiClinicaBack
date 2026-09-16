@@ -10,18 +10,20 @@ public class PlanRepository(AppDbContext db, IUsuarioLogadoService usuario) : IP
 {
     public async Task<(List<Plans> Items, int TotalCount)> GetPagedAsync(
         TipoPlano? tipoPlano,
-        TipoSessao? tipoSessao,
+        int? tipoSessaoId,
         bool? isActive,
         int page,
         int pageSize)
     {
-        var query = db.Plans.Where(p => p.ClinicaId == usuario.ClinicaId && !p.IsDeleted).AsQueryable();
+        var query = db.Plans
+            .Include(p => p.TipoSessao)
+            .Where(p => p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
         if (tipoPlano.HasValue)
             query = query.Where(p => p.TipoPlano == tipoPlano.Value);
 
-        if (tipoSessao.HasValue)
-            query = query.Where(p => p.TipoSessao == tipoSessao.Value);
+        if (tipoSessaoId.HasValue)
+            query = query.Where(p => p.TipoSessaoId == tipoSessaoId.Value);
 
         if (isActive.HasValue)
             query = query.Where(p => p.IsActive == isActive.Value);
@@ -36,7 +38,9 @@ public class PlanRepository(AppDbContext db, IUsuarioLogadoService usuario) : IP
     }
 
     public async Task<Plans?> GetByIdAsync(int id)
-        => await db.Plans.FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
+        => await db.Plans
+            .Include(p => p.TipoSessao)
+            .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<bool> NameExistsAsync(string name, int? excludeId = null)
     {

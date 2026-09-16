@@ -2,134 +2,98 @@ using MultiClinica.API.Common;
 using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Plans;
 using MultiClinica.API.Models;
+using MultiClinica.API.Repositories;
 using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class PlanService(IPlanRepository repository, IUsuarioLogadoService usuario) : IPlanService
+public class PlanService(IPlanRepository repository, SessionTypeRepository sessionTypes, IUsuarioLogadoService usuario) : IPlanService
 {
-    // ── Listagem ─────────────────────────────────────────────────────────────
+    private static PlanResponseDto Map(Plans plan) => new()
+    {
+        Id = plan.Id,
+        Name = plan.Name,
+        Valor = plan.Valor,
+        TipoPlano = plan.TipoPlano,
+        TipoSessaoId = plan.TipoSessaoId,
+        TipoSessaoName = plan.TipoSessao.Name,
+        IsActive = plan.IsActive,
+        CreatedAt = plan.CreatedAt
+    };
 
     public async Task<Result<PagedResult<PlanResponseDto>>> GetPagedAsync(
-        TipoPlano? tipoPlano, TipoSessao? tipoSessao, bool? isActive, int page, int pageSize)
+        TipoPlano? tipoPlano, int? tipoSessaoId, bool? isActive, int page, int pageSize)
     {
-        var (items, total) = await repository.GetPagedAsync(
-            tipoPlano, tipoSessao, isActive, page, pageSize);
-
-        var data = items.Select(p => new PlanResponseDto
-        {
-            Id         = p.Id,
-            Name       = p.Name,
-            Valor      = p.Valor,
-            TipoPlano  = p.TipoPlano,
-            TipoSessao = p.TipoSessao,
-            IsActive   = p.IsActive,
-            CreatedAt  = p.CreatedAt,
-        });
-
+        var (items, total) = await repository.GetPagedAsync(tipoPlano, tipoSessaoId, isActive, page, pageSize);
         return Result<PagedResult<PlanResponseDto>>.Ok(new PagedResult<PlanResponseDto>
         {
-            Data       = data,
+            Data = items.Select(Map),
             TotalCount = total,
-            Page       = page,
-            PageSize   = pageSize
+            Page = page,
+            PageSize = pageSize
         });
     }
-
-    // ── Busca por Id ─────────────────────────────────────────────────────────
 
     public async Task<Result<PlanResponseDto>> GetByIdAsync(int id)
     {
         var plan = await repository.GetByIdAsync(id);
-        if (plan is null)
-            return Result<PlanResponseDto>.Fail(ErrorCodes.NotFound, "Plano não encontrado.");
-
-        return Result<PlanResponseDto>.Ok(new PlanResponseDto
-        {
-            Id         = plan.Id,
-            Name       = plan.Name,
-            Valor      = plan.Valor,
-            TipoPlano  = plan.TipoPlano,
-            TipoSessao = plan.TipoSessao,
-            IsActive   = plan.IsActive,
-            CreatedAt  = plan.CreatedAt,
-        });
+        return plan is null
+            ? Result<PlanResponseDto>.Fail(ErrorCodes.NotFound, "Plano não encontrado.")
+            : Result<PlanResponseDto>.Ok(Map(plan));
     }
-
-    // ── Criação ──────────────────────────────────────────────────────────────
 
     public async Task<Result<PlanResponseDto>> CreateAsync(CreatePlanDto dto)
     {
         if (dto.Valor <= 0)
-            return Result<PlanResponseDto>.Fail(
-                ErrorCodes.InvalidValue, "O valor do plano deve ser maior que zero.");
-
+            return Result<PlanResponseDto>.Fail(ErrorCodes.InvalidValue, "O valor do plano deve ser maior que zero.");
         if (await repository.NameExistsAsync(dto.Name))
-            return Result<PlanResponseDto>.Fail(
-                ErrorCodes.DuplicateName, "Já existe um plano com este nome.");
+            return Result<PlanResponseDto>.Fail(ErrorCodes.DuplicateName, "Já existe um plano com este nome.");
+
+        var sessionType = await sessionTypes.GetByIdAsync(dto.TipoSessaoId);
+        if (sessionType is null)
+            return Result<PlanResponseDto>.Fail(ErrorCodes.InvalidValue, "Tipo de sessão inválido.");
 
         var plan = new Plans
         {
-            ClinicaId   = usuario.ClinicaId,
-            Name       = dto.Name,
-            Valor      = dto.Valor,
-            TipoPlano  = dto.TipoPlano,
-            TipoSessao = dto.TipoSessao,
-            CreatedByUserId = usuario.UserId,
+            ClinicaId = usuario.ClinicaId,
+            Name = dto.Name,
+            Valor = dto.Valor,
+            TipoPlano = dto.TipoPlano,
+            TipoSessaoId = sessionType.Id,
+            TipoSessao = sessionType,
+            CreatedByUserId = usuario.UserId
         };
 
         await repository.AddAsync(plan);
-
-        return Result<PlanResponseDto>.Ok(new PlanResponseDto
-        {
-            Id         = plan.Id,
-            Name       = plan.Name,
-            Valor      = plan.Valor,
-            TipoPlano  = plan.TipoPlano,
-            TipoSessao = plan.TipoSessao,
-            IsActive   = plan.IsActive,
-            CreatedAt  = plan.CreatedAt,
-        });
+        return Result<PlanResponseDto>.Ok(Map(plan));
     }
-
-    // ── Atualização ──────────────────────────────────────────────────────────
 
     public async Task<Result<PlanResponseDto>> UpdateAsync(int id, UpdatePlanDto dto)
     {
         if (dto.Valor <= 0)
-            return Result<PlanResponseDto>.Fail(
-                ErrorCodes.InvalidValue, "O valor do plano deve ser maior que zero.");
+            return Result<PlanResponseDto>.Fail(ErrorCodes.InvalidValue, "O valor do plano deve ser maior que zero.");
 
         var plan = await repository.GetByIdAsync(id);
         if (plan is null)
             return Result<PlanResponseDto>.Fail(ErrorCodes.NotFound, "Plano não encontrado.");
-
         if (await repository.NameExistsAsync(dto.Name, id))
-            return Result<PlanResponseDto>.Fail(
-                ErrorCodes.DuplicateName, "Já existe um plano com este nome.");
+            return Result<PlanResponseDto>.Fail(ErrorCodes.DuplicateName, "Já existe um plano com este nome.");
 
-        plan.Name       = dto.Name;
-        plan.Valor      = dto.Valor;
-        plan.TipoPlano  = dto.TipoPlano;
-        plan.TipoSessao = dto.TipoSessao;
+        var sessionType = await sessionTypes.GetByIdAsync(dto.TipoSessaoId);
+        if (sessionType is null)
+            return Result<PlanResponseDto>.Fail(ErrorCodes.InvalidValue, "Tipo de sessão inválido.");
+
+        plan.Name = dto.Name;
+        plan.Valor = dto.Valor;
+        plan.TipoPlano = dto.TipoPlano;
+        plan.TipoSessaoId = sessionType.Id;
+        plan.TipoSessao = sessionType;
         plan.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();
-
-        return Result<PlanResponseDto>.Ok(new PlanResponseDto
-        {
-            Id         = plan.Id,
-            Name       = plan.Name,
-            Valor      = plan.Valor,
-            TipoPlano  = plan.TipoPlano,
-            TipoSessao = plan.TipoSessao,
-            IsActive   = plan.IsActive,
-            CreatedAt  = plan.CreatedAt,
-        });
+        return Result<PlanResponseDto>.Ok(Map(plan));
     }
-
-    // ── Toggle Status ────────────────────────────────────────────────────────
 
     public async Task<Result<bool>> ToggleStatusAsync(int id)
     {
@@ -142,17 +106,13 @@ public class PlanService(IPlanRepository repository, IUsuarioLogadoService usuar
         return Result<bool>.Ok(true);
     }
 
-    // ── Deleção ──────────────────────────────────────────────────────────────
-
     public async Task<Result<bool>> DeleteAsync(int id)
     {
         var plan = await repository.GetByIdAsync(id);
         if (plan is null)
             return Result<bool>.Fail(ErrorCodes.NotFound, "Plano não encontrado.");
-
         if (await repository.HasPaymentsAsync(id))
-            return Result<bool>.Fail(
-                ErrorCodes.HasAssociatedRecords, "Não é possível excluir um plano com pagamentos associados.");
+            return Result<bool>.Fail(ErrorCodes.HasAssociatedRecords, "Não é possível excluir um plano com pagamentos associados.");
 
         await repository.DeleteAsync(plan);
         return Result<bool>.Ok(true);

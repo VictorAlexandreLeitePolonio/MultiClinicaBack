@@ -16,12 +16,12 @@ public class PlansController(IPlanService service) : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetPlans(
         [FromQuery] TipoPlano? tipoPlano,
-        [FromQuery] TipoSessao? tipoSessao,
+        [FromQuery] int? tipoSessaoId,
         [FromQuery] bool? isActive,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
-        var result = await service.GetPagedAsync(tipoPlano, tipoSessao, isActive, page, pageSize);
+        var result = await service.GetPagedAsync(tipoPlano, tipoSessaoId, isActive, page, pageSize);
         return Ok(result.Value);
     }
 
