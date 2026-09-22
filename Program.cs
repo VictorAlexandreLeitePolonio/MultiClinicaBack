@@ -266,10 +266,7 @@ app.Logger.LogInformation(
     string.Join(", ", app.Urls),
     string.IsNullOrWhiteSpace(railwayPort) ? "not set" : railwayPort);
 
-app.Lifetime.ApplicationStarted.Register(() =>
-{
-    _ = Task.Run(() => AppBootstrapper.BootstrapSuperAdminAsync(app));
-});
+await AppBootstrapper.BootstrapSuperAdminAsync(app);
 
 app.Logger.LogInformation("MultiClinica API startup completed.");
 
