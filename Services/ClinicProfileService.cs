@@ -21,7 +21,16 @@ public class ClinicProfileService(
         var items = await db.ClinicCategories
             .Where(c => c.IsActive && !c.IsDeleted)
             .OrderBy(c => c.Name)
-            .Select(c => new ClinicCategoryDto { Id = c.Id, Name = c.Name, Slug = c.Slug })
+            .Select(c => new ClinicCategoryDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Slug = c.Slug,
+                Kind = c.Kind,
+                ParentCategoryId = c.ParentCategoryId,
+                ClinicalProfileKey = c.ClinicalProfileKey,
+                ClinicalModelStatus = c.ClinicalModelStatus,
+            })
             .ToListAsync();
         return Result<IReadOnlyList<ClinicCategoryDto>>.Ok(items);
     }
@@ -197,7 +206,16 @@ public class ClinicProfileService(
     private static IReadOnlyList<ClinicCategoryDto> MapCategories(IEnumerable<ClinicCategory> categories)
         => categories.Where(c => !c.IsDeleted)
             .OrderBy(c => c.Name)
-            .Select(c => new ClinicCategoryDto { Id = c.Id, Name = c.Name, Slug = c.Slug })
+            .Select(c => new ClinicCategoryDto
+            {
+                Id = c.Id,
+                Name = c.Name,
+                Slug = c.Slug,
+                Kind = c.Kind,
+                ParentCategoryId = c.ParentCategoryId,
+                ClinicalProfileKey = c.ClinicalProfileKey,
+                ClinicalModelStatus = c.ClinicalModelStatus,
+            })
             .ToList();
 
     private static BusinessHourDto MapHour(ClinicBusinessHour h) => new()

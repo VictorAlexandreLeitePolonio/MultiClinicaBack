@@ -19,6 +19,7 @@ public class Patient : AuditableEntity
     public string? Estado { get; set; }
     public string? Cep { get; set; }
     public string? Phone { get; set; }
+    public DateOnly? BirthDate { get; set; }
     public Clinica Clinica { get; set; } = null!;
     public ICollection<Appointment> Appointments { get; set; } = [];
     public ICollection<Payment> Payments { get; set; } = [];

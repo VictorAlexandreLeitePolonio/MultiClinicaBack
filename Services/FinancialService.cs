@@ -57,9 +57,12 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
 
     private async Task<BalanceMoneySummaryDto> BuildMoneySummaryAsync(int clinicaId, DateTime start, DateTime endExclusive)
     {
+        var startDate = DateOnly.FromDateTime(start);
+        var endDateExclusive = DateOnly.FromDateTime(endExclusive);
         var paidPayments = await db.Payments
             .Where(p => p.ClinicaId == clinicaId && !p.IsDeleted && p.Status == PaymentStatus.Paid
-                && (p.PaidAt ?? p.PaymentDate) >= start && (p.PaidAt ?? p.PaymentDate) < endExclusive)
+                && (p.PaidAt ?? p.PaymentDate) >= startDate
+                && (p.PaidAt ?? p.PaymentDate) < endDateExclusive)
             .Select(p => p.Amount)
             .ToListAsync();
 
@@ -196,9 +199,12 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
 
     private async Task<List<BalanceRecentMovementDto>> BuildRecentMovementsAsync(int clinicaId, DateTime start, DateTime endExclusive)
     {
+        var startDate = DateOnly.FromDateTime(start);
+        var endDateExclusive = DateOnly.FromDateTime(endExclusive);
         var payments = await db.Payments
             .Where(p => p.ClinicaId == clinicaId && !p.IsDeleted && p.Status == PaymentStatus.Paid
-                && (p.PaidAt ?? p.PaymentDate) >= start && (p.PaidAt ?? p.PaymentDate) < endExclusive)
+                && (p.PaidAt ?? p.PaymentDate) >= startDate
+                && (p.PaidAt ?? p.PaymentDate) < endDateExclusive)
             .ToListAsync();
 
         var stockMovements = await db.MovimentacoesEstoque
@@ -221,7 +227,7 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             Description = $"Pagamento - {p.ReferenceMonth}",
             Amount = p.Amount,
             Quantity = null,
-            Date = (p.PaidAt ?? p.PaymentDate)!.Value
+            Date = (p.PaidAt ?? p.PaymentDate)!.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
         });
 
         var fromStock = stockMovements.Select(m => new BalanceRecentMovementDto

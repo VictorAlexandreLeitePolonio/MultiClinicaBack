@@ -1,4 +1,3 @@
-using System.Text.RegularExpressions;
 using MultiClinica.API.Common;
 using MultiClinica.API.Data;
 using MultiClinica.API.DTOs;
@@ -7,18 +6,20 @@ using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace MultiClinica.API.Services;
 
-public partial class PaymentService(IPaymentRepository repository, AppDbContext db, IUsuarioLogadoService usuario) : IPaymentService
+public class PaymentService(
+    IPaymentRepository repository,
+    AppDbContext db,
+    IUsuarioLogadoService usuario,
+    TimeProvider timeProvider) : IPaymentService
 {
-    [GeneratedRegex(@"^\d{2}-\d{4}$")]
-    private static partial Regex ReferenceMonthRegex();
-
     // ── Listagem ─────────────────────────────────────────────────────────────
 
     public async Task<Result<PagedResult<PaymentResponseDto>>> GetPagedAsync(
-        int? patientId, PaymentStatus? status, string? referenceMonth,
+        int? patientId, PaymentStatus? status, DateOnly? referenceMonth,
         string? patientName, int page, int pageSize)
     {
         var (items, total) = await repository.GetPagedAsync(
@@ -46,14 +47,43 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         return Result<PaymentResponseDto>.Ok(ToDto(payment));
     }
 
+    private static Result<PaymentResponseDto>? ValidateReferenceMonth(DateOnly referenceMonth)
+        => referenceMonth == default
+            ? Result<PaymentResponseDto>.Fail(
+                ErrorCodes.InvalidDate, "O mês de referência deve ser uma data válida.")
+            : null;
+
+    private async Task<DateOnly> TodayInClinicAsync()
+    {
+        var timeZoneId = await db.Clinicas
+            .Where(clinic => clinic.Id == usuario.ClinicaId)
+            .Select(clinic => clinic.TimeZoneId)
+            .FirstOrDefaultAsync();
+
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId ?? "UTC");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+
+        return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), timeZone).DateTime);
+    }
+
     // ── Criação ──────────────────────────────────────────────────────────────
 
     public async Task<Result<PaymentResponseDto>> CreateAsync(CreatePaymentDto dto)
     {
-        // Validações de formato
-        if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
-            return Result<PaymentResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
+        var referenceValidation = ValidateReferenceMonth(dto.ReferenceMonth);
+        if (referenceValidation is not null)
+            return referenceValidation;
 
         if (string.IsNullOrWhiteSpace(dto.PaymentMethod))
             return Result<PaymentResponseDto>.Fail(
@@ -77,6 +107,10 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
             return Result<PaymentResponseDto>.Fail(
                 ErrorCodes.DuplicatePayment, "Já existe um pagamento para este paciente neste mês.");
 
+        DateOnly? paidAt = dto.Status == PaymentStatus.Paid
+            ? dto.PaidAt ?? await TodayInClinicAsync()
+            : null;
+
         var payment = new Payment
         {
             ClinicaId      = usuario.ClinicaId,
@@ -86,11 +120,21 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
             Amount         = plan.Valor,  // valor sempre vem do plano
             ReferenceMonth = dto.ReferenceMonth,
             PaymentMethod  = dto.PaymentMethod,
+            Status         = dto.Status,
+            PaidAt         = paidAt,
             PaymentDate    = dto.PaymentDate,
             CreatedByUserId = usuario.UserId,
         };
 
-        await repository.AddAsync(payment);
+        try
+        {
+            await repository.AddAsync(payment);
+        }
+        catch (DbUpdateException exception) when (IsMonthlyDuplicate(exception))
+        {
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.DuplicatePayment, "Já existe um pagamento para este paciente neste mês.");
+        }
 
         // Monta DTO com os dados já em memória (evita nova query e referência circular)
         return Result<PaymentResponseDto>.Ok(new PaymentResponseDto
@@ -115,9 +159,9 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
 
     public async Task<Result<PaymentResponseDto>> UpdateAsync(int id, UpdatePaymentDto dto)
     {
-        if (!ReferenceMonthRegex().IsMatch(dto.ReferenceMonth))
-            return Result<PaymentResponseDto>.Fail(
-                ErrorCodes.InvalidFormat, "O formato do mês de referência deve ser 'MM-YYYY'.");
+        var referenceValidation = ValidateReferenceMonth(dto.ReferenceMonth);
+        if (referenceValidation is not null)
+            return referenceValidation;
 
         if (string.IsNullOrWhiteSpace(dto.PaymentMethod))
             return Result<PaymentResponseDto>.Fail(
@@ -126,6 +170,10 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         var payment = await repository.GetByIdAsync(id);
         if (payment is null)
             return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Pagamento não encontrado.");
+
+        if (await repository.ExistsAsync(payment.PatientId, dto.ReferenceMonth, id))
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.DuplicatePayment, "Já existe um pagamento para este paciente neste mês.");
 
         // Se o plano mudou, atualiza Amount
         if (dto.PlanId != payment.PlanId)
@@ -144,9 +192,17 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
 
         // Gerencia PaidAt automaticamente
         payment.PaidAt = dto.Status == PaymentStatus.Paid
-            ? (dto.PaidAt ?? DateTime.UtcNow)
+            ? (dto.PaidAt ?? await TodayInClinicAsync())
             : null;
-        await repository.SaveChangesAsync();
+        try
+        {
+            await repository.SaveChangesAsync();
+        }
+        catch (DbUpdateException exception) when (IsMonthlyDuplicate(exception))
+        {
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.DuplicatePayment, "Já existe um pagamento para este paciente neste mês.");
+        }
 
         // Recarrega para retornar dados atualizados com navigations
         var updated = await repository.GetByIdAsync(id);
@@ -188,4 +244,8 @@ public partial class PaymentService(IPaymentRepository repository, AppDbContext 
         PaymentDate         = p.PaymentDate,
         CreatedAt           = p.CreatedAt
     };
+
+    private static bool IsMonthlyDuplicate(DbUpdateException exception)
+        => exception.InnerException is PostgresException postgres
+            && postgres.ConstraintName == "IX_Payments_ClinicaId_PatientId_ReferenceMonth_Month";
 }

@@ -27,6 +27,7 @@ else if (builder.Environment.IsProduction())
 }
 
 builder.Services.AddHttpContextAccessor();
+builder.Services.AddSingleton(TimeProvider.System);
 
 if (!builder.Environment.IsEnvironment("Testing"))
 {
@@ -351,19 +352,21 @@ internal static class AppBootstrapper
 {
     public static async Task BootstrapSuperAdminAsync(WebApplication app)
     {
-        var name = app.Configuration["SUPER_ADMIN_NAME"];
-        var email = app.Configuration["SUPER_ADMIN_EMAIL"];
-        var password = app.Configuration["SUPER_ADMIN_PASSWORD"];
-
-        if (string.IsNullOrWhiteSpace(name)
-            || string.IsNullOrWhiteSpace(email)
-            || string.IsNullOrWhiteSpace(password))
-            return;
-
         try
         {
             using var scope = app.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            await ClinicCategoryCatalog.SeedAsync(db);
+            app.Logger.LogInformation("Clinic category catalog ensured with {Count} entries.", ClinicCategoryCatalog.Entries.Count);
+
+            var name = app.Configuration["SUPER_ADMIN_NAME"];
+            var email = app.Configuration["SUPER_ADMIN_EMAIL"];
+            var password = app.Configuration["SUPER_ADMIN_PASSWORD"];
+
+            if (string.IsNullOrWhiteSpace(name)
+                || string.IsNullOrWhiteSpace(email)
+                || string.IsNullOrWhiteSpace(password))
+                return;
 
             var adminClinic = await db.Clinicas.FirstOrDefaultAsync(c => c.Nome == "Admin Interno");
             if (adminClinic is null)
@@ -396,37 +399,11 @@ internal static class AppBootstrapper
                 await db.SaveChangesAsync();
             }
 
-            await SeedClinicCategoriesAsync(db);
         }
         catch (Exception ex)
         {
-            app.Logger.LogError(ex, "SuperAdmin bootstrap failed.");
+            app.Logger.LogError(ex, "Application bootstrap failed.");
         }
-    }
-
-    // Seed inicial controlado de categorias (idempotente por slug).
-    private static async Task SeedClinicCategoriesAsync(AppDbContext db)
-    {
-        (string Name, string Slug)[] seed =
-        [
-            ("Fisioterapia", "fisioterapia"),
-            ("Psicologia", "psicologia"),
-            ("Nutrição", "nutricao"),
-            ("Odontologia", "odontologia"),
-            ("Ortopedia", "ortopedia"),
-            ("Dermatologia", "dermatologia"),
-            ("Estética", "estetica"),
-            ("Pilates", "pilates"),
-            ("Clínica Geral", "clinica-geral"),
-            ("Outros", "outros"),
-        ];
-
-        var existing = await db.ClinicCategories.Select(c => c.Slug).ToListAsync();
-        var missing = seed.Where(s => !existing.Contains(s.Slug))
-            .Select(s => new ClinicCategory { Name = s.Name, Slug = s.Slug, IsActive = true });
-
-        db.ClinicCategories.AddRange(missing);
-        await db.SaveChangesAsync();
     }
 }
 

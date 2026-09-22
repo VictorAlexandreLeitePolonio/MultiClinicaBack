@@ -27,6 +27,10 @@ public sealed class MarketplaceService(
                 Id = category.Id,
                 Name = category.Name,
                 Slug = category.Slug,
+                Kind = category.Kind,
+                ParentCategoryId = category.ParentCategoryId,
+                ClinicalProfileKey = category.ClinicalProfileKey,
+                ClinicalModelStatus = category.ClinicalModelStatus,
             })
             .ToListAsync();
 
@@ -234,6 +238,10 @@ public sealed class MarketplaceService(
                 Id = category.Id,
                 Name = category.Name,
                 Slug = category.Slug,
+                Kind = category.Kind,
+                ParentCategoryId = category.ParentCategoryId,
+                ClinicalProfileKey = category.ClinicalProfileKey,
+                ClinicalModelStatus = category.ClinicalModelStatus,
             })
             .ToList();
 

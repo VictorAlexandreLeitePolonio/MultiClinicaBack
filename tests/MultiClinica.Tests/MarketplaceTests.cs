@@ -100,7 +100,13 @@ public class MarketplaceTests
         var categories = await client.GetFromJsonAsync<List<Category>>(
             "/api/patient/marketplace/categories");
 
-        Assert.Equal(["Alpha", "Zeta"], categories!.Select(category => category.Name));
+        var names = categories!.Select(category => category.Name).ToList();
+
+        Assert.Equal(names.OrderBy(name => name), names);
+        Assert.Contains("Alpha", names);
+        Assert.Contains("Zeta", names);
+        Assert.DoesNotContain("Inativa", names);
+        Assert.DoesNotContain("Excluída", names);
     }
 
     [Fact]

@@ -11,7 +11,7 @@ public class PaymentRepository(AppDbContext db, IUsuarioLogadoService usuario) :
     public async Task<(List<Payment> Items, int TotalCount)> GetPagedAsync(
         int? patientId,
         PaymentStatus? status,
-        string? referenceMonth,
+        DateOnly? referenceMonth,
         string? patientName,
         int page,
         int pageSize)
@@ -31,8 +31,12 @@ public class PaymentRepository(AppDbContext db, IUsuarioLogadoService usuario) :
         if (status.HasValue)
             query = query.Where(p => p.Status == status.Value);
 
-        if (!string.IsNullOrEmpty(referenceMonth))
-            query = query.Where(p => p.ReferenceMonth == referenceMonth);
+        if (referenceMonth.HasValue)
+        {
+            var start = new DateOnly(referenceMonth.Value.Year, referenceMonth.Value.Month, 1);
+            var end = start.AddMonths(1);
+            query = query.Where(p => p.ReferenceMonth >= start && p.ReferenceMonth < end);
+        }
 
         var totalCount = await query.CountAsync();
         var items = await query
@@ -49,9 +53,22 @@ public class PaymentRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             .Include(p => p.Plan)
             .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
-    public async Task<bool> ExistsAsync(int patientId, string referenceMonth)
-        => await db.Payments.AnyAsync(p =>
-            p.PatientId == patientId && p.ReferenceMonth == referenceMonth && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
+    public async Task<bool> ExistsAsync(int patientId, DateOnly referenceMonth, int? excludeId = null)
+    {
+        var start = new DateOnly(referenceMonth.Year, referenceMonth.Month, 1);
+        var end = start.AddMonths(1);
+        var query = db.Payments.Where(p =>
+            p.PatientId == patientId
+            && p.ReferenceMonth >= start
+            && p.ReferenceMonth < end
+            && p.ClinicaId == usuario.ClinicaId
+            && !p.IsDeleted);
+
+        if (excludeId.HasValue)
+            query = query.Where(p => p.Id != excludeId.Value);
+
+        return await query.AnyAsync();
+    }
 
     public async Task<Payment> AddAsync(Payment payment)
     {

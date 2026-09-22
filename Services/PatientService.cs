@@ -11,7 +11,8 @@ public class PatientService(
     IPatientRepository repository,
     IPatientAccountService accountService,
     IPatientNotificationService notifications,
-    IUsuarioLogadoService usuario) : IPatientService
+    IUsuarioLogadoService usuario,
+    TimeProvider timeProvider) : IPatientService
 {
     // Dispara o e-mail apropriado após o vínculo já persistido. Falha de envio
     // nunca reverte o cadastro. Retorna se um convite de ATIVAÇÃO foi enviado.
@@ -31,6 +32,32 @@ public class PatientService(
 
     private static string? DigitsOnly(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : new string(value.Where(char.IsDigit).ToArray());
+
+    private async Task<Result<bool>> ValidateBirthDateAsync(DateOnly? birthDate)
+    {
+        if (birthDate is null)
+            return Result<bool>.Ok(true);
+
+        var timeZoneId = await repository.GetCurrentClinicTimeZoneIdAsync();
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId ?? "UTC");
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+
+        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), timeZone).DateTime);
+        return birthDate > today
+            ? Result<bool>.Fail(ErrorCodes.InvalidDate, "A data de nascimento não pode ser futura.")
+            : Result<bool>.Ok(true);
+    }
 
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -55,6 +82,7 @@ public class PatientService(
             Estado            = p.Estado,
             Cep               = p.Cep,
             Phone             = p.Phone,
+            BirthDate         = p.BirthDate,
             IsActive          = p.IsActive,
             appointmentStatus = p.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status ?? AppointmentStatus.Scheduled,
             paymentStatus     = p.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status ?? PaymentStatus.Pending,
@@ -92,6 +120,7 @@ public class PatientService(
             Estado            = patient.Estado,
             Cep               = patient.Cep,
             Phone             = patient.Phone,
+            BirthDate         = patient.BirthDate,
             IsActive          = patient.IsActive,
             appointmentStatus = patient.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status ?? AppointmentStatus.Scheduled,
             paymentStatus     = patient.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status ?? PaymentStatus.Pending,
@@ -122,6 +151,7 @@ public class PatientService(
             Cidade    = patient.Cidade,
             Estado    = patient.Estado,
             Cep       = patient.Cep,
+            BirthDate = patient.BirthDate,
             IsActive  = patient.IsActive,
             CreatedAt = patient.CreatedAt,
             PortalAccessStatus = patient.PatientAccount?.Status,
@@ -172,6 +202,11 @@ public class PatientService(
 
     public async Task<Result<PatientCreatedResponseDto>> CreateAsync(CreatePatientDto dto)
     {
+        var birthDateValidation = await ValidateBirthDateAsync(dto.BirthDate);
+        if (!birthDateValidation.IsSuccess)
+            return Result<PatientCreatedResponseDto>.Fail(
+                birthDateValidation.ErrorCode!, birthDateValidation.ErrorMessage!);
+
         var email = accountService.NormalizeEmail(dto.Email);
         var cpf   = accountService.NormalizeCpf(dto.CPF);
         var phone = DigitsOnly(dto.Phone);
@@ -225,6 +260,7 @@ public class PatientService(
             Estado = NormalizeOptional(dto.Estado),
             Cep    = DigitsOnly(dto.Cep),
             Phone  = phone,
+            BirthDate = dto.BirthDate,
             CreatedByUserId = usuario.UserId,
         };
 
@@ -340,6 +376,14 @@ public class PatientService(
 
     public async Task<Result<bool>> UpdateAsync(int id, UpdatePatientDto dto)
     {
+        if (dto.BirthDateProvided)
+        {
+            var birthDateValidation = await ValidateBirthDateAsync(dto.BirthDate);
+            if (!birthDateValidation.IsSuccess)
+                return Result<bool>.Fail(
+                    birthDateValidation.ErrorCode!, birthDateValidation.ErrorMessage!);
+        }
+
         var normalizedEmail = NormalizeOptional(dto.Email);
         var normalizedCpf = DigitsOnly(dto.CPF);
 
@@ -365,6 +409,8 @@ public class PatientService(
         patient.Estado = NormalizeOptional(dto.Estado);
         patient.Cep    = DigitsOnly(dto.Cep);
         patient.Phone  = DigitsOnly(dto.Phone);
+        if (dto.BirthDateProvided)
+            patient.BirthDate = dto.BirthDate;
         patient.UpdatedByUserId = usuario.UserId;
 
         await repository.SaveChangesAsync();

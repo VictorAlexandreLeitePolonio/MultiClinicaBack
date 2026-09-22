@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MultiClinica.API.Common;
@@ -22,8 +23,22 @@ public class PaymentsController(IPaymentService service) : ControllerBase
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 10)
     {
+        DateOnly? parsedReferenceMonth = null;
+        if (!string.IsNullOrWhiteSpace(referenceMonth))
+        {
+            if (!DateOnly.TryParseExact(
+                    referenceMonth,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsed))
+                return BadRequest(new { message = "O mês de referência deve usar o formato YYYY-MM-DD." });
+
+            parsedReferenceMonth = parsed;
+        }
+
         var result = await service.GetPagedAsync(
-            patientId, status, referenceMonth, PatientName, page, pageSize);
+            patientId, status, parsedReferenceMonth, PatientName, page, pageSize);
         return Ok(result.Value);
     }
 
@@ -56,9 +71,12 @@ public class PaymentsController(IPaymentService service) : ControllerBase
     {
         var result = await service.UpdateAsync(id, dto);
         if (!result.IsSuccess)
-            return result.ErrorCode == ErrorCodes.NotFound
-                ? NotFound(new { message = result.ErrorMessage })
-                : BadRequest(new { message = result.ErrorMessage });
+            return result.ErrorCode switch
+            {
+                ErrorCodes.NotFound       => NotFound(new { message = result.ErrorMessage }),
+                ErrorCodes.DuplicatePayment => Conflict(new { message = result.ErrorMessage }),
+                _                         => BadRequest(new { message = result.ErrorMessage })
+            };
 
         return Ok(result.Value);
     }

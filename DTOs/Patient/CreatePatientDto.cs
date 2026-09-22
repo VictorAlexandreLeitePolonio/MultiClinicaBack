@@ -13,4 +13,5 @@ public class CreatePatientDto
     public string? Estado { get; set; }
     public string? Cep { get; set; }
     public string? Phone { get; set; }
+    public DateOnly? BirthDate { get; set; }
 }

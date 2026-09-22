@@ -5,8 +5,14 @@ public class ClinicCategory : AuditableEntity
 {
     public string Name { get; set; } = string.Empty;
     public string Slug { get; set; } = string.Empty;
+    public ClinicCategoryKind Kind { get; set; }
+    public int? ParentCategoryId { get; set; }
+    public ClinicCategory? ParentCategory { get; set; }
+    public string? ClinicalProfileKey { get; set; }
+    public ClinicalModelStatus ClinicalModelStatus { get; set; }
 
     public ICollection<Clinica> Clinicas { get; set; } = [];
+    public ICollection<ClinicCategory> Children { get; set; } = [];
 }
 
 /// <summary>Faixa de horário de funcionamento. Mais de uma faixa por dia é permitida.</summary>

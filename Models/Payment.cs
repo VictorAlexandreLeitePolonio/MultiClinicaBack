@@ -18,9 +18,7 @@ public class Payment : AuditableEntity
     public int UserId { get; set; }
     public int PlanId { get; set; }
 
-    // Mês de referência do pagamento. Formato: "03-2026".
-    // Usando string para simplicidade — identifica qual mês está sendo cobrado.
-    public string ReferenceMonth { get; set; } = string.Empty;
+    public DateOnly ReferenceMonth { get; set; }
 
     // Valor do pagamento. "decimal" é o tipo correto para dinheiro —
     // evita erros de arredondamento que ocorrem com float/double.
@@ -34,10 +32,10 @@ public class Payment : AuditableEntity
 
     // Data em que o pagamento foi confirmado — nullable porque só é preenchido quando pago.
     // Não tem valor padrão pois começa nulo (ainda não foi pago).
-    public DateTime? PaidAt { get; set; }
+    public DateOnly? PaidAt { get; set; }
 
     // Data de vencimento do pagamento — usada pelo PaymentReminderJob para enviar lembrete 24h antes.
-    public DateTime? PaymentDate { get; set; }
+    public DateOnly? PaymentDate { get; set; }
 
     public Clinica Clinica { get; set; } = null!;
     public User User { get; set; } = null!;

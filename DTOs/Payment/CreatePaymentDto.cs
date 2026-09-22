@@ -1,13 +1,15 @@
 namespace MultiClinica.API.DTOs.Payment;
 
-// Dados recebidos na criação de um pagamento.
-// Status não está aqui — todo pagamento começa como Pending automaticamente.
+using MultiClinica.API.Models;
+
 public class CreatePaymentDto
 {
     public int ResponsavelId { get; set; }
     public int PatientId { get; set; }
     public int PlanId { get; set; }
-    public string    ReferenceMonth { get; set; } = string.Empty; // Formato: "MM-YYYY"
-    public string    PaymentMethod  { get; set; } = string.Empty;
-    public DateTime? PaymentDate    { get; set; }
+    public DateOnly ReferenceMonth { get; set; }
+    public string PaymentMethod { get; set; } = string.Empty;
+    public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
+    public DateOnly? PaidAt { get; set; }
+    public DateOnly? PaymentDate { get; set; }
 }

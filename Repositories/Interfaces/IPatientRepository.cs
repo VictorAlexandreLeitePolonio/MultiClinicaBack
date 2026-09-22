@@ -31,6 +31,9 @@ public interface IPatientRepository
     /// <summary>Nome de exibição da clínica autenticada (para e-mails de vínculo).</summary>
     Task<string?> GetCurrentClinicNameAsync();
 
+    /// <summary>Fuso horário da clínica autenticada para validar datas civis.</summary>
+    Task<string?> GetCurrentClinicTimeZoneIdAsync();
+
     /// <summary>Verifica se o paciente tem agendamentos ou pagamentos associados.</summary>
     Task<bool> HasAssociatedRecordsAsync(int id);
 

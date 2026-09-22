@@ -19,6 +19,7 @@ public class PatientProfileDto
     public string? Cidade  { get; set; }
     public string? Estado  { get; set; }
     public string? Cep     { get; set; }
+    public DateOnly? BirthDate { get; set; }
     public bool   IsActive { get; set; }
     public DateTime CreatedAt { get; set; }
 
@@ -56,12 +57,12 @@ public class MedicalRecordSummary
 public class PaymentSummary
 {
     public int           Id                  { get; set; }
-    public string        ReferenceMonth      { get; set; } = string.Empty;
+    public DateOnly      ReferenceMonth      { get; set; }
     public string        PlanName            { get; set; } = string.Empty;
     public decimal       Amount              { get; set; }
     public string        PaymentMethod       { get; set; } = string.Empty;
     public PaymentStatus Status              { get; set; }
-    public DateTime?     PaymentDate         { get; set; }
-    public DateTime?     PaidAt              { get; set; }
+    public DateOnly?     PaymentDate         { get; set; }
+    public DateOnly?     PaidAt              { get; set; }
     public DateTime      CreatedAt           { get; set; }
 }

@@ -88,11 +88,11 @@ public class FinancialBalanceTests
                 PatientId = patient.Id,
                 UserId = admin.Id,
                 PlanId = plan.Id,
-                ReferenceMonth = monthStart.ToString("MM-yyyy"),
+                ReferenceMonth = DateOnly.FromDateTime(monthStart),
                 Amount = 150,
                 PaymentMethod = "Pix",
                 Status = PaymentStatus.Paid,
-                PaidAt = monthStart.AddDays(1)
+                PaidAt = DateOnly.FromDateTime(monthStart.AddDays(1))
             });
 
             var produto = new Produto
@@ -234,13 +234,13 @@ public class FinancialBalanceTests
                 new Payment
                 {
                     ClinicaId = clinica.Id, PatientId = patient.Id, UserId = admin.Id, PlanId = plan.Id,
-                    ReferenceMonth = monthStart.ToString("MM-yyyy"), Amount = 150, PaymentMethod = "Pix",
-                    Status = PaymentStatus.Paid, PaidAt = monthStart.AddDays(1)
+                    ReferenceMonth = DateOnly.FromDateTime(monthStart), Amount = 150, PaymentMethod = "Pix",
+                    Status = PaymentStatus.Paid, PaidAt = DateOnly.FromDateTime(monthStart.AddDays(1))
                 },
                 new Payment
                 {
                     ClinicaId = clinica.Id, PatientId = patient.Id, UserId = admin.Id, PlanId = plan.Id,
-                    ReferenceMonth = monthStart.ToString("MM-yyyy"), Amount = 999, PaymentMethod = "Pix",
+                    ReferenceMonth = DateOnly.FromDateTime(monthStart), Amount = 999, PaymentMethod = "Pix",
                     Status = PaymentStatus.Pending
                 });
             await db.SaveChangesAsync();

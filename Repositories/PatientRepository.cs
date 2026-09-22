@@ -93,6 +93,12 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             .Select(c => string.IsNullOrEmpty(c.NomeFantasia) ? c.Nome : c.NomeFantasia)
             .FirstOrDefaultAsync();
 
+    public async Task<string?> GetCurrentClinicTimeZoneIdAsync()
+        => await db.Clinicas
+            .Where(c => c.Id == usuario.ClinicaId)
+            .Select(c => c.TimeZoneId)
+            .FirstOrDefaultAsync();
+
     public async Task<bool> HasAssociatedRecordsAsync(int id)
         => await db.Appointments.AnyAsync(a => a.PatientId == id && a.ClinicaId == usuario.ClinicaId)
            || await db.Payments.AnyAsync(p => p.PatientId == id && p.ClinicaId == usuario.ClinicaId);

@@ -10,7 +10,7 @@ public interface IPaymentService
     Task<Result<PagedResult<PaymentResponseDto>>> GetPagedAsync(
         int? patientId,
         PaymentStatus? status,
-        string? referenceMonth,
+        DateOnly? referenceMonth,
         string? patientName,
         int page,
         int pageSize);

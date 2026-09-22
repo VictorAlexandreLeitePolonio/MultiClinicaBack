@@ -72,6 +72,35 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Payment>()
             .Property(p => p.Status)
             .HasConversion<string>();
+        modelBuilder.Entity<Payment>()
+            .Property(p => p.ReferenceMonth)
+            .HasColumnType("date")
+            .IsRequired();
+        modelBuilder.Entity<Payment>()
+            .Property(p => p.PaidAt)
+            .HasColumnType("date");
+        modelBuilder.Entity<Payment>()
+            .Property(p => p.PaymentDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<ClinicCategory>()
+            .Property(c => c.Kind)
+            .HasConversion<string>();
+        modelBuilder.Entity<ClinicCategory>()
+            .Property(c => c.ClinicalModelStatus)
+            .HasConversion<string>();
+        modelBuilder.Entity<ClinicCategory>()
+            .Property(c => c.ClinicalProfileKey)
+            .HasMaxLength(100);
+        modelBuilder.Entity<ClinicCategory>()
+            .HasOne(c => c.ParentCategory)
+            .WithMany(c => c.Children)
+            .HasForeignKey(c => c.ParentCategoryId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Patient>()
+            .Property(p => p.BirthDate)
+            .HasColumnType("date");
 
         modelBuilder.Entity<ClinicCharge>()
             .Property(c => c.Status)

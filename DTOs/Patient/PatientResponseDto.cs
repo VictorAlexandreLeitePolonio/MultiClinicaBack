@@ -16,6 +16,7 @@ namespace MultiClinica.API.DTOs.Patient
         public string? Estado { get; set; }
         public string? Cep { get; set; }
         public string? Phone { get; set; }
+        public DateOnly? BirthDate { get; set; }
         public bool IsActive { get; set; }
         public AppointmentStatus appointmentStatus { get; set; }
         public PaymentStatus paymentStatus { get; set; }

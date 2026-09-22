@@ -8,7 +8,7 @@ public interface IPaymentRepository
     Task<(List<Payment> Items, int TotalCount)> GetPagedAsync(
         int? patientId,
         PaymentStatus? status,
-        string? referenceMonth,
+        DateOnly? referenceMonth,
         string? patientName,
         int page,
         int pageSize);
@@ -17,7 +17,7 @@ public interface IPaymentRepository
     Task<Payment?> GetByIdAsync(int id);
 
     /// <summary>Verifica se já existe pagamento para o paciente naquele mês.</summary>
-    Task<bool> ExistsAsync(int patientId, string referenceMonth);
+    Task<bool> ExistsAsync(int patientId, DateOnly referenceMonth, int? excludeId = null);
 
     /// <summary>Adiciona e salva um novo pagamento.</summary>
     Task<Payment> AddAsync(Payment payment);
