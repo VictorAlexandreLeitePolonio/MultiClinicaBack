@@ -11,8 +11,38 @@ namespace MultiClinica.API.Controllers;
 [Authorize(Roles = "Administrador,Profissional,Recepcao")]
 [ApiController]
 [Route("api/[controller]")]
-public class PatientsController(IPatientService service) : ControllerBase
+public class PatientsController(IPatientService service, IPatientImportService importService) : ControllerBase
 {
+    [HttpPost("import")]
+    [Consumes("multipart/form-data")]
+    [ProducesResponseType(typeof(PatientImportResponseDto), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(PatientImportErrorDto), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(PatientImportErrorDto), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(typeof(PatientImportErrorDto), StatusCodes.Status413PayloadTooLarge)]
+    [ProducesResponseType(typeof(PatientImportErrorDto), StatusCodes.Status415UnsupportedMediaType)]
+    public async Task<IActionResult> ImportPatients(
+        [FromForm] IFormFile? file,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await importService.ImportAsync(file, idempotencyKey, cancellationToken);
+        if (result.IsSuccess)
+            return Ok(result.Value);
+
+        var statusCode = result.ErrorCode switch
+        {
+            ErrorCodes.FileTooLarge or ErrorCodes.TooManyRows => StatusCodes.Status413PayloadTooLarge,
+            ErrorCodes.InvalidFileType => StatusCodes.Status415UnsupportedMediaType,
+            ErrorCodes.IdempotencyConflict => StatusCodes.Status409Conflict,
+            _ => StatusCodes.Status400BadRequest
+        };
+        return StatusCode(statusCode, new PatientImportErrorDto
+        {
+            Code = result.ErrorCode!,
+            Message = result.ErrorMessage!
+        });
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetPatients(
         [FromQuery] string? name,

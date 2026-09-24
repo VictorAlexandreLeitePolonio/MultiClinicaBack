@@ -44,6 +44,22 @@ Variáveis obrigatórias:
 - `AWS_REGION`
 - `S3_BUCKET_NAME`
 
+## Importação de pacientes
+
+`POST /api/patients/import` recebe uma requisição `multipart/form-data` com o arquivo no campo `file` e um UUID no cabeçalho `Idempotency-Key`. A rota exige autenticação de clínica e aceita os papéis `Administrador`, `Profissional` e `Recepcao`.
+
+São aceitos arquivos `.csv` em UTF-8 (com ou sem BOM, delimitados por vírgula ou ponto e vírgula) e `.xlsx` com uma planilha de dados. O arquivo pode ter até 10 MB e 10.000 linhas; os limites podem ser alterados por `PatientImport__MaxFileBytes` e `PatientImport__MaxRows`. Colunas aceitas, em qualquer ordem e sem diferenciar maiúsculas de minúsculas: `Name`, `Email`, `CPF`, `Rg`, `Phone`, `Rua`, `Numero`, `Bairro`, `Cidade`, `Estado` e `Cep`. `Name` é obrigatória. Por exemplo, um CSV mínimo é:
+
+```csv
+Name
+Maria da Silva
+João Souza
+```
+
+Linhas vazias são ignoradas. Erros de validação são retornados por linha, enquanto as linhas válidas são persistidas; cabeçalhos ou estrutura inválidos rejeitam o arquivo inteiro antes de qualquer inserção. Um paciente sem e-mail não recebe conta de portal nem notificação. Com e-mail, a nova conta pendente ou o vínculo com uma conta existente entram na mesma transação da importação, sem sobrescrever os dados da identidade existente; a fila persistente envia a notificação após o commit.
+
+O relatório de sucesso contém `importId`, `status`, `totalRows`, `importedCount`, `rejectedCount`, `emailsQueuedCount`, `emailsSkippedNoEmailCount` e `results`. Cada item de `results` informa o número original da linha, o resultado e eventuais erros. Reenviar o mesmo arquivo com a mesma chave devolve o resultado original; uma chave já usada com conteúdo diferente retorna `409 Conflict`. Gere uma nova chave ao iniciar outra importação. Os parâmetros da fila estão disponíveis em `.env.example`.
+
 ## SuperAdmin Inicial
 
 O bootstrap é idempotente e só roda quando todas as envs abaixo existem:

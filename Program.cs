@@ -66,6 +66,8 @@ builder.Services.AddScoped<CompraService>();
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<IPatientService, PatientService>();
+builder.Services.AddScoped<IPatientImportService, PatientImportService>();
+builder.Services.AddScoped<PatientEmailOutboxProcessor>();
 builder.Services.AddScoped<IPatientAccountRepository, PatientAccountRepository>();
 builder.Services.AddScoped<IPatientAccountService, PatientAccountService>();
 
@@ -138,6 +140,8 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddHostedService<AppointmentStatusUpdater>();
 builder.Services.AddHostedService<ClinicBillingBackgroundJob>();
+if (builder.Configuration.GetValue<bool?>("PatientEmailOutbox:Enabled") ?? !builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<PatientEmailOutboxWorker>();
 
 builder.Services.Configure<ForwardedHeadersOptions>(options =>
 {

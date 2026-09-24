@@ -76,21 +76,56 @@ public class PatientAuthController(
     [AllowAnonymous]
     [EnableRateLimiting("auth")]
     [HttpPost("activate")]
-    public async Task<IActionResult> Activate(ActivateAccountDto dto)
+    public async Task<IActionResult> Activate(ActivateAccountDto dto, CancellationToken cancellationToken)
     {
         if (!IsPasswordValid(dto.Password, out var error))
             return BadRequest(new { message = error });
 
         var token = await tokenService.ValidateAsync(dto.Token, PatientAuthTokenType.Activation);
-        if (token is null)
+        if (token is null || token.PatientAccount.Status != PatientAccountStatus.PendingActivation)
             return BadRequest(new { message = "Token inválido ou expirado." });
 
         var account = token.PatientAccount;
-        account.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-        account.Status = PatientAccountStatus.Active;
-        account.ActivatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
-        await tokenService.ConsumeAsync(token);
+        var passwordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
+        var now = DateTime.UtcNow;
+        if (db.Database.IsRelational())
+        {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+            var changed = await db.PatientAccounts
+                .Where(candidate => candidate.Id == account.Id && candidate.Status == PatientAccountStatus.PendingActivation)
+                .ExecuteUpdateAsync(update => update
+                    .SetProperty(candidate => candidate.PasswordHash, passwordHash)
+                    .SetProperty(candidate => candidate.Status, PatientAccountStatus.Active)
+                    .SetProperty(candidate => candidate.ActivatedAt, now)
+                    .SetProperty(candidate => candidate.UpdatedAt, now), cancellationToken);
+            if (changed == 0)
+                return BadRequest(new { message = "Token inválido ou expirado." });
+
+            await db.PatientAuthTokens
+                .Where(candidate => candidate.PatientAccountId == account.Id
+                    && candidate.Type == PatientAuthTokenType.Activation
+                    && candidate.ConsumedAt == null)
+                .ExecuteUpdateAsync(update => update.SetProperty(candidate => candidate.ConsumedAt, now), cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
+            account.PasswordHash = passwordHash;
+            account.Status = PatientAccountStatus.Active;
+            account.ActivatedAt = now;
+            account.UpdatedAt = now;
+        }
+        else
+        {
+            account.PasswordHash = passwordHash;
+            account.Status = PatientAccountStatus.Active;
+            account.ActivatedAt = now;
+            var activationTokens = await db.PatientAuthTokens
+                .Where(candidate => candidate.PatientAccountId == account.Id
+                    && candidate.Type == PatientAuthTokenType.Activation
+                    && candidate.ConsumedAt == null)
+                .ToListAsync(cancellationToken);
+            foreach (var activationToken in activationTokens)
+                activationToken.ConsumedAt = now;
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
         IssueCookie(account);
         return Ok(MapAccount(account));

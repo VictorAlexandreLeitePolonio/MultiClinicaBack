@@ -19,6 +19,8 @@ public static class ErrorCodes
     public const string InvalidPassword    = "INVALID_PASSWORD";
     public const string InvalidFileType    = "INVALID_FILE_TYPE";
     public const string FileTooLarge       = "FILE_TOO_LARGE";
+    public const string TooManyRows        = "TOO_MANY_ROWS";
+    public const string IdempotencyConflict = "IDEMPOTENCY_CONFLICT";
     public const string Forbidden          = "FORBIDDEN";
     public const string AlreadyOpen        = "ALREADY_OPEN";
     public const string AlreadyLinked      = "ALREADY_LINKED";
