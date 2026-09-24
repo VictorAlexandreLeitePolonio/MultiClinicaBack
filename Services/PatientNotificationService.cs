@@ -1,3 +1,4 @@
+using System.Net;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services.Interfaces;
 
@@ -16,7 +17,7 @@ public class PatientNotificationService(
 
     public async Task<bool> SendActivationInviteAsync(PatientAccount account)
     {
-        if (string.IsNullOrWhiteSpace(account.Email))
+        if (account.Status != PatientAccountStatus.PendingActivation || string.IsNullOrWhiteSpace(account.Email))
             return false;
 
         var token = await tokenService.IssueAsync(account.Id, PatientAuthTokenType.Activation, ActivationTtl);
@@ -39,7 +40,7 @@ public class PatientNotificationService(
         var link = $"{FrontendUrl}/paciente/login";
         var body = $"""
             <p>Olá{NamePart(account)},</p>
-            <p>Sua conta foi vinculada à clínica <strong>{clinicName}</strong>.</p>
+            <p>Sua conta foi vinculada à clínica <strong>{HtmlText(clinicName)}</strong>.</p>
             <p>Acesse o portal do paciente para acompanhar suas consultas:</p>
             <p><a href="{link}">Acessar o portal</a></p>
             """;
@@ -72,9 +73,9 @@ public class PatientNotificationService(
         if (to is null) return;
 
         var body = $"""
-            <p>Nova solicitação de consulta de <strong>{account.Name ?? account.Email}</strong>.</p>
+            <p>Nova solicitação de consulta de <strong>{AccountLabel(account)}</strong>.</p>
             <p>Data desejada: {request.RequestedDate:dd/MM/yyyy HH:mm}</p>
-            <p>Motivo: {request.Reason ?? "-"}</p>
+            <p>Motivo: {HtmlText(request.Reason ?? "-")}</p>
             """;
         await TrySendAsync(to, "Nova solicitação de consulta", body);
     }
@@ -96,7 +97,7 @@ public class PatientNotificationService(
         var body = $"""
             <p>Olá{NamePart(account)},</p>
             <p>Sua solicitação de consulta na clínica <strong>{ClinicName(clinic)}</strong> foi recusada.</p>
-            <p>Motivo: {request.ResponseReason ?? "-"}</p>
+            <p>Motivo: {HtmlText(request.ResponseReason ?? "-")}</p>
             """;
         await TrySendAsync(account.Email, "Solicitação de consulta recusada", body);
     }
@@ -109,9 +110,9 @@ public class PatientNotificationService(
             var to = ClinicEmail(clinic);
             if (to is null) return;
             var body = $"""
-                <p>O paciente <strong>{account.Name ?? account.Email}</strong> cancelou uma solicitação de consulta.</p>
+                <p>O paciente <strong>{AccountLabel(account)}</strong> cancelou uma solicitação de consulta.</p>
                 <p>Data: {request.RequestedDate:dd/MM/yyyy HH:mm}</p>
-                <p>Motivo: {request.ResponseReason ?? "-"}</p>
+                <p>Motivo: {HtmlText(request.ResponseReason ?? "-")}</p>
                 """;
             await TrySendAsync(to, "Solicitação de consulta cancelada pelo paciente", body);
         }
@@ -121,7 +122,7 @@ public class PatientNotificationService(
             var body = $"""
                 <p>Olá{NamePart(account)},</p>
                 <p>A clínica <strong>{ClinicName(clinic)}</strong> cancelou sua solicitação de consulta.</p>
-                <p>Motivo: {request.ResponseReason ?? "-"}</p>
+                <p>Motivo: {HtmlText(request.ResponseReason ?? "-")}</p>
                 """;
             await TrySendAsync(account.Email, "Solicitação de consulta cancelada", body);
         }
@@ -133,10 +134,16 @@ public class PatientNotificationService(
          : null;
 
     private static string ClinicName(Clinica clinic)
-        => string.IsNullOrWhiteSpace(clinic.NomeFantasia) ? clinic.Nome : clinic.NomeFantasia;
+        => HtmlText(string.IsNullOrWhiteSpace(clinic.NomeFantasia) ? clinic.Nome : clinic.NomeFantasia);
 
     private static string NamePart(PatientAccount account)
-        => string.IsNullOrWhiteSpace(account.Name) ? "" : $" {account.Name}";
+        => string.IsNullOrWhiteSpace(account.Name) ? "" : $" {HtmlText(account.Name)}";
+
+    private static string AccountLabel(PatientAccount account)
+        => HtmlText(account.Name ?? account.Email);
+
+    private static string HtmlText(string? value)
+        => WebUtility.HtmlEncode(value ?? string.Empty);
 
     private async Task<bool> TrySendAsync(string to, string subject, string body)
     {

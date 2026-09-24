@@ -11,13 +11,24 @@ public class PatientTokenService(AppDbContext db) : IPatientTokenService
     public async Task<string> IssueAsync(int patientAccountId, PatientAuthTokenType type, TimeSpan ttl)
     {
         var rawToken = GenerateToken();
+        var now = DateTime.UtcNow;
+        if (type == PatientAuthTokenType.Activation)
+        {
+            var existingTokens = await db.PatientAuthTokens
+                .Where(token => token.PatientAccountId == patientAccountId
+                    && token.Type == PatientAuthTokenType.Activation
+                    && token.ConsumedAt == null)
+                .ToListAsync();
+            foreach (var token in existingTokens)
+                token.ConsumedAt = now;
+        }
 
         db.PatientAuthTokens.Add(new PatientAuthToken
         {
             PatientAccountId = patientAccountId,
             Type             = type,
             TokenHash        = Hash(rawToken),
-            ExpiresAt        = DateTime.UtcNow.Add(ttl),
+            ExpiresAt        = now.Add(ttl),
         });
         await db.SaveChangesAsync();
 

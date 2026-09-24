@@ -15,6 +15,8 @@ public class AppDbContext : DbContext
     public DbSet<Patient> Patients { get; set; } = null!;
     public DbSet<PatientAccount> PatientAccounts { get; set; } = null!;
     public DbSet<PatientAuthToken> PatientAuthTokens { get; set; } = null!;
+    public DbSet<PatientImportOperation> PatientImportOperations { get; set; } = null!;
+    public DbSet<PatientEmailOutbox> PatientEmailOutbox { get; set; } = null!;
     public DbSet<AppointmentRequest> AppointmentRequests { get; set; } = null!;
     public DbSet<ClinicCategory> ClinicCategories { get; set; } = null!;
     public DbSet<ClinicBusinessHour> ClinicBusinessHours { get; set; } = null!;
@@ -434,6 +436,45 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(t => t.PatientAccountId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PatientImportOperation>()
+            .Property(operation => operation.Status)
+            .HasConversion<string>();
+        modelBuilder.Entity<PatientImportOperation>()
+            .HasIndex(operation => new { operation.ClinicaId, operation.IdempotencyKey })
+            .IsUnique();
+        modelBuilder.Entity<PatientImportOperation>()
+            .HasOne(operation => operation.Clinica)
+            .WithMany()
+            .HasForeignKey(operation => operation.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .Property(job => job.Type)
+            .HasConversion<string>();
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .Property(job => job.Status)
+            .HasConversion<string>();
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .HasIndex(job => job.DeduplicationKey)
+            .IsUnique();
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .HasIndex(job => new { job.Status, job.NextAttemptAt, job.LeaseUntil });
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .HasOne(job => job.Clinica)
+            .WithMany()
+            .HasForeignKey(job => job.ClinicaId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .HasOne(job => job.Patient)
+            .WithMany()
+            .HasForeignKey(job => job.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
+        modelBuilder.Entity<PatientEmailOutbox>()
+            .HasOne(job => job.PatientAccount)
+            .WithMany()
+            .HasForeignKey(job => job.PatientAccountId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // ── Solicitações de consulta (AppointmentRequest) ────────────────────
         modelBuilder.Entity<AppointmentRequest>()
