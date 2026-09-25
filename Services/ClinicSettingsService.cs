@@ -104,8 +104,6 @@ public partial class ClinicSettingsService(AppDbContext db, IUsuarioLogadoServic
         if (!string.IsNullOrWhiteSpace(request.LogoUrl))
         {
             var logoUrl = request.LogoUrl.Trim();
-            if (logoUrl.Length > 500)
-                return "A URL do logo deve ter no máximo 500 caracteres.";
             if (!Uri.TryCreate(logoUrl, UriKind.Absolute, out var uri) ||
                 (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
                 return "A URL do logo é inválida.";

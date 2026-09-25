@@ -77,6 +77,25 @@ public class ClinicSettingsTests
     }
 
     [Fact]
+    public async Task UpdateClinicSettings_AcceptsLongValidLogoUrl()
+    {
+        await using var app = new MultiClinicaFactory();
+        await SeedClinicUserAsync(app, "Clinica Logo", "admin.logo@a.local");
+        using var client = app.CreateClient();
+        await LoginAsync(client, "admin.logo@a.local");
+        var logoUrl = $"https://cdn.example.com/{new string('a', 600)}.png";
+
+        var response = await client.PutAsJsonAsync("/api/clinic/settings", new UpdateClinicSettingsRequest
+        {
+            LogoUrl = logoUrl
+        });
+        var settings = await response.Content.ReadFromJsonAsync<ClinicSettingsDto>();
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(logoUrl, settings!.LogoUrl);
+    }
+
+    [Fact]
     public async Task UpdateClinicSettings_InvalidColor_ReturnsBadRequest()
     {
         await using var app = new MultiClinicaFactory();
