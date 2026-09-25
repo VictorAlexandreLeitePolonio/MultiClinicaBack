@@ -108,6 +108,7 @@ else
 // Appointment — Repository e Service
 builder.Services.AddScoped<IAppointmentRepository, AppointmentRepository>();
 builder.Services.AddScoped<IAppointmentService, AppointmentService>();
+builder.Services.AddScoped<AppointmentBookingGuard>();
 
 // Plan — Repository e Service
 builder.Services.AddScoped<IPlanRepository, PlanRepository>();

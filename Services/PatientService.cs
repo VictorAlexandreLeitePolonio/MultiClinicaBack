@@ -39,21 +39,7 @@ public class PatientService(
             return Result<bool>.Ok(true);
 
         var timeZoneId = await repository.GetCurrentClinicTimeZoneIdAsync();
-        TimeZoneInfo timeZone;
-        try
-        {
-            timeZone = TimeZoneInfo.FindSystemTimeZoneById(timeZoneId ?? "UTC");
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            timeZone = TimeZoneInfo.Utc;
-        }
-        catch (InvalidTimeZoneException)
-        {
-            timeZone = TimeZoneInfo.Utc;
-        }
-
-        var today = DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), timeZone).DateTime);
+        var today = PatientBirthDate.Today(timeProvider, timeZoneId);
         return birthDate > today
             ? Result<bool>.Fail(ErrorCodes.InvalidDate, "A data de nascimento não pode ser futura.")
             : Result<bool>.Ok(true);
@@ -84,8 +70,8 @@ public class PatientService(
             Phone             = p.Phone,
             BirthDate         = p.BirthDate,
             IsActive          = p.IsActive,
-            appointmentStatus = p.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status ?? AppointmentStatus.Scheduled,
-            paymentStatus     = p.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status ?? PaymentStatus.Pending,
+            appointmentStatus = p.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status,
+            paymentStatus     = p.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status,
             CreatedAt         = p.CreatedAt,
         });
 
@@ -122,8 +108,8 @@ public class PatientService(
             Phone             = patient.Phone,
             BirthDate         = patient.BirthDate,
             IsActive          = patient.IsActive,
-            appointmentStatus = patient.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status ?? AppointmentStatus.Scheduled,
-            paymentStatus     = patient.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status ?? PaymentStatus.Pending,
+            appointmentStatus = patient.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status,
+            paymentStatus     = patient.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status,
             CreatedAt         = patient.CreatedAt,
             PortalAccessStatus = patient.PatientAccount?.Status,
         });
@@ -376,6 +362,9 @@ public class PatientService(
 
     public async Task<Result<bool>> UpdateAsync(int id, UpdatePatientDto dto)
     {
+        var name = NormalizeOptional(dto.Name);
+        if (name is null)
+            return Result<bool>.Fail(ErrorCodes.EmptyField, "Nome é obrigatório.");
         if (dto.BirthDateProvided)
         {
             var birthDateValidation = await ValidateBirthDateAsync(dto.BirthDate);
@@ -398,7 +387,7 @@ public class PatientService(
         if (patient is null)
             return Result<bool>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
 
-        patient.Name   = NormalizeOptional(dto.Name);
+        patient.Name   = name;
         patient.Email  = normalizedEmail;
         patient.CPF    = normalizedCpf;
         patient.Rg     = NormalizeOptional(dto.Rg);

@@ -45,6 +45,97 @@ public class PatientImportTests
     private sealed record ImportRowError(string Field, string Code, string Message);
 
     [Fact]
+    public async Task Patient_get_routes_return_null_statuses_without_appointments_or_payments()
+    {
+        await using var app = new PatientImportFactory();
+        await app.SeedAsync(db => SeedClinicAsync(db, "Clinica A", "admin-a@test.local"));
+        using var client = await LoginAsync(app, "admin-a@test.local");
+        using var import = await ImportCsvAsync(client, "Name\nMaria", "patients.csv", Guid.NewGuid().ToString());
+        var report = await import.Content.ReadFromJsonAsync<ImportResponse>(Json);
+        var patientId = Assert.Single(report!.Results).PatientId;
+
+        using var list = await client.GetAsync("/api/patients");
+        using var listBody = await JsonDocument.ParseAsync(await list.Content.ReadAsStreamAsync());
+        var listPatient = Assert.Single(listBody.RootElement.GetProperty("data").EnumerateArray());
+        Assert.Equal(patientId, listPatient.GetProperty("id").GetInt32());
+        Assert.Equal(JsonValueKind.Null, listPatient.GetProperty("appointmentStatus").ValueKind);
+        Assert.Equal(JsonValueKind.Null, listPatient.GetProperty("paymentStatus").ValueKind);
+
+        using var detail = await client.GetAsync($"/api/patients/{patientId}");
+        using var detailBody = await JsonDocument.ParseAsync(await detail.Content.ReadAsStreamAsync());
+        Assert.Equal(JsonValueKind.Null, detailBody.RootElement.GetProperty("appointmentStatus").ValueKind);
+        Assert.Equal(JsonValueKind.Null, detailBody.RootElement.GetProperty("paymentStatus").ValueKind);
+    }
+
+    [Fact]
+    public async Task Import_birth_dates_preserves_civil_day_and_rejects_only_invalid_rows()
+    {
+        await using var app = new PatientImportFactory();
+        await app.SeedAsync(db => SeedClinicAsync(db, "Clinica A", "admin-a@test.local"));
+        using var client = await LoginAsync(app, "admin-a@test.local");
+        using var response = await ImportCsvAsync(client,
+            "Name,BirthDate\nAna,26/05/2021\nBia,2020-02-29\nCaio,2025-02-29\nDuda,05/06/21\nEva,2999-01-01\nFabi,",
+            "patients.csv", Guid.NewGuid().ToString());
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var report = await response.Content.ReadFromJsonAsync<ImportResponse>(Json);
+        Assert.Equal(3, report!.ImportedCount);
+        Assert.Equal(3, report.RejectedCount);
+        Assert.All(report.Results.Where(row => row.Status == "Rejected"), row =>
+            Assert.Contains(row.Errors!, error => error.Field == "BirthDate"));
+        await app.SeedAsync(async db =>
+        {
+            var patients = await db.Patients.OrderBy(patient => patient.Name).ToListAsync();
+            Assert.Equal(new DateOnly(2021, 5, 26), patients[0].BirthDate);
+            Assert.Equal(new DateOnly(2020, 2, 29), patients[1].BirthDate);
+            Assert.Null(patients[2].BirthDate);
+        });
+    }
+
+    [Fact]
+    public async Task Incomplete_patient_can_update_city_but_cannot_clear_name()
+    {
+        await using var app = new PatientImportFactory();
+        await app.SeedAsync(db => SeedClinicAsync(db, "Clinica A", "admin-a@test.local"));
+        using var client = await LoginAsync(app, "admin-a@test.local");
+        using var import = await ImportCsvAsync(client, "Name,BirthDate\nMaria,2021-05-26", "patients.csv", Guid.NewGuid().ToString());
+        Assert.Equal(HttpStatusCode.OK, import.StatusCode);
+        var patientId = 0;
+        await app.SeedAsync(async db => patientId = (await db.Patients.SingleAsync()).Id);
+
+        using var update = await client.PutAsJsonAsync($"/api/patients/{patientId}",
+            new { name = "Maria", email = "", cpf = "", phone = "", cidade = "Recife", birthDate = "2021-05-26" });
+        Assert.Equal(HttpStatusCode.OK, update.StatusCode);
+        using var clearName = await client.PutAsJsonAsync($"/api/patients/{patientId}",
+            new { name = "   ", cidade = "Outra" });
+        Assert.Equal(HttpStatusCode.BadRequest, clearName.StatusCode);
+        await app.SeedAsync(async db =>
+        {
+            var patient = await db.Patients.SingleAsync();
+            Assert.Equal("Maria", patient.Name);
+            Assert.Equal("Recife", patient.Cidade);
+            Assert.Null(patient.Email);
+            Assert.Null(patient.CPF);
+            Assert.Null(patient.Phone);
+            Assert.Equal(new DateOnly(2021, 5, 26), patient.BirthDate);
+        });
+    }
+
+    [Fact]
+    public async Task Import_xlsx_native_date_preserves_birth_day()
+    {
+        await using var app = new PatientImportFactory();
+        await app.SeedAsync(db => SeedClinicAsync(db, "Clinica A", "admin-a@test.local"));
+        using var client = await LoginAsync(app, "admin-a@test.local");
+        var serial = new DateTime(2021, 5, 26).ToOADate().ToString(System.Globalization.CultureInfo.InvariantCulture);
+        using var response = await ImportXlsxAsync(client,
+            ["Name", "BirthDate"], ["Maria", serial], Guid.NewGuid().ToString(), nativeBirthDate: true);
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        await app.SeedAsync(async db =>
+            Assert.Equal(new DateOnly(2021, 5, 26), (await db.Patients.SingleAsync()).BirthDate));
+    }
+
+    [Fact]
     public async Task Import_csv_name_only_persists_valid_rows_in_authenticated_clinic_and_reports_invalid_rows()
     {
         await using var app = new PatientImportFactory();
@@ -492,10 +583,11 @@ public class PatientImportTests
         string[] headers,
         string[] values,
         string key,
-        int inflatedEntryCharacters = 0)
+        int inflatedEntryCharacters = 0,
+        bool nativeBirthDate = false)
     {
         using var form = new MultipartFormDataContent();
-        var file = new ByteArrayContent(CreateXlsx(headers, values, inflatedEntryCharacters));
+        var file = new ByteArrayContent(CreateXlsx(headers, values, inflatedEntryCharacters, nativeBirthDate));
         file.Headers.ContentType = new MediaTypeHeaderValue("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
         form.Add(file, "file", "patients.xlsx");
         using var request = new HttpRequestMessage(HttpMethod.Post, "/api/patients/import") { Content = form };
@@ -503,7 +595,7 @@ public class PatientImportTests
         return await client.SendAsync(request);
     }
 
-    private static byte[] CreateXlsx(string[] headers, string[] values, int inflatedEntryCharacters = 0)
+    private static byte[] CreateXlsx(string[] headers, string[] values, int inflatedEntryCharacters = 0, bool nativeBirthDate = false)
     {
         using var stream = new MemoryStream();
         using (var archive = new System.IO.Compression.ZipArchive(stream, System.IO.Compression.ZipArchiveMode.Create, true))
@@ -529,19 +621,28 @@ public class PatientImportTests
                   <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
                 </Relationships>
                 """);
-            AddEntry(archive, "xl/worksheets/sheet1.xml", BuildSheet(headers, values));
+            if (nativeBirthDate)
+                AddEntry(archive, "xl/styles.xml", """
+                    <styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+                      <cellXfs count="2"><xf numFmtId="0"/><xf numFmtId="14" applyNumberFormat="1"/></cellXfs>
+                    </styleSheet>
+                    """);
+            AddEntry(archive, "xl/worksheets/sheet1.xml", BuildSheet(headers, values, nativeBirthDate));
             if (inflatedEntryCharacters > 0)
                 AddEntry(archive, "xl/media/unused.bin", new string('x', inflatedEntryCharacters));
         }
         return stream.ToArray();
     }
 
-    private static string BuildSheet(string[] headers, string[] values)
+    private static string BuildSheet(string[] headers, string[] values, bool nativeBirthDate = false)
     {
         static string Cell(string column, int row, string value)
             => $"<c r=\"{column}{row}\" t=\"inlineStr\"><is><t>{System.Security.SecurityElement.Escape(value)}</t></is></c>";
         var row1 = string.Join("", headers.Select((value, index) => Cell(((char)('A' + index)).ToString(), 1, value)));
-        var row2 = string.Join("", values.Select((value, index) => Cell(((char)('A' + index)).ToString(), 2, value)));
+        var row2 = string.Join("", values.Select((value, index) =>
+            nativeBirthDate && headers[index] == "BirthDate"
+                ? $"<c r=\"{(char)('A' + index)}2\" s=\"1\"><v>{value}</v></c>"
+                : Cell(((char)('A' + index)).ToString(), 2, value)));
         return $"""
             <?xml version="1.0" encoding="UTF-8" standalone="yes"?>
             <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">{row1}</row><row r="2">{row2}</row></sheetData></worksheet>

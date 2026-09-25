@@ -52,7 +52,8 @@ public class AppointmentRequestRepository(AppDbContext db) : IAppointmentRequest
 
     public Task<bool> ProfessionalBelongsToClinicAsync(int professionalId, int clinicaId)
         => db.Users.AnyAsync(u =>
-            u.Id == professionalId && u.ClinicaId == clinicaId && !u.IsDeleted && u.IsActive);
+            u.Id == professionalId && u.ClinicaId == clinicaId && !u.IsDeleted && u.IsActive
+            && (u.Role == UserRole.Profissional || u.Role == UserRole.Administrador));
 
     public Task SaveChangesAsync() => db.SaveChangesAsync();
 }

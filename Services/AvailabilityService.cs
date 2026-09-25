@@ -219,13 +219,7 @@ public sealed class AvailabilityService(AppDbContext db, IUsuarioLogadoService u
         if (!covered)
             return Result<bool>.Fail(ErrorCodes.ProfessionalUnavailable, ProfessionalUnavailableMessage);
 
-        var hasConflict = await db.Appointments.AnyAsync(a =>
-            a.ClinicaId == clinicId && a.UserId == professionalId && a.Status == AppointmentStatus.Scheduled
-            && !a.IsDeleted && utcStart < a.AppointmentDate.AddMinutes(a.DurationMinutes)
-            && utcEnd > a.AppointmentDate);
-        return hasConflict
-            ? Result<bool>.Fail(ErrorCodes.ProfessionalUnavailable, ProfessionalUnavailableMessage)
-            : Result<bool>.Ok(true);
+        return Result<bool>.Ok(true);
     }
 
     private Task<Clinica?> CurrentClinicAsync() => db.Clinicas.FirstOrDefaultAsync(c =>

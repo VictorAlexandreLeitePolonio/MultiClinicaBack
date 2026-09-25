@@ -1,5 +1,7 @@
 using System.IO.Compression;
+using System.Globalization;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 using MultiClinica.API.Common;
@@ -12,6 +14,7 @@ internal sealed record PatientImportSourceRow(
     string? Email,
     string? CPF,
     string? Rg,
+    string? BirthDate,
     string? Rua,
     string? Numero,
     string? Bairro,
@@ -29,7 +32,7 @@ internal sealed class PatientImportFileParser
     private static readonly XNamespace RelationshipNamespace = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
     private static readonly XNamespace PackageRelationshipNamespace = "http://schemas.openxmlformats.org/package/2006/relationships";
     private static readonly string[] AllowedHeaders =
-    ["Name", "Email", "CPF", "Rg", "Rua", "Numero", "Bairro", "Cidade", "Estado", "Cep", "Phone"];
+    ["Name", "Email", "CPF", "Rg", "BirthDate", "Rua", "Numero", "Bairro", "Cidade", "Estado", "Cep", "Phone"];
 
     public IReadOnlyList<PatientImportSourceRow> Parse(string fileName, byte[] content, int maxRows)
     {
@@ -78,6 +81,7 @@ internal sealed class PatientImportFileParser
                 Value(record, headers, "Email"),
                 Value(record, headers, "CPF"),
                 Value(record, headers, "Rg"),
+                Value(record, headers, "BirthDate"),
                 Value(record, headers, "Rua"),
                 Value(record, headers, "Numero"),
                 Value(record, headers, "Bairro"),
@@ -270,6 +274,8 @@ internal sealed class PatientImportFileParser
                 .Root?.Elements(SheetNamespace + "si")
                 .Select(item => string.Concat(item.Descendants(SheetNamespace + "t").Select(text => text.Value)))
                 .ToArray() ?? [];
+            var dateStyles = DateStyleIndexes(TryLoadXml(archive, "xl/styles.xml"));
+            var date1904 = (string?)workbook.Root?.Element(SheetNamespace + "workbookPr")?.Attribute("date1904") is "1" or "true";
 
             var relationshipTargets = relationships.Root?
                 .Elements(PackageRelationshipNamespace + "Relationship")
@@ -287,7 +293,7 @@ internal sealed class PatientImportFileParser
                     if (relationshipId is null || !relationshipTargets.TryGetValue(relationshipId, out var target))
                         throw InvalidFile("O XLSX contém uma planilha sem destino válido.");
                     var document = LoadXml(archive, target);
-                    return ReadSheetRows(document, sharedStrings, maxRows);
+                    return ReadSheetRows(document, sharedStrings, dateStyles, date1904, maxRows);
                 })
                 .Where(rows => rows.Count > 0)
                 .ToArray();
@@ -309,6 +315,8 @@ internal sealed class PatientImportFileParser
     private static IReadOnlyList<CsvRecord> ReadSheetRows(
         XDocument document,
         IReadOnlyList<string> sharedStrings,
+        HashSet<int> dateStyles,
+        bool date1904,
         int maxRows)
     {
         var sheetData = document.Root?.Element(SheetNamespace + "sheetData")
@@ -328,7 +336,7 @@ internal sealed class PatientImportFileParser
                 fallbackColumn = column;
                 if (column > 100)
                     throw InvalidFile("O XLSX possui mais colunas que o permitido.");
-                values[column] = CellValue(cell, sharedStrings);
+                values[column] = CellValue(cell, sharedStrings, dateStyles, date1904);
             }
 
             if (values.Count == 0 || values.Values.All(string.IsNullOrWhiteSpace))
@@ -358,7 +366,8 @@ internal sealed class PatientImportFileParser
         return rows;
     }
 
-    private static string CellValue(XElement cell, IReadOnlyList<string> sharedStrings)
+    private static string CellValue(XElement cell, IReadOnlyList<string> sharedStrings,
+        HashSet<int> dateStyles, bool date1904)
     {
         var type = (string?)cell.Attribute("t");
         if (type == "inlineStr")
@@ -374,7 +383,46 @@ internal sealed class PatientImportFileParser
             return sharedStrings[sharedStringIndex];
         }
 
+        if (type is null or "n" && int.TryParse((string?)cell.Attribute("s"), out var style)
+            && dateStyles.Contains(style) && double.TryParse(value, NumberStyles.Float,
+                CultureInfo.InvariantCulture, out var serial))
+        {
+            try
+            {
+                if (date1904 && serial >= 0)
+                    return DateOnly.FromDateTime(new DateTime(1904, 1, 1).AddDays(serial)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+                if (!date1904 && serial >= 1 && serial != 60)
+                    return DateOnly.FromDateTime(DateTime.FromOADate(serial)).ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
+            }
+            catch (ArgumentException)
+            {
+                return value;
+            }
+        }
         return type == "b" ? value == "1" ? "TRUE" : "FALSE" : value;
+    }
+
+    private static HashSet<int> DateStyleIndexes(XDocument? styles)
+    {
+        if (styles?.Root is null) return [];
+        var formats = styles.Root.Element(SheetNamespace + "numFmts")?
+            .Elements(SheetNamespace + "numFmt")
+            .Where(format => int.TryParse((string?)format.Attribute("numFmtId"), out _))
+            .ToDictionary(format => int.Parse((string)format.Attribute("numFmtId")!),
+                format => (string?)format.Attribute("formatCode") ?? string.Empty) ?? [];
+        var result = new HashSet<int>();
+        var xfs = styles.Root.Element(SheetNamespace + "cellXfs")?.Elements(SheetNamespace + "xf") ?? [];
+        var index = 0;
+        foreach (var xf in xfs)
+        {
+            if (int.TryParse((string?)xf.Attribute("numFmtId"), out var formatId)
+                && (formatId is >= 14 and <= 22 or >= 27 and <= 36 or >= 50 and <= 58
+                    || formats.TryGetValue(formatId, out var formatCode)
+                        && Regex.IsMatch(Regex.Replace(formatCode, "\"[^\"]*\"|\\\\.", ""), "[dmy]", RegexOptions.IgnoreCase)))
+                result.Add(index);
+            index++;
+        }
+        return result;
     }
 
     private static int ColumnNumber(string reference)

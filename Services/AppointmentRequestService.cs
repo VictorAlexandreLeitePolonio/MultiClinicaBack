@@ -11,7 +11,8 @@ public class AppointmentRequestService(
     IPatientAccountLoggedService patient,
     IUsuarioLogadoService usuario,
     IPatientNotificationService notifications,
-    IAvailabilityService availability) : IAppointmentRequestService
+    IAvailabilityService availability,
+    AppointmentBookingGuard bookingGuard) : IAppointmentRequestService
 {
     // ── Paciente ─────────────────────────────────────────────────────────────
 
@@ -136,7 +137,14 @@ public class AppointmentRequestService(
         request.RespondedAt = DateTime.UtcNow;
         request.UpdatedByUserId = usuario.UserId;
 
-        await repository.SaveChangesAsync();
+        var booking = await bookingGuard.RunAsync(usuario.ClinicaId, dto.ProfessionalId,
+            request.RequestedDate, request.DurationMinutes, null, async () =>
+            {
+                await repository.SaveChangesAsync();
+                return true;
+            });
+        if (!booking.IsSuccess)
+            return Fail(booking.ErrorCode!, booking.ErrorMessage!);
 
         if (account is not null)
             await notifications.NotifyRequestAcceptedAsync(account, request.Clinica, request);

@@ -28,6 +28,19 @@ public class AppointmentsController(IAppointmentService service) : ControllerBas
         return Ok(result.Value);
     }
 
+    [HttpGet("professionals")]
+    public async Task<IActionResult> GetProfessionals()
+        => Ok((await service.GetProfessionalsAsync()).Value);
+
+    [HttpGet("day-schedule")]
+    public async Task<IActionResult> GetDaySchedule([FromQuery] int professionalId, [FromQuery] DateOnly date)
+    {
+        var result = await service.GetDayScheduleAsync(professionalId, date);
+        return result.IsSuccess ? Ok(result.Value) : result.ErrorCode == ErrorCodes.NotFound
+            ? NotFound(new { message = result.ErrorMessage })
+            : BadRequest(new { message = result.ErrorMessage });
+    }
+
     [HttpGet("{id}")]
     public async Task<IActionResult> GetAppointment(int id)
     {
@@ -47,6 +60,7 @@ public class AppointmentsController(IAppointmentService service) : ControllerBas
                 ErrorCodes.NotFound         => NotFound(new { message = result.ErrorMessage }),
                 ErrorCodes.InactivePatient  => BadRequest(new { message = result.ErrorMessage }),
                 ErrorCodes.InvalidDate      => BadRequest(new { message = result.ErrorMessage }),
+                ErrorCodes.AppointmentConflict => Conflict(new { code = result.ErrorCode, message = result.ErrorMessage }),
                 _                           => BadRequest(new { message = result.ErrorMessage })
             };
 
@@ -62,6 +76,7 @@ public class AppointmentsController(IAppointmentService service) : ControllerBas
             {
                 ErrorCodes.NotFound      => NotFound(new { message = result.ErrorMessage }),
                 ErrorCodes.CannotModify  => BadRequest(new { message = result.ErrorMessage }),
+                ErrorCodes.AppointmentConflict => Conflict(new { code = result.ErrorCode, message = result.ErrorMessage }),
                 _                        => BadRequest(new { message = result.ErrorMessage })
             };
 

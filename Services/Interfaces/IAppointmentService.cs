@@ -17,6 +17,8 @@ public interface IAppointmentService
         int pageSize);
 
     Task<Result<AppointmentResponseDto>> GetByIdAsync(int id);
+    Task<Result<IReadOnlyList<AppointmentProfessionalDto>>> GetProfessionalsAsync();
+    Task<Result<ProfessionalDayScheduleDto>> GetDayScheduleAsync(int professionalId, DateOnly date);
 
     Task<Result<AppointmentResponseDto>> CreateAsync(CreateAppointmentDto dto);
 

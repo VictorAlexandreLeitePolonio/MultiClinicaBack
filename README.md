@@ -48,7 +48,7 @@ Variáveis obrigatórias:
 
 `POST /api/patients/import` recebe uma requisição `multipart/form-data` com o arquivo no campo `file` e um UUID no cabeçalho `Idempotency-Key`. A rota exige autenticação de clínica e aceita os papéis `Administrador`, `Profissional` e `Recepcao`.
 
-São aceitos arquivos `.csv` em UTF-8 (com ou sem BOM, delimitados por vírgula ou ponto e vírgula) e `.xlsx` com uma planilha de dados. O arquivo pode ter até 10 MB e 10.000 linhas; os limites podem ser alterados por `PatientImport__MaxFileBytes` e `PatientImport__MaxRows`. Colunas aceitas, em qualquer ordem e sem diferenciar maiúsculas de minúsculas: `Name`, `Email`, `CPF`, `Rg`, `Phone`, `Rua`, `Numero`, `Bairro`, `Cidade`, `Estado` e `Cep`. `Name` é obrigatória. Por exemplo, um CSV mínimo é:
+São aceitos arquivos `.csv` em UTF-8 (com ou sem BOM, delimitados por vírgula ou ponto e vírgula) e `.xlsx` com uma planilha de dados. O arquivo pode ter até 10 MB e 10.000 linhas; os limites podem ser alterados por `PatientImport__MaxFileBytes` e `PatientImport__MaxRows`. Colunas aceitas, em qualquer ordem e sem diferenciar maiúsculas de minúsculas: `Name`, `Email`, `CPF`, `Rg`, `BirthDate`, `Rua`, `Numero`, `Bairro`, `Cidade`, `Estado`, `Cep` e `Phone`. `Name` é obrigatória. `BirthDate` é opcional e aceita `DD/MM/AAAA`, `AAAA-MM-DD` ou uma célula de data nativa do Excel; datas inválidas ou futuras rejeitam apenas a linha. Por exemplo, um CSV mínimo é:
 
 ```csv
 Name

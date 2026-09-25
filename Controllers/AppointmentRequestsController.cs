@@ -45,6 +45,7 @@ public class AppointmentRequestsController(IAppointmentRequestService service) :
             ErrorCodes.Forbidden     => StatusCode(StatusCodes.Status403Forbidden, new { message = result.ErrorMessage }),
             ErrorCodes.InvalidStatus => Conflict(new { message = result.ErrorMessage }),
             ErrorCodes.ProfessionalUnavailable => Conflict(new { code = result.ErrorCode, message = result.ErrorMessage }),
+            ErrorCodes.AppointmentConflict => Conflict(new { code = result.ErrorCode, message = result.ErrorMessage }),
             _                        => BadRequest(new { message = result.ErrorMessage })
         };
     }

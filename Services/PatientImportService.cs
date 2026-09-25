@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Microsoft.AspNetCore.Http;
@@ -165,7 +166,10 @@ public class PatientImportService(
         CancellationToken cancellationToken)
     {
         var rejected = new List<PatientImportRowResultDto>();
-        var drafts = BuildDrafts(rows, rejected);
+        var timeZoneId = await db.Clinicas.Where(clinic => clinic.Id == usuario.ClinicaId)
+            .Select(clinic => clinic.TimeZoneId).SingleAsync(cancellationToken);
+        var today = PatientBirthDate.Today(timeProvider, timeZoneId);
+        var drafts = BuildDrafts(rows, rejected, today);
         if (drafts.Count == 0)
             return ([], rejected);
 
@@ -195,13 +199,14 @@ public class PatientImportService(
 
     private List<PatientImportDraft> BuildDrafts(
         IReadOnlyList<PatientImportSourceRow> rows,
-        List<PatientImportRowResultDto> rejected)
+        List<PatientImportRowResultDto> rejected,
+        DateOnly today)
     {
         var drafts = new List<PatientImportDraft>();
         foreach (var row in rows)
         {
             var errors = new List<PatientImportRowErrorDto>();
-            var draft = TryCreateDraft(row, errors);
+            var draft = TryCreateDraft(row, errors, today);
             if (draft is null)
                 rejected.Add(RejectedRow(row.Row, errors));
             else
@@ -212,7 +217,8 @@ public class PatientImportService(
 
     private PatientImportDraft? TryCreateDraft(
         PatientImportSourceRow row,
-        List<PatientImportRowErrorDto> errors)
+        List<PatientImportRowErrorDto> errors,
+        DateOnly today)
     {
         var name = Optional(row.Name);
         if (name is null)
@@ -229,6 +235,17 @@ public class PatientImportService(
         ValidateDigits(row.Phone, phone, "Phone", errors);
         var cep = DigitsOnly(row.Cep);
         ValidateDigits(row.Cep, cep, "Cep", errors);
+        DateOnly? birthDate = null;
+        if (row.BirthDate is not null)
+        {
+            if (!DateOnly.TryParseExact(row.BirthDate, ["dd/MM/yyyy", "yyyy-MM-dd"],
+                    CultureInfo.InvariantCulture, DateTimeStyles.None, out var parsedBirthDate))
+                errors.Add(RowError("BirthDate", ErrorCodes.InvalidDate, "Data de nascimento inválida. Use DD/MM/AAAA ou AAAA-MM-DD."));
+            else if (parsedBirthDate > today)
+                errors.Add(RowError("BirthDate", ErrorCodes.InvalidDate, "A data de nascimento não pode ser futura."));
+            else
+                birthDate = parsedBirthDate;
+        }
 
         return errors.Count > 0
             ? null
@@ -238,6 +255,7 @@ public class PatientImportService(
                 email,
                 cpf,
                 Optional(row.Rg),
+                birthDate,
                 Optional(row.Rua),
                 Optional(row.Numero),
                 Optional(row.Bairro),
@@ -360,6 +378,7 @@ public class PatientImportService(
             Email = draft.Email,
             CPF = draft.CPF,
             Rg = draft.Rg,
+            BirthDate = draft.BirthDate,
             Rua = draft.Rua,
             Numero = draft.Numero,
             Bairro = draft.Bairro,
@@ -450,6 +469,7 @@ public class PatientImportService(
         string? Email,
         string? CPF,
         string? Rg,
+        DateOnly? BirthDate,
         string? Rua,
         string? Numero,
         string? Bairro,

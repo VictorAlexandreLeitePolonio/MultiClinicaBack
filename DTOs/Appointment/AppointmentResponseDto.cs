@@ -13,4 +13,5 @@ public class AppointmentResponseDto
     public DateTime AppointmentDate { get; set; }
     public AppointmentStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
+    public string? TimeZoneId { get; set; }
 }

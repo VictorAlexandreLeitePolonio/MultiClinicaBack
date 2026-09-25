@@ -16,6 +16,7 @@ public static class ErrorCodes
     public const string CannotModify       = "CANNOT_MODIFY";
     public const string LastAdmin          = "LAST_ADMIN";
     public const string InvalidDate        = "INVALID_DATE";
+    public const string AppointmentConflict = "APPOINTMENT_CONFLICT";
     public const string InvalidPassword    = "INVALID_PASSWORD";
     public const string InvalidFileType    = "INVALID_FILE_TYPE";
     public const string FileTooLarge       = "FILE_TOO_LARGE";
