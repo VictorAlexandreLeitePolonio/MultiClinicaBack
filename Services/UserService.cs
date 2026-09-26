@@ -22,6 +22,7 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
             Email     = u.Email,
             Role      = u.Role,
             CreatedAt = u.CreatedAt,
+            InvitationPending = u.InvitationTokenHash != null,
         }).ToList();
 
         return Result<PagedResult<UserResponseDto>>.Ok(new PagedResult<UserResponseDto>
@@ -48,6 +49,7 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
             Email     = user.Email,
             Role      = user.Role,
             CreatedAt = user.CreatedAt,
+            InvitationPending = user.InvitationTokenHash != null,
         });
     }
 
@@ -92,6 +94,7 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
             Email     = user.Email,
             Role      = user.Role,
             CreatedAt = user.CreatedAt,
+            InvitationPending = user.InvitationTokenHash != null,
         });
     }
 
@@ -108,6 +111,10 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
         if (user is null)
             return Result<UserResponseDto>.Fail(ErrorCodes.NotFound, "Usuário não encontrado.");
 
+        if (user.InvitationTokenHash != null && user.Email != dto.Email.Trim().ToLowerInvariant())
+            return Result<UserResponseDto>.Fail(ErrorCodes.Forbidden,
+                "Para alterar o e-mail, exclua o convite pendente e envie um novo.");
+
         user.Name      = dto.Name;
         user.Email     = dto.Email.Trim().ToLowerInvariant();
         user.UpdatedByUserId = usuario.UserId;
@@ -122,6 +129,7 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
             Email     = user.Email,
             Role      = user.Role,
             CreatedAt = user.CreatedAt,
+            InvitationPending = user.InvitationTokenHash != null,
         });
     }
 

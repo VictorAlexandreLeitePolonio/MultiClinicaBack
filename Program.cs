@@ -119,6 +119,7 @@ builder.Services.AddScoped<SessionTypeService>();
 // User — Repository e Service
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
+builder.Services.AddScoped<UserInvitationService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();

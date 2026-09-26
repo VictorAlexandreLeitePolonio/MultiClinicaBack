@@ -23,6 +23,8 @@ public class User : AuditableEntity
     public string Cep { get; set; } = string.Empty;
 
     public string PasswordHash { get; set; } = string.Empty;
+    public string? InvitationTokenHash { get; set; }
+    public DateTime? InvitationExpiresAt { get; set; }
     public UserRole Role { get; set; } = UserRole.Profissional;
 
     public Clinica Clinica { get; set; } = null!;

@@ -58,6 +58,10 @@ public class AppDbContext : DbContext
             .IsUnique();
 
         modelBuilder.Entity<User>()
+            .Property(u => u.InvitationTokenHash)
+            .IsConcurrencyToken();
+
+        modelBuilder.Entity<User>()
             .Property(u => u.Role)
             .HasConversion<string>();
 
