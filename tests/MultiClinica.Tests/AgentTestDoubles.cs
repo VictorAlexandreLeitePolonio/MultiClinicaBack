@@ -24,3 +24,47 @@ public static class AgentSeed
         return ids;
     }
 }
+
+public sealed class FakeChatModel : MultiClinica.API.Services.Agent.IChatModel
+{
+    public Queue<Func<MultiClinica.API.Services.Agent.AgentChatResult>> Script { get; } = new();
+    public List<(string Model, List<MultiClinica.API.Services.Agent.AgentChatMessage> Messages)> Requests { get; } = [];
+
+    public FakeChatModel Reply(string text)
+    {
+        Script.Enqueue(() => new(text, [], 10, 5));
+        return this;
+    }
+
+    public FakeChatModel CallTool(string name, string argsJson, string id = "call_1")
+    {
+        Script.Enqueue(() => new(null, [new(id, name, argsJson)], 10, 5));
+        return this;
+    }
+
+    public FakeChatModel Throw()
+    {
+        Script.Enqueue(() => throw new HttpRequestException("LLM fora do ar"));
+        return this;
+    }
+
+    public Task<MultiClinica.API.Services.Agent.AgentChatResult> CompleteAsync(string model,
+        IReadOnlyList<MultiClinica.API.Services.Agent.AgentChatMessage> messages,
+        IReadOnlyList<MultiClinica.API.Services.Agent.AgentToolDefinition> tools, CancellationToken ct)
+    {
+        Requests.Add((model, messages.ToList()));
+        if (Script.Count == 0) throw new InvalidOperationException("FakeChatModel sem resposta roteirizada.");
+        return Task.FromResult(Script.Dequeue()());
+    }
+}
+
+public sealed class FakeTelegramClient : MultiClinica.API.Services.Agent.ITelegramClient
+{
+    public List<(long ChatId, string Text)> Sent { get; } = [];
+
+    public Task SendMessageAsync(long chatId, string text, CancellationToken ct)
+    {
+        Sent.Add((chatId, text));
+        return Task.CompletedTask;
+    }
+}

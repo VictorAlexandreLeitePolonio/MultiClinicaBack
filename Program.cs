@@ -125,6 +125,7 @@ builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentIdentity>();
 builder.Services.Configure<MultiClinica.API.Services.Agent.AgentOptions>(builder.Configuration.GetSection("Agent"));
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.IChatModel, MultiClinica.API.Services.Agent.OpenAiChatModel>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.OwnerAgentTools>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentRunner>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
