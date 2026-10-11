@@ -10,6 +10,7 @@ public class AgentConversation : AuditableEntity
     public AgentChannel Channel { get; set; }
     public AgentProfile Profile { get; set; }
     public string ExternalChatId { get; set; } = string.Empty;
+    // ponytail: ids sem FK (integridade garantida pelo código); adicionar FKs se registros passarem a ser apagados fisicamente.
     public int? UserId { get; set; }
     public int? PatientId { get; set; }
     public int? AppointmentRequestId { get; set; }

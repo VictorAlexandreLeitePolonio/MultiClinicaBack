@@ -26,6 +26,7 @@ public class User : AuditableEntity
     public string? InvitationTokenHash { get; set; }
     public DateTime? InvitationExpiresAt { get; set; }
     public long? TelegramChatId { get; set; }
+    // ponytail: sem índice (resgate do vínculo é raro); indexar se a busca por hash ficar frequente.
     public string? TelegramLinkCodeHash { get; set; }
     public DateTime? TelegramLinkExpiresAt { get; set; }
     public UserRole Role { get; set; } = UserRole.Profissional;
