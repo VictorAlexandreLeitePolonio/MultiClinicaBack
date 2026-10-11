@@ -237,4 +237,30 @@ public class OwnerAgentToolsTests
             Assert.False(string.IsNullOrWhiteSpace(root.GetProperty("erro").GetString()));
         }
     }
+
+    [Fact]
+    public async Task Argument_errors_use_exact_messages()
+    {
+        var (app, clinicId, adminId, _) = await SetupAsync();
+        await using var _ = app;
+
+        var missing = await RunAsync(app, clinicId, adminId, "agendar", new { });
+        Assert.Equal("Parâmetro obrigatório ausente: paciente_id.", missing.GetProperty("erro").GetString());
+
+        var invalid = await RunAsync(app, clinicId, adminId, "agendar",
+            new { paciente_id = "abc", profissional_id = 1, data_hora = "2030-01-01T09:00" });
+        Assert.Equal("Parâmetro inválido: paciente_id.", invalid.GetProperty("erro").GetString());
+    }
+
+    [Fact]
+    public async Task Numeric_string_argument_is_parsed_and_reaches_the_service()
+    {
+        var (app, clinicId, adminId, _) = await SetupAsync();
+        await using var _ = app;
+
+        var result = await RunAsync(app, clinicId, adminId, "cancelar", new { consulta_id = "999999" });
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Equal("Consulta não encontrada.", result.GetProperty("erro").GetString());
+    }
 }

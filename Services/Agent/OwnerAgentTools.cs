@@ -25,7 +25,7 @@ public sealed class OwnerAgentTools(
     [
         new("buscar_paciente", "Busca pacientes da clínica pelo nome (parcial, sem diferenciar maiúsculas). Retorna até 5.",
             """{"type":"object","properties":{"nome":{"type":"string"}},"required":["nome"]}"""),
-        new("cadastrar_paciente", "Cadastra um paciente novo. Todos os campos são obrigatórios; se a conta do paciente for nova, ele recebe e-mail de convite de ativação.",
+        new("cadastrar_paciente", "Cadastra um paciente novo. Todos os campos são obrigatórios; se a conta do paciente ainda não estiver ativa, ele recebe e-mail de convite de ativação.",
             """{"type":"object","properties":{"nome":{"type":"string"},"telefone":{"type":"string"},"email":{"type":"string"},"cpf":{"type":"string"}},"required":["nome","telefone","email","cpf"]}"""),
         new("ver_agenda", "Lista consultas agendadas entre duas datas (inclusive), opcionalmente de um profissional.",
             """{"type":"object","properties":{"data_inicio":{"type":"string","description":"yyyy-MM-dd"},"data_fim":{"type":"string","description":"yyyy-MM-dd"},"profissional_id":{"type":"integer"}},"required":["data_inicio","data_fim"]}"""),
@@ -63,10 +63,6 @@ public sealed class OwnerAgentTools(
         catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException)
         {
             return Error(ex.Message);
-        }
-        catch (OperationCanceledException)
-        {
-            throw;
         }
         catch (Exception ex)
         {
@@ -206,9 +202,13 @@ public sealed class OwnerAgentTools(
             .Select(c => c.TimeZoneId).FirstAsync());
 
     private static string Str(JsonElement args, string name)
-        => args.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String && !string.IsNullOrWhiteSpace(v.GetString())
-            ? v.GetString()!
-            : throw new ArgumentException($"Parâmetro obrigatório ausente: {name}.");
+    {
+        if (!args.TryGetProperty(name, out var v) || v.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            throw new ArgumentException($"Parâmetro obrigatório ausente: {name}.");
+        if (v.ValueKind != JsonValueKind.String || string.IsNullOrWhiteSpace(v.GetString()))
+            throw new ArgumentException($"Parâmetro inválido: {name}.");
+        return v.GetString()!;
+    }
 
     private static int Int(JsonElement args, string name)
         => OptInt(args, name) ?? throw new ArgumentException($"Parâmetro obrigatório ausente: {name}.");
