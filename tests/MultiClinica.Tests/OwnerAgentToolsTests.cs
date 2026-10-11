@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
@@ -72,10 +73,13 @@ public class OwnerAgentToolsTests
             new { paciente_id = patientId, profissional_id = adminId, data_hora = local });
 
         Assert.True(result.GetProperty("ok").GetBoolean());
+        // Independente de AgentTime: São Paulo é UTC-3 (sem horário de verão desde 2019).
+        var expectedUtc = DateTime.SpecifyKind(
+            DateTime.ParseExact(local, "yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture).AddHours(3), DateTimeKind.Utc);
         await app.SeedAsync(async db =>
         {
             var appointment = await db.Appointments.SingleAsync();
-            Assert.Equal(AgentTime.ToUtc(local, Sp), DateTime.SpecifyKind(appointment.AppointmentDate, DateTimeKind.Utc));
+            Assert.Equal(expectedUtc, DateTime.SpecifyKind(appointment.AppointmentDate, DateTimeKind.Utc));
         });
     }
 
@@ -134,6 +138,70 @@ public class OwnerAgentToolsTests
             .Select(t => t.GetString()).ToList();
         Assert.DoesNotContain(local, times);
         Assert.Contains($"{day}T10:00", times);
+    }
+
+    [Fact]
+    public async Task Cancel_refuses_appointment_that_is_not_scheduled()
+    {
+        var (app, clinicId, adminId, patientId) = await SetupAsync();
+        await using var _ = app;
+        var created = await RunAsync(app, clinicId, adminId, "agendar",
+            new { paciente_id = patientId, profissional_id = adminId, data_hora = FutureLocal() });
+        var id = created.GetProperty("consulta_id").GetInt32();
+        await app.SeedAsync(async db =>
+        {
+            var appointment = await db.Appointments.SingleAsync();
+            appointment.Status = AppointmentStatus.Completed;
+            await db.SaveChangesAsync();
+        });
+
+        var result = await RunAsync(app, clinicId, adminId, "cancelar", new { consulta_id = id });
+
+        Assert.False(result.GetProperty("ok").GetBoolean());
+        Assert.Equal("Só é possível cancelar consulta agendada.", result.GetProperty("erro").GetString());
+        await app.SeedAsync(async db =>
+        {
+            var appointment = await db.Appointments.SingleAsync();
+            Assert.Equal(AppointmentStatus.Completed, appointment.Status);
+        });
+    }
+
+    [Fact]
+    public async Task Other_clinic_appointments_are_invisible_and_untouchable()
+    {
+        var (app, clinicId, adminId, _) = await SetupAsync();
+        await using var _ = app;
+        var local = FutureLocal(9);
+        var day = local[..10];
+        var foreignId = 0;
+        await app.SeedAsync(async db =>
+        {
+            var other = await db.Clinicas.SingleAsync(c => c.Nome == "Outra");
+            var professional = new User { ClinicaId = other.Id, Name = "Dra. Outra", Email = "pro-outra@test.local", Role = UserRole.Profissional };
+            var patient = new Patient { ClinicaId = other.Id, Name = "Paciente Outra", Phone = "11977776666" };
+            db.Users.Add(professional);
+            db.Patients.Add(patient);
+            await db.SaveChangesAsync();
+            var appointment = new Appointment { ClinicaId = other.Id, UserId = professional.Id, PatientId = patient.Id,
+                AppointmentDate = AgentTime.ToUtc(local, Sp), Status = AppointmentStatus.Scheduled };
+            db.Appointments.Add(appointment);
+            await db.SaveChangesAsync();
+            foreignId = appointment.Id;
+        });
+
+        var agenda = await RunAsync(app, clinicId, adminId, "ver_agenda", new { data_inicio = day, data_fim = day });
+        Assert.Empty(agenda.GetProperty("consultas").EnumerateArray());
+
+        var moved = await RunAsync(app, clinicId, adminId, "remarcar",
+            new { consulta_id = foreignId, nova_data_hora = FutureLocal(14) });
+        Assert.False(moved.GetProperty("ok").GetBoolean());
+        var cancelled = await RunAsync(app, clinicId, adminId, "cancelar", new { consulta_id = foreignId });
+        Assert.False(cancelled.GetProperty("ok").GetBoolean());
+        await app.SeedAsync(async db =>
+        {
+            var appointment = await db.Appointments.SingleAsync(a => a.Id == foreignId);
+            Assert.Equal(AppointmentStatus.Scheduled, appointment.Status);
+        });
     }
 
     [Fact]

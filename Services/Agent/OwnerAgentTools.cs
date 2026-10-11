@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
@@ -24,7 +25,7 @@ public sealed class OwnerAgentTools(
     [
         new("buscar_paciente", "Busca pacientes da clínica pelo nome (parcial, sem diferenciar maiúsculas). Retorna até 5.",
             """{"type":"object","properties":{"nome":{"type":"string"}},"required":["nome"]}"""),
-        new("cadastrar_paciente", "Cadastra um paciente novo. Todos os campos são obrigatórios; o paciente recebe e-mail de convite.",
+        new("cadastrar_paciente", "Cadastra um paciente novo. Todos os campos são obrigatórios; se a conta do paciente for nova, ele recebe e-mail de convite de ativação.",
             """{"type":"object","properties":{"nome":{"type":"string"},"telefone":{"type":"string"},"email":{"type":"string"},"cpf":{"type":"string"}},"required":["nome","telefone","email","cpf"]}"""),
         new("ver_agenda", "Lista consultas agendadas entre duas datas (inclusive), opcionalmente de um profissional.",
             """{"type":"object","properties":{"data_inicio":{"type":"string","description":"yyyy-MM-dd"},"data_fim":{"type":"string","description":"yyyy-MM-dd"},"profissional_id":{"type":"integer"}},"required":["data_inicio","data_fim"]}"""),
@@ -40,15 +41,10 @@ public sealed class OwnerAgentTools(
 
     public async Task<string> ExecuteAsync(string name, string argumentsJson)
     {
-        JsonElement args;
-        try
-        {
-            args = JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson).RootElement;
-        }
-        catch (JsonException)
-        {
+        using var doc = TryParse(argumentsJson);
+        if (doc is null)
             return Error("Argumentos em JSON inválido.");
-        }
+        var args = doc.RootElement;
 
         try
         {
@@ -67,6 +63,10 @@ public sealed class OwnerAgentTools(
         catch (Exception ex) when (ex is ArgumentException or FormatException or InvalidOperationException)
         {
             return Error(ex.Message);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -97,7 +97,7 @@ public sealed class OwnerAgentTools(
             CPF = Str(args, "cpf"),
         });
         return result.IsSuccess
-            ? Ok(new { ok = true, paciente_id = result.Value!.PatientId })
+            ? Ok(new { ok = true, paciente_id = result.Value!.PatientId, convite_enviado = result.Value.InvitationSent })
             : Error(result.ErrorMessage!);
     }
 
@@ -191,6 +191,8 @@ public sealed class OwnerAgentTools(
     {
         var current = await appointments.GetByIdAsync(appointmentId);
         if (!current.IsSuccess) return Error(current.ErrorMessage!);
+        if (current.Value!.Status != AppointmentStatus.Scheduled)
+            return Error("Só é possível cancelar consulta agendada.");
         var result = await appointments.UpdateAsync(appointmentId, new UpdateAppointmentDto
         {
             AppointmentDate = current.Value!.AppointmentDate,
@@ -212,7 +214,24 @@ public sealed class OwnerAgentTools(
         => OptInt(args, name) ?? throw new ArgumentException($"Parâmetro obrigatório ausente: {name}.");
 
     private static int? OptInt(JsonElement args, string name)
-        => args.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var i) ? i : null;
+    {
+        if (!args.TryGetProperty(name, out var v)) return null;
+        if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n)) return n;
+        if (v.ValueKind == JsonValueKind.String && int.TryParse(v.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var s)) return s;
+        throw new ArgumentException($"Parâmetro inválido: {name}.");
+    }
+
+    private static JsonDocument? TryParse(string argumentsJson)
+    {
+        try
+        {
+            return JsonDocument.Parse(string.IsNullOrWhiteSpace(argumentsJson) ? "{}" : argumentsJson);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
 
     private static string Ok(object value) => JsonSerializer.Serialize(value, Json);
     private static string Error(string message) => JsonSerializer.Serialize(new { ok = false, erro = message }, Json);
