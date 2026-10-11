@@ -15,12 +15,16 @@ public sealed class AgentRunner(
     IChatModel chat,
     OwnerAgentTools ownerTools,
     IAppointmentService appointments,
+    IUsuarioLogadoService usuario,
     IOptions<AgentOptions> options,
     TimeProvider time)
 {
     // ponytail: só o perfil Owner por enquanto; o perfil Patient entra no plano do WhatsApp.
     public async Task<string> RunAsync(AgentConversation conversation, User owner, CancellationToken ct)
     {
+        if (usuario.ClinicaId != conversation.ClinicaId || usuario.UserId != owner.Id)
+            throw new InvalidOperationException("Identidade do agente não corresponde à conversa.");
+
         var o = options.Value;
         var model = o.ModelFor(conversation.Profile);
         var now = time.GetUtcNow().UtcDateTime;
@@ -40,6 +44,11 @@ public sealed class AgentRunner(
             var result = await chat.CompleteAsync(model, messages, OwnerAgentTools.Definitions, ct);
             watch.Stop();
 
+            // Última volta: sem próxima chamada para devolver o resultado, então não executa tool nem grava linha órfã.
+            if (result.ToolCalls.Count > 0 && i == o.MaxToolIterations - 1)
+                throw new AgentLoopLimitException();
+
+            // Grava o Assistant antes de executar as tools: as tools commitam pelos próprios services.
             db.AgentMessages.Add(new AgentMessage
             {
                 ConversationId = conversation.Id,
@@ -52,13 +61,11 @@ public sealed class AgentRunner(
                 OutputTokens = result.OutputTokens,
                 LatencyMs = (int)watch.ElapsedMilliseconds,
             });
+            await db.SaveChangesAsync(ct);
             messages.Add(new AgentChatMessage(AgentChatRole.Assistant, result.Content, result.ToolCalls));
 
             if (result.ToolCalls.Count == 0)
-            {
-                await db.SaveChangesAsync(ct);
                 return result.Content ?? "Pronto.";
-            }
 
             foreach (var call in result.ToolCalls)
             {
@@ -71,9 +78,9 @@ public sealed class AgentRunner(
                     Content = output,
                     ToolCallId = call.Id,
                 });
+                await db.SaveChangesAsync(ct);
                 messages.Add(new AgentChatMessage(AgentChatRole.Tool, output, ToolCallId: call.Id));
             }
-            await db.SaveChangesAsync(ct);
         }
 
         throw new AgentLoopLimitException();
@@ -82,6 +89,7 @@ public sealed class AgentRunner(
     private async Task<List<AgentChatMessage>> LoadHistoryAsync(int conversationId, DateTime sinceUtc, int max,
         CancellationToken ct)
     {
+        // ponytail: janela por número de linhas (HistoryMaxMessages), não por tokens; trocar por orçamento de tokens se o prompt crescer demais.
         var rows = await db.AgentMessages.AsNoTracking()
             .Where(m => m.ConversationId == conversationId && m.CreatedAt >= sinceUtc
                 && m.Status != AgentMessageStatus.Failed)

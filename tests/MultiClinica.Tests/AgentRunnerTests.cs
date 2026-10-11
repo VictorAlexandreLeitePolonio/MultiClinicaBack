@@ -37,13 +37,13 @@ public class AgentRunnerTests
         return (app, model, conversationId);
     }
 
-    private static async Task<string> RunAsync(MultiClinicaFactory app, int conversationId)
+    private static async Task<string> RunAsync(MultiClinicaFactory app, int conversationId, int identityOffset = 0)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var conversation = await db.AgentConversations.SingleAsync(c => c.Id == conversationId);
         var owner = await db.Users.SingleAsync(u => u.Id == conversation.UserId);
-        scope.ServiceProvider.GetRequiredService<AgentIdentity>().Set(owner.ClinicaId, owner.Id, owner.Role);
+        scope.ServiceProvider.GetRequiredService<AgentIdentity>().Set(owner.ClinicaId, owner.Id + identityOffset, owner.Role);
         return await scope.ServiceProvider.GetRequiredService<AgentRunner>().RunAsync(conversation, owner, CancellationToken.None);
     }
 
@@ -101,6 +101,54 @@ public class AgentRunnerTests
         for (var i = 0; i < 3; i++) model.CallTool("buscar_paciente", """{"nome":"x"}""", $"call_{i}");
 
         await Assert.ThrowsAsync<AgentLoopLimitException>(() => RunAsync(app, conversationId));
+
+        // A 3ª volta não executa tool nem grava Assistant com tool_calls sem resultado.
+        await app.SeedAsync(async db =>
+        {
+            var rows = await db.AgentMessages.Where(m => m.ConversationId == conversationId)
+                .Select(m => m.Role).ToListAsync();
+            Assert.Equal(2, rows.Count(r => r == AgentMessageRole.Tool));
+            Assert.Equal(2, rows.Count(r => r == AgentMessageRole.Assistant));
+        });
+    }
+
+    [Fact]
+    public async Task Refuses_to_run_when_agent_identity_is_another_user()
+    {
+        var (app, model, conversationId) = await SetupAsync("oi");
+        await using var _ = app;
+        model.Reply("nunca");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() => RunAsync(app, conversationId, identityOffset: 999));
+
+        Assert.Empty(model.Requests);
+    }
+
+    [Fact]
+    public async Task Second_run_replays_the_earlier_tool_call_from_the_database()
+    {
+        var (app, model, conversationId) = await SetupAsync("acha a cida");
+        await using var _ = app;
+        model.CallTool("buscar_paciente", """{"nome":"cida"}""", "call_1").Reply("Achei.");
+        await RunAsync(app, conversationId);
+
+        await app.SeedAsync(async db =>
+        {
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram,
+                Role = AgentMessageRole.User, Content = "e a próxima?", Status = AgentMessageStatus.Pending });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("Ok.");
+        await RunAsync(app, conversationId);
+
+        var messages = model.Requests[1].Messages;
+        var assistantIndex = messages.FindIndex(m => m.Role == AgentChatRole.Assistant && m.ToolCalls is { Count: > 0 });
+        Assert.True(assistantIndex >= 0);
+        var call = Assert.Single(messages[assistantIndex].ToolCalls!);
+        Assert.Equal("call_1", call.Id);
+        Assert.Equal("buscar_paciente", call.Name);
+        Assert.Equal(AgentChatRole.Tool, messages[assistantIndex + 1].Role);
+        Assert.Equal("call_1", messages[assistantIndex + 1].ToolCallId);
     }
 
     [Fact]
