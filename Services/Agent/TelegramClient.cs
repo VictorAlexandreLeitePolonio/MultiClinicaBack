@@ -19,7 +19,8 @@ public sealed class TelegramClient(HttpClient http, IOptions<TelegramOptions> op
 {
     public async Task SendMessageAsync(long chatId, string text, CancellationToken ct)
     {
-        var response = await http.PostAsJsonAsync($"bot{options.Value.BotToken}/sendMessage",
+        // O token vai na URL: System.Net.Http.HttpClient precisa ficar em Warning (appsettings.json) para não logar o path.
+        using var response = await http.PostAsJsonAsync($"bot{options.Value.BotToken}/sendMessage",
             new { chat_id = chatId, text }, ct);
         response.EnsureSuccessStatusCode();
     }

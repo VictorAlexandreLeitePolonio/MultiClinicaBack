@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using MultiClinica.API.Data;
@@ -168,5 +169,28 @@ public class AgentRunnerTests
         await RunAsync(app, conversationId);
 
         Assert.Equal(AgentChatRole.User, model.Requests[0].Messages[1].Role);
+    }
+
+    [Fact]
+    public async Task Assistant_tool_call_without_result_is_left_out_of_the_history()
+    {
+        var (app, model, conversationId) = await SetupAsync();
+        await using var _ = app;
+        await app.SeedAsync(async db =>
+        {
+            var callsJson = JsonSerializer.Serialize(new[] { new AgentToolCall("x", "buscar_paciente", "{}") });
+            db.AgentMessages.AddRange(
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("ok");
+
+        await RunAsync(app, conversationId);
+
+        var messages = model.Requests[0].Messages;
+        Assert.DoesNotContain(messages, m => m.ToolCalls is { Count: > 0 } calls && calls.Any(c => c.Id == "x"));
+        Assert.Equal(["antiga", "nova"], messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
     }
 }

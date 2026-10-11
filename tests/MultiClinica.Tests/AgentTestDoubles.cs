@@ -29,6 +29,8 @@ public sealed class FakeChatModel : MultiClinica.API.Services.Agent.IChatModel
 {
     public Queue<Func<MultiClinica.API.Services.Agent.AgentChatResult>> Script { get; } = new();
     public List<(string Model, List<MultiClinica.API.Services.Agent.AgentChatMessage> Messages)> Requests { get; } = [];
+    // Roda dentro da chamada, antes da resposta roteirizada: simula mensagem que chega durante o LLM.
+    public Func<Task>? OnCall { get; set; }
 
     public FakeChatModel Reply(string text)
     {
@@ -48,13 +50,14 @@ public sealed class FakeChatModel : MultiClinica.API.Services.Agent.IChatModel
         return this;
     }
 
-    public Task<MultiClinica.API.Services.Agent.AgentChatResult> CompleteAsync(string model,
+    public async Task<MultiClinica.API.Services.Agent.AgentChatResult> CompleteAsync(string model,
         IReadOnlyList<MultiClinica.API.Services.Agent.AgentChatMessage> messages,
         IReadOnlyList<MultiClinica.API.Services.Agent.AgentToolDefinition> tools, CancellationToken ct)
     {
         Requests.Add((model, messages.ToList()));
+        if (OnCall is not null) await OnCall();
         if (Script.Count == 0) throw new InvalidOperationException("FakeChatModel sem resposta roteirizada.");
-        return Task.FromResult(Script.Dequeue()());
+        return Script.Dequeue()();
     }
 }
 

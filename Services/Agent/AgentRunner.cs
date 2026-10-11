@@ -100,12 +100,39 @@ public sealed class AgentRunner(
         var firstUser = rows.FindIndex(m => m.Role == AgentMessageRole.User);
         if (firstUser < 0) return [];
 
-        return rows.Skip(firstUser).Select(m => m.Role switch
+        return DropUnpairedToolRows(rows.Skip(firstUser).ToList()).Select(m => m.Role switch
         {
             AgentMessageRole.User => new AgentChatMessage(AgentChatRole.User, m.Content),
             AgentMessageRole.Tool => new AgentChatMessage(AgentChatRole.Tool, m.Content, ToolCallId: m.ToolCallId),
             _ => new AgentChatMessage(AgentChatRole.Assistant, m.Content,
                 m.ToolCallsJson is null ? null : JsonSerializer.Deserialize<List<AgentToolCall>>(m.ToolCallsJson)),
         }).ToList();
+    }
+
+    // Assistant com tool_calls só fica se TODAS as chamadas tiverem Tool logo depois; Tool só fica se responde
+    // a uma chamada de um Assistant mantido. Turno interrompido (crash entre o Assistant e a tool) deixa isso.
+    private static List<AgentMessage> DropUnpairedToolRows(List<AgentMessage> rows)
+    {
+        var kept = new List<AgentMessage>(rows.Count);
+        for (var i = 0; i < rows.Count; i++)
+        {
+            var row = rows[i];
+            // Tool entra junto com o Assistant que o chamou; um Tool visto aqui sozinho é órfão.
+            if (row.Role == AgentMessageRole.Tool) continue;
+            if (row.ToolCallsJson is null)
+            {
+                kept.Add(row);
+                continue;
+            }
+
+            var calls = JsonSerializer.Deserialize<List<AgentToolCall>>(row.ToolCallsJson) ?? [];
+            var results = new List<AgentMessage>();
+            for (var j = i + 1; j < rows.Count && rows[j].Role == AgentMessageRole.Tool; j++) results.Add(rows[j]);
+            if (!calls.All(c => results.Any(r => r.ToolCallId == c.Id))) continue;
+
+            kept.Add(row);
+            kept.AddRange(results.Where(r => calls.Any(c => c.Id == r.ToolCallId)));
+        }
+        return kept;
     }
 }
