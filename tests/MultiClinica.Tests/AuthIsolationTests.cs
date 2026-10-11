@@ -565,6 +565,8 @@ public sealed class MultiClinicaFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = Guid.NewGuid().ToString("N");
 
+    public Action<IServiceCollection>? ConfigureTestServices { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -583,6 +585,7 @@ public sealed class MultiClinicaFactory : WebApplicationFactory<Program>
             if (storageDescriptor is not null)
                 services.Remove(storageDescriptor);
             services.AddSingleton<IAttachmentStorage, FakeAttachmentStorage>();
+            ConfigureTestServices?.Invoke(services);
         });
     }
 

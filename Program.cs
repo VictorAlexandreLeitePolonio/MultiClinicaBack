@@ -121,6 +121,7 @@ builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<UserInvitationService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentIdentity>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
