@@ -133,6 +133,7 @@ builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.ITelegramClient, 
     client.Timeout = TimeSpan.FromSeconds(10);
 });
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcessor>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.TelegramLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
