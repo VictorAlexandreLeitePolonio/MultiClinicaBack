@@ -37,6 +37,160 @@ namespace MultiClinica.API.Migrations
                     b.ToTable("ClinicCategoryClinica");
                 });
 
+            modelBuilder.Entity("MultiClinica.API.Models.AgentConversation", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("AppointmentRequestId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ClinicaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DeletedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ExternalChatId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("LastInboundAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Profile")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicaId");
+
+                    b.HasIndex("Channel", "ClinicaId", "ExternalChatId")
+                        .IsUnique();
+
+                    b.ToTable("AgentConversations");
+                });
+
+            modelBuilder.Entity("MultiClinica.API.Models.AgentMessage", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("Attempts")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Channel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Content")
+                        .HasColumnType("text");
+
+                    b.Property<int>("ConversationId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("CreatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("DeletedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("DeletedByUserId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ExternalMessageId")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("InputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LatencyMs")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Model")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("OutputTokens")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToolCallId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ToolCallsJson")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int?>("UpdatedByUserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ConversationId");
+
+                    b.HasIndex("Channel", "ExternalMessageId")
+                        .IsUnique();
+
+                    b.HasIndex("Status", "ConversationId");
+
+                    b.ToTable("AgentMessages");
+                });
+
             modelBuilder.Entity("MultiClinica.API.Models.Appointment", b =>
                 {
                     b.Property<int>("Id")
@@ -2314,6 +2468,15 @@ namespace MultiClinica.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<long?>("TelegramChatId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("TelegramLinkCodeHash")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("TelegramLinkExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -2325,6 +2488,9 @@ namespace MultiClinica.API.Migrations
                     b.HasIndex("ClinicaId");
 
                     b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("TelegramChatId")
                         .IsUnique();
 
                     b.ToTable("Users");
@@ -2343,6 +2509,28 @@ namespace MultiClinica.API.Migrations
                         .HasForeignKey("ClinicasId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+                });
+
+            modelBuilder.Entity("MultiClinica.API.Models.AgentConversation", b =>
+                {
+                    b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
+                        .WithMany()
+                        .HasForeignKey("ClinicaId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.Navigation("Clinica");
+                });
+
+            modelBuilder.Entity("MultiClinica.API.Models.AgentMessage", b =>
+                {
+                    b.HasOne("MultiClinica.API.Models.AgentConversation", "Conversation")
+                        .WithMany("Messages")
+                        .HasForeignKey("ConversationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Conversation");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.Appointment", b =>
@@ -2905,6 +3093,11 @@ namespace MultiClinica.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Clinica");
+                });
+
+            modelBuilder.Entity("MultiClinica.API.Models.AgentConversation", b =>
+                {
+                    b.Navigation("Messages");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.ClinicCategory", b =>

@@ -41,6 +41,8 @@ public class AppDbContext : DbContext
     public DbSet<PatientEvolution> PatientEvolutions { get; set; } = null!;
     public DbSet<PatientEvolutionValue> PatientEvolutionValues { get; set; } = null!;
     public DbSet<ClinicExpense> ClinicExpenses { get; set; } = null!;
+    public DbSet<AgentConversation> AgentConversations { get; set; } = null!;
+    public DbSet<AgentMessage> AgentMessages { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -573,6 +575,31 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(l => l.ClinicaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ── Agente IA (Telegram) ─────────────────────────────────────────────
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.TelegramChatId)
+            .IsUnique();
+
+        modelBuilder.Entity<AgentConversation>(e =>
+        {
+            e.Property(c => c.Channel).HasConversion<string>();
+            e.Property(c => c.Profile).HasConversion<string>();
+            e.HasIndex(c => new { c.Channel, c.ClinicaId, c.ExternalChatId }).IsUnique();
+            e.HasOne(c => c.Clinica).WithMany().HasForeignKey(c => c.ClinicaId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AgentMessage>(e =>
+        {
+            e.Property(m => m.Channel).HasConversion<string>();
+            e.Property(m => m.Role).HasConversion<string>();
+            e.Property(m => m.Status).HasConversion<string>();
+            // Deduplicação de reentrega dos webhooks (Postgres trata NULLs como distintos).
+            e.HasIndex(m => new { m.Channel, m.ExternalMessageId }).IsUnique();
+            e.HasIndex(m => new { m.Status, m.ConversationId });
+            e.HasOne(m => m.Conversation).WithMany(c => c.Messages)
+                .HasForeignKey(m => m.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

@@ -25,6 +25,9 @@ public class User : AuditableEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string? InvitationTokenHash { get; set; }
     public DateTime? InvitationExpiresAt { get; set; }
+    public long? TelegramChatId { get; set; }
+    public string? TelegramLinkCodeHash { get; set; }
+    public DateTime? TelegramLinkExpiresAt { get; set; }
     public UserRole Role { get; set; } = UserRole.Profissional;
 
     public Clinica Clinica { get; set; } = null!;
