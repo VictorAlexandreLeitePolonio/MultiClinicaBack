@@ -10,7 +10,11 @@ namespace MultiClinica.Tests;
 
 public class AgentRunnerTests
 {
-    private static async Task<(MultiClinicaFactory App, FakeChatModel Model, int ConversationId)> SetupAsync(params string[] pending)
+    private static Task<(MultiClinicaFactory App, FakeChatModel Model, int ConversationId)> SetupAsync(params string[] pending)
+        => SetupAsync(historyHours: 24, pending);
+
+    private static async Task<(MultiClinicaFactory App, FakeChatModel Model, int ConversationId)> SetupAsync(int historyHours,
+        params string[] pending)
     {
         var model = new FakeChatModel();
         var app = new MultiClinicaFactory
@@ -18,7 +22,7 @@ public class AgentRunnerTests
             ConfigureTestServices = s =>
             {
                 s.AddSingleton<IChatModel>(model);
-                s.Configure<AgentOptions>(o => { o.Model = "modelo-teste"; o.MaxToolIterations = 3; });
+                s.Configure<AgentOptions>(o => { o.Model = "modelo-teste"; o.MaxToolIterations = 3; o.HistoryHours = historyHours; });
             },
         };
         var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, telegramChatId: 555);
@@ -38,14 +42,15 @@ public class AgentRunnerTests
         return (app, model, conversationId);
     }
 
-    private static async Task<string> RunAsync(MultiClinicaFactory app, int conversationId, int identityOffset = 0)
+    private static async Task<string> RunAsync(MultiClinicaFactory app, int conversationId, int identityOffset = 0,
+        int maxMessageId = int.MaxValue)
     {
         using var scope = app.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var conversation = await db.AgentConversations.SingleAsync(c => c.Id == conversationId);
         var owner = await db.Users.SingleAsync(u => u.Id == conversation.UserId);
         scope.ServiceProvider.GetRequiredService<AgentIdentity>().Set(owner.ClinicaId, owner.Id + identityOffset, owner.Role);
-        return await scope.ServiceProvider.GetRequiredService<AgentRunner>().RunAsync(conversation, owner, CancellationToken.None);
+        return await scope.ServiceProvider.GetRequiredService<AgentRunner>().RunAsync(conversation, owner, maxMessageId, CancellationToken.None);
     }
 
     [Fact]
@@ -266,5 +271,46 @@ public class AgentRunnerTests
             messages.Select(m => m.Role));
         Assert.Equal("x", messages[2].ToolCallId);
         Assert.Equal(["antiga", "no meio", "nova"], messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
+    }
+
+    [Fact]
+    public async Task Rows_after_the_batch_bound_stay_out_of_the_request()
+    {
+        var (app, model, conversationId) = await SetupAsync("oi");
+        await using var _ = app;
+        var batchMax = 0;
+        await app.SeedAsync(async db => batchMax = await db.AgentMessages.Where(m => m.ConversationId == conversationId).MaxAsync(m => m.Id));
+        await app.SeedAsync(async db =>
+        {
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram,
+                Role = AgentMessageRole.User, Content = "chegou depois", Status = AgentMessageStatus.Pending });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("ok");
+
+        await RunAsync(app, conversationId, maxMessageId: batchMax);
+
+        Assert.Equal(["oi"], model.Requests[0].Messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
+        await app.SeedAsync(async db =>
+            Assert.Equal(AgentMessageStatus.Pending, (await db.AgentMessages.SingleAsync(m => m.Content == "chegou depois")).Status));
+    }
+
+    [Fact]
+    public async Task Pending_turn_is_sent_even_when_it_is_outside_the_history_window()
+    {
+        // HistoryHours 0: a janela de tempo não traz nada; só a regra de Pending pode trazer o turno.
+        var (app, model, conversationId) = await SetupAsync(historyHours: 0, "oi, de antes da janela");
+        await using var _ = app;
+        await app.SeedAsync(async db =>
+        {
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram,
+                Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("ok");
+
+        await RunAsync(app, conversationId);
+
+        Assert.Equal(["oi, de antes da janela"], model.Requests[0].Messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
     }
 }

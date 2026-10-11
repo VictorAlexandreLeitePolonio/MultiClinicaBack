@@ -127,11 +127,12 @@ builder.Services.AddSingleton<MultiClinica.API.Services.Agent.IChatModel, MultiC
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.OwnerAgentTools>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentRunner>();
 builder.Services.Configure<MultiClinica.API.Services.Agent.TelegramOptions>(builder.Configuration.GetSection("Telegram"));
+// O token vai na URL (bot{token}/sendMessage): sem loggers, o HttpClient não o registra em nenhum nível.
 builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.ITelegramClient, MultiClinica.API.Services.Agent.TelegramClient>(client =>
 {
     client.BaseAddress = new Uri("https://api.telegram.org/");
     client.Timeout = TimeSpan.FromSeconds(10);
-});
+}).RemoveAllLoggers();
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcessor>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.TelegramLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))

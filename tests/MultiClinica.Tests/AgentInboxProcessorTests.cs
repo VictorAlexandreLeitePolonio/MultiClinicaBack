@@ -9,7 +9,7 @@ namespace MultiClinica.Tests;
 public class AgentInboxProcessorTests
 {
     private static async Task<(MultiClinicaFactory App, FakeChatModel Model, FakeTelegramClient Telegram, ManualClock Clock)> SetupAsync(
-        bool billingBlocked = false)
+        bool billingBlocked = false, bool clinicDeleted = false)
     {
         var model = new FakeChatModel();
         var telegram = new FakeTelegramClient();
@@ -29,6 +29,7 @@ public class AgentInboxProcessorTests
         {
             var clinic = await db.Clinicas.SingleAsync(c => c.Id == clinicId);
             clinic.IsBlockedByBilling = billingBlocked;
+            clinic.IsDeleted = clinicDeleted;
             var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
                 Profile = AgentProfile.Owner, ExternalChatId = "777", UserId = adminId, LastInboundAt = DateTime.UtcNow };
             conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.Telegram, Role = AgentMessageRole.User,
@@ -103,6 +104,19 @@ public class AgentInboxProcessorTests
     }
 
     [Fact]
+    public async Task Soft_deleted_clinic_is_not_processed()
+    {
+        var (app, model, telegram, _) = await SetupAsync(clinicDeleted: true);
+        await using var _ = app;
+
+        await ProcessAsync(app);
+
+        Assert.Empty(model.Requests);
+        Assert.Empty(telegram.Sent);
+        Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
+    }
+
+    [Fact]
     public async Task Non_admin_owner_is_not_processed()
     {
         var (app, model, telegram, _) = await SetupAsync();
@@ -141,6 +155,8 @@ public class AgentInboxProcessorTests
 
         await ProcessAsync(app);
 
+        // Chegou durante o LLM: não entra no request desta execução.
+        Assert.Equal(["oi"], model.Requests[0].Messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
         var late = await InboundAsync(app, "777:2");
         Assert.Equal(AgentMessageStatus.Pending, late.Status);
         Assert.Equal(0, late.Attempts);
@@ -236,6 +252,19 @@ public class AgentInboxProcessorTests
         Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
         Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app, "nao-numerico:1")).Status);
         Assert.Single(model.Requests);
+    }
+
+    [Fact]
+    public async Task Long_reply_is_cut_for_telegram_without_splitting_an_emoji()
+    {
+        var (app, model, telegram, _) = await SetupAsync();
+        await using var _ = app;
+        // 3999 letras + emoji (par substituto de 2 chars) cruza o corte de 4000: o corte recua para não partir o par.
+        model.Reply(new string('a', 3999) + "😀" + new string('b', 100));
+
+        await ProcessAsync(app);
+
+        Assert.Equal([(777L, new string('a', 3999) + "…")], telegram.Sent);
     }
 
     // Relógio manual: o backoff lê o TimeProvider, e o UpdatedAt gravado pelo banco usa o relógio real.

@@ -8,6 +8,8 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
 {
     public const int MaxAttempts = 3;
     public const string FailureReply = "Tive um problema para fazer isso agora. Tente de novo em alguns minutos ou use o app.";
+    // O Telegram aceita 4096 caracteres por mensagem; 4000 + "…" fica abaixo.
+    private const int TelegramReplyMaxChars = 4000;
 
     public async Task ProcessBatchAsync(CancellationToken ct)
     {
@@ -28,7 +30,7 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
                 .ToListAsync(ct);
         }
 
-        // ponytail: processamento sequencial em instância única; com várias instâncias, usar FOR UPDATE SKIP LOCKED.
+        // ponytail: instância única obrigatória enquanto não houver FOR UPDATE SKIP LOCKED/advisory lock; com Agent:Enabled em 2+ instâncias haveria respostas e ações duplicadas.
         foreach (var id in conversationIds)
         {
             try
@@ -67,7 +69,8 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
 
         var owner = await db.Users.Include(u => u.Clinica).FirstOrDefaultAsync(u => u.Id == conversation.UserId, ct);
         if (owner is null || !owner.IsActive || owner.IsDeleted || owner.Role != UserRole.Administrador
-            || owner.TelegramChatId != chatId || !owner.Clinica.IsActive || owner.Clinica.IsBlockedByBilling)
+            || owner.TelegramChatId != chatId || !owner.Clinica.IsActive || owner.Clinica.IsBlockedByBilling
+            || owner.Clinica.IsDeleted)
         {
             await SetStatusAsync(db, batch, AgentMessageStatus.Failed, ct);
             return;
@@ -76,10 +79,10 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
         sp.GetRequiredService<AgentIdentity>().Set(owner.ClinicaId, owner.Id, owner.Role);
         try
         {
-            var reply = await sp.GetRequiredService<AgentRunner>().RunAsync(conversation, owner, ct);
+            var reply = await sp.GetRequiredService<AgentRunner>().RunAsync(conversation, owner, batch.Max(), ct);
             await SetStatusAsync(db, batch, AgentMessageStatus.Done, ct);
-            // ponytail: falha no envio só é logada (resposta já gravada); retentar envio se virar problema real.
-            await SendSafelyAsync(telegram, chatId, reply, ct);
+            // ponytail: falha no envio só é logada (resposta já gravada); retentar envio se virar problema real. A ação já foi executada; o histórico guarda a resposta. Reenvio exigiria marcador de não-enviado no AgentMessage.
+            await SendSafelyAsync(telegram, chatId, TruncateForTelegram(reply), ct);
         }
         catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
         {
@@ -109,6 +112,14 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
             .ToListAsync(ct);
         foreach (var message in messages) message.Status = status;
         await db.SaveChangesAsync(ct);
+    }
+
+    // Corta sem deixar um par substituto (emoji) partido no fim.
+    private static string TruncateForTelegram(string text)
+    {
+        if (text.Length <= TelegramReplyMaxChars) return text;
+        var cut = char.IsHighSurrogate(text[TelegramReplyMaxChars - 1]) ? TelegramReplyMaxChars - 1 : TelegramReplyMaxChars;
+        return text[..cut] + "…";
     }
 
     private async Task SendSafelyAsync(ITelegramClient telegram, long chatId, string text, CancellationToken ct)

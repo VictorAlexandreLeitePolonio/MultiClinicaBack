@@ -20,7 +20,7 @@ public sealed class AgentRunner(
     TimeProvider time)
 {
     // ponytail: só o perfil Owner por enquanto; o perfil Patient entra no plano do WhatsApp.
-    public async Task<string> RunAsync(AgentConversation conversation, User owner, CancellationToken ct)
+    public async Task<string> RunAsync(AgentConversation conversation, User owner, int maxMessageId, CancellationToken ct)
     {
         if (usuario.ClinicaId != conversation.ClinicaId || usuario.UserId != owner.Id)
             throw new InvalidOperationException("Identidade do agente não corresponde à conversa.");
@@ -36,7 +36,7 @@ public sealed class AgentRunner(
         {
             new(AgentChatRole.System, AgentPrompts.Owner(clinic.DisplayName ?? clinic.NomeFantasia, owner.Name, now, tz, professionals)),
         };
-        messages.AddRange(await LoadHistoryAsync(conversation.Id, now.AddHours(-o.HistoryHours), o.HistoryMaxMessages, ct));
+        messages.AddRange(await LoadHistoryAsync(conversation.Id, now.AddHours(-o.HistoryHours), o.HistoryMaxMessages, maxMessageId, ct));
 
         for (var i = 0; i < o.MaxToolIterations; i++)
         {
@@ -87,15 +87,21 @@ public sealed class AgentRunner(
     }
 
     private async Task<List<AgentChatMessage>> LoadHistoryAsync(int conversationId, DateTime sinceUtc, int max,
-        CancellationToken ct)
+        int maxMessageId, CancellationToken ct)
     {
         // ponytail: janela por número de linhas (HistoryMaxMessages), não por tokens; trocar por orçamento de tokens se o prompt crescer demais.
-        var rows = await db.AgentMessages.AsNoTracking()
-            .Where(m => m.ConversationId == conversationId && m.CreatedAt >= sinceUtc
+        // Id <= maxMessageId: o lote não enxerga o que chegou durante a execução (continua Pending para o próximo ciclo).
+        var windowed = await db.AgentMessages.AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && m.Id <= maxMessageId && m.CreatedAt >= sinceUtc
                 && m.Status != AgentMessageStatus.Failed)
             .OrderByDescending(m => m.Id).Take(max)
             .ToListAsync(ct);
-        rows.Reverse();
+        // Turno pendente nunca some da janela: entra mesmo fora do período ou do limite de linhas.
+        var pending = await db.AgentMessages.AsNoTracking()
+            .Where(m => m.ConversationId == conversationId && m.Id <= maxMessageId
+                && m.Role == AgentMessageRole.User && m.Status == AgentMessageStatus.Pending)
+            .ToListAsync(ct);
+        var rows = windowed.Concat(pending).DistinctBy(m => m.Id).OrderBy(m => m.Id).ToList();
         // O corte por quantidade pode deixar um tool/assistant órfão no início; a API rejeita isso.
         var firstUser = rows.FindIndex(m => m.Role == AgentMessageRole.User);
         if (firstUser < 0) return [];
