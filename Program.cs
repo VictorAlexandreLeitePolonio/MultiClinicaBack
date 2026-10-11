@@ -126,6 +126,15 @@ builder.Services.Configure<MultiClinica.API.Services.Agent.AgentOptions>(builder
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.IChatModel, MultiClinica.API.Services.Agent.OpenAiChatModel>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.OwnerAgentTools>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentRunner>();
+builder.Services.Configure<MultiClinica.API.Services.Agent.TelegramOptions>(builder.Configuration.GetSection("Telegram"));
+builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.ITelegramClient, MultiClinica.API.Services.Agent.TelegramClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.telegram.org/");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
+builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcessor>();
+if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
 builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
