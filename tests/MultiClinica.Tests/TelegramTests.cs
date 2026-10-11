@@ -14,7 +14,7 @@ public class TelegramTests
 {
     private const string Secret = "test-secret";
 
-    private static MultiClinicaFactory CreateApp(FakeTelegramClient telegram) => new()
+    private static MultiClinicaFactory CreateApp(ITelegramClient telegram) => new()
     {
         ConfigureTestServices = s =>
         {
@@ -103,9 +103,12 @@ public class TelegramTests
             await db.SaveChangesAsync();
         });
 
-        await PostUpdateAsync(client, 4242, 1, $"/start {url.Split("start=")[1]}");
-        await PostUpdateAsync(client, 4242, 2, "/start codigo-inventado");
+        var first = await PostUpdateAsync(client, 4242, 1, $"/start {url.Split("start=")[1]}");
+        var second = await PostUpdateAsync(client, 4242, 2, "/start codigo-inventado");
 
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, second.StatusCode);
+        Assert.Equal(2, telegram.Sent.Count);
         await app.SeedAsync(async db => Assert.Null((await db.Users.SingleAsync(u => u.Id == adminId)).TelegramChatId));
         Assert.All(telegram.Sent, m => Assert.Contains("inválido ou expirado", m.Text));
     }
@@ -127,6 +130,26 @@ public class TelegramTests
             Assert.Equal(AgentMessageStatus.Pending, message.Status);
             Assert.Equal("4242:10", message.ExternalMessageId);
             Assert.Equal(AgentProfile.Owner, message.Conversation.Profile);
+        });
+        Assert.Empty(telegram.Sent);
+    }
+
+    [Fact]
+    public async Task Linked_user_message_starting_with_start_word_is_queued_as_text()
+    {
+        var telegram = new FakeTelegramClient();
+        await using var app = CreateApp(telegram);
+        await AgentSeed.ClinicWithAdminAsync(app, telegramChatId: 4242);
+        using var client = app.CreateClient();
+
+        Assert.Equal(HttpStatusCode.OK, (await PostUpdateAsync(client, 4242, 20, "/startar agenda")).StatusCode);
+
+        await app.SeedAsync(async db =>
+        {
+            var message = await db.AgentMessages.SingleAsync();
+            Assert.Equal(AgentMessageStatus.Pending, message.Status);
+            Assert.Equal(AgentMessageRole.User, message.Role);
+            Assert.Equal("/startar agenda", message.Content);
         });
         Assert.Empty(telegram.Sent);
     }
@@ -190,4 +213,26 @@ public class TelegramTests
             Assert.Equal(4242L, (await db.Users.SingleAsync(u => u.Email == "outro@test.local")).TelegramChatId);
         });
     }
+
+    [Fact]
+    public async Task Link_completes_even_when_telegram_replies_fail()
+    {
+        await using var app = CreateApp(new ThrowingTelegramClient());
+        var (_, adminId) = await AgentSeed.ClinicWithAdminAsync(app);
+        using var client = app.CreateClient();
+        await LoginAsync(client, "agent-admin@test.local");
+        var url = JsonDocument.Parse(await (await client.PostAsync("/api/me/telegram-link", null)).Content.ReadAsStringAsync())
+            .RootElement.GetProperty("url").GetString()!;
+
+        Assert.Equal(HttpStatusCode.OK, (await PostUpdateAsync(client, 4242, 1, $"/start {url.Split("start=")[1]}")).StatusCode);
+        Assert.Equal(HttpStatusCode.OK, (await PostUpdateAsync(client, 4242, 2, "/start codigo-inventado")).StatusCode);
+
+        await app.SeedAsync(async db => Assert.Equal(4242L, (await db.Users.SingleAsync(u => u.Id == adminId)).TelegramChatId));
+    }
+}
+
+public sealed class ThrowingTelegramClient : ITelegramClient
+{
+    public Task SendMessageAsync(long chatId, string text, CancellationToken ct)
+        => Task.FromException(new HttpRequestException("Telegram fora do ar"));
 }

@@ -4,12 +4,13 @@ using System.Text;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using MultiClinica.API.Data;
+using MultiClinica.API.Models;
 
 namespace MultiClinica.API.Services.Agent;
 
 // Mesmo padrão do convite de usuário: só o hash do código fica no banco, uso único, expira rápido.
 public sealed class TelegramLinkService(AppDbContext db, IOptions<TelegramOptions> options, TimeProvider time,
-    ITelegramClient telegram)
+    ITelegramClient telegram, ILogger<TelegramLinkService> logger)
 {
     private static readonly TimeSpan Lifetime = TimeSpan.FromMinutes(15);
 
@@ -38,11 +39,10 @@ public sealed class TelegramLinkService(AppDbContext db, IOptions<TelegramOption
         var hash = Hash(code.Trim());
         var now = time.GetUtcNow().UtcDateTime;
         var user = await db.Users.FirstOrDefaultAsync(u => u.TelegramLinkCodeHash == hash
-            && u.TelegramLinkExpiresAt > now && u.IsActive && !u.IsDeleted);
+            && u.TelegramLinkExpiresAt > now && u.IsActive && !u.IsDeleted && u.Role == UserRole.Administrador);
         if (user is null)
         {
-            await telegram.SendMessageAsync(chatId,
-                "Link inválido ou expirado. Gere um novo em Configurações → Conectar Telegram.", CancellationToken.None);
+            await ReplyAsync(chatId, "Link inválido ou expirado. Gere um novo em Configurações → Conectar Telegram.");
             return false;
         }
 
@@ -59,10 +59,16 @@ public sealed class TelegramLinkService(AppDbContext db, IOptions<TelegramOption
         user.TelegramLinkExpiresAt = null;
         await db.SaveChangesAsync();
 
-        await telegram.SendMessageAsync(chatId,
-            $"Pronto, {user.Name}! Sou o assistente da sua clínica. Pode pedir, por exemplo: \"agenda a Cida terça às 9h\" ou \"o que tenho amanhã?\".",
-            CancellationToken.None);
+        await ReplyAsync(chatId,
+            $"Pronto, {user.Name}! Sou o assistente da sua clínica. Pode pedir, por exemplo: \"agenda a Cida terça às 9h\" ou \"o que tenho amanhã?\".");
         return true;
+    }
+
+    // Falha de envio não pode virar 500: o Telegram reentregaria o /start já consumido e o usuário veria "inválido" com o vínculo feito.
+    private async Task ReplyAsync(long chatId, string text)
+    {
+        try { await telegram.SendMessageAsync(chatId, text, CancellationToken.None); }
+        catch (Exception ex) { logger.LogWarning(ex, "Falha ao responder o vínculo do Telegram"); }
     }
 
     private static string Hash(string code) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(code)));

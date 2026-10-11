@@ -33,7 +33,7 @@ public class TelegramWebhookController(
         var chatId = message.Chat.Id;
         var text = message.Text?.Trim();
 
-        if (text is not null && text.StartsWith("/start", StringComparison.Ordinal))
+        if (text is not null && (text == "/start" || text.StartsWith("/start ", StringComparison.Ordinal)))
         {
             var code = text["/start".Length..].Trim();
             if (code.Length > 0) await links.CompleteAsync(chatId, code);
@@ -71,8 +71,9 @@ public class TelegramWebhookController(
         db.AgentMessages.Add(new AgentMessage { Conversation = conversation, Channel = AgentChannel.Telegram,
             Role = AgentMessageRole.User, Content = text, ExternalMessageId = externalId, Status = AgentMessageStatus.Pending });
 
-        try { await db.SaveChangesAsync(ct); }
-        catch (DbUpdateException) { /* reentrega concorrente bateu no índice único: já está na fila */ }
+        // Sem try/catch de propósito. Engolir DbUpdateException devolveria 200 e o Telegram nunca reentregaria: mensagem perdida.
+        // Sem engolir, uma reentrega concorrente que bate no índice único vira 500, o Telegram reenvia e o AnyAsync acima responde 200.
+        await db.SaveChangesAsync(ct);
         return Ok();
     }
 
