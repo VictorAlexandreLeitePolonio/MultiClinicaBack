@@ -109,15 +109,17 @@ public sealed class AgentRunner(
         }).ToList();
     }
 
-    // Assistant com tool_calls só fica se TODAS as chamadas tiverem Tool logo depois; Tool só fica se responde
-    // a uma chamada de um Assistant mantido. Turno interrompido (crash entre o Assistant e a tool) deixa isso.
+    // Tool pareia com a chamada pelo ToolCallId entre as linhas que vêm DEPOIS do Assistant (não precisa ser adjacente).
+    // Assistant só fica se TODAS as chamadas tiverem resposta; as respostas saem logo depois dele, na ordem das chamadas.
+    // Tool sem Assistant mantido é descartada. Turno interrompido (crash entre o Assistant e a tool) deixa isso.
     private static List<AgentMessage> DropUnpairedToolRows(List<AgentMessage> rows)
     {
         var kept = new List<AgentMessage>(rows.Count);
+        var claimed = new HashSet<int>();
         for (var i = 0; i < rows.Count; i++)
         {
             var row = rows[i];
-            // Tool entra junto com o Assistant que o chamou; um Tool visto aqui sozinho é órfão.
+            // Tool é emitida junto ao Assistant dono (ou descartada); na posição original é pulada.
             if (row.Role == AgentMessageRole.Tool) continue;
             if (row.ToolCallsJson is null)
             {
@@ -126,13 +128,32 @@ public sealed class AgentRunner(
             }
 
             var calls = JsonSerializer.Deserialize<List<AgentToolCall>>(row.ToolCallsJson) ?? [];
-            var results = new List<AgentMessage>();
-            for (var j = i + 1; j < rows.Count && rows[j].Role == AgentMessageRole.Tool; j++) results.Add(rows[j]);
-            if (!calls.All(c => results.Any(r => r.ToolCallId == c.Id))) continue;
+            var results = new List<int>(calls.Count);
+            foreach (var call in calls)
+            {
+                var j = FindResult(rows, i, call.Id, claimed, results);
+                if (j < 0) break;
+                results.Add(j);
+            }
+            if (results.Count != calls.Count) continue;
 
             kept.Add(row);
-            kept.AddRange(results.Where(r => calls.Any(c => c.Id == r.ToolCallId)));
+            foreach (var j in results)
+            {
+                claimed.Add(j);
+                kept.Add(rows[j]);
+            }
         }
         return kept;
+    }
+
+    // Procura a resposta da chamada entre as linhas depois do Assistant, ignorando as já usadas por outro Assistant.
+    private static int FindResult(List<AgentMessage> rows, int after, string? callId, HashSet<int> claimed, List<int> picked)
+    {
+        for (var j = after + 1; j < rows.Count; j++)
+            if (rows[j].Role == AgentMessageRole.Tool && rows[j].ToolCallId == callId
+                && !claimed.Contains(j) && !picked.Contains(j))
+                return j;
+        return -1;
     }
 }

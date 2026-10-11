@@ -126,7 +126,7 @@ public class AgentInboxProcessorTests
     [InlineData(true)]
     public async Task Message_arriving_during_the_run_stays_pending_for_next_cycle(bool llmFails)
     {
-        var (app, model, _, _) = await SetupAsync();
+        var (app, model, telegram, clock) = await SetupAsync();
         await using var _ = app;
         if (llmFails) model.Throw();
         else model.Reply("Olá!");
@@ -147,6 +147,50 @@ public class AgentInboxProcessorTests
         var first = await InboundAsync(app);
         Assert.Equal(llmFails ? AgentMessageStatus.Pending : AgentMessageStatus.Done, first.Status);
         Assert.Equal(llmFails ? 1 : 0, first.Attempts);
+
+        // Próximo ciclo: a mensagem que chegou durante a chamada é respondida, e a que falhou também (se ainda pendente).
+        model.OnCall = null;
+        model.Reply("Olá de novo!");
+        clock.Advance(TimeSpan.FromMinutes(10));
+        await ProcessAsync(app);
+
+        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app, "777:2")).Status);
+        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
+        List<string> expectedReplies = llmFails ? ["Olá de novo!"] : ["Olá!", "Olá de novo!"];
+        Assert.Equal(expectedReplies, telegram.Sent.Select(s => s.Text));
+    }
+
+    // A falha uma vez; B chega dentro da janela de backoff de A. A conversa entra pelo B, então A vai no mesmo lote.
+    [Fact]
+    public async Task Message_arriving_during_backoff_is_answered_with_the_failed_one_only_once()
+    {
+        var (app, model, telegram, clock) = await SetupAsync();
+        await using var _ = app;
+        model.Throw().Reply("Olá, as duas!");
+
+        await ProcessAsync(app);
+        Assert.Equal(1, (await InboundAsync(app)).Attempts);
+
+        await app.SeedAsync(async db =>
+        {
+            var conversation = await db.AgentConversations.SingleAsync();
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversation.Id, Channel = AgentChannel.Telegram,
+                Role = AgentMessageRole.User, Content = "chegou depois", Status = AgentMessageStatus.Pending,
+                ExternalMessageId = "777:2" });
+            await db.SaveChangesAsync();
+        });
+        await ProcessAsync(app);
+
+        Assert.Equal(["oi", "chegou depois"], model.Requests[1].Messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
+        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
+        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app, "777:2")).Status);
+        Assert.Equal([(777L, "Olá, as duas!")], telegram.Sent);
+
+        // Passou o backoff de A, mas não sobrou Pending: nenhum request novo e nenhuma segunda resposta.
+        clock.Advance(TimeSpan.FromMinutes(10));
+        await ProcessAsync(app);
+        Assert.Equal(2, model.Requests.Count);
+        Assert.Single(telegram.Sent);
     }
 
     [Fact]
@@ -165,7 +209,7 @@ public class AgentInboxProcessorTests
         };
         await using var _ = app;
         var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, telegramChatId: 777);
-        // Chat id não numérico estoura no long.Parse, fora do try. Entra primeiro para ser processado antes.
+        // Chat id não numérico: a conversa vira Failed sem chamar o modelo. Entra primeiro para provar que não bloqueia a outra.
         await app.SeedAsync(async db =>
         {
             var broken = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
@@ -190,6 +234,8 @@ public class AgentInboxProcessorTests
 
         Assert.Equal([(777L, "Olá!")], telegram.Sent);
         Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
+        Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app, "nao-numerico:1")).Status);
+        Assert.Single(model.Requests);
     }
 
     // Relógio manual: o backoff lê o TimeProvider, e o UpdatedAt gravado pelo banco usa o relógio real.

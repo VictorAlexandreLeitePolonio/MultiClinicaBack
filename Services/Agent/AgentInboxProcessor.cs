@@ -12,21 +12,20 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
     public async Task ProcessBatchAsync(CancellationToken ct)
     {
         var now = time.GetUtcNow().UtcDateTime;
+        // ponytail: backoff via UpdatedAt: 1 falha espera 30s, 2 ou mais espera 60s (MaxAttempts 3); usar NextAttemptAt se precisar de política melhor.
+        var t30 = now.AddSeconds(-30);
+        var t60 = now.AddSeconds(-60);
         List<int> conversationIds;
         await using (var scope = scopes.CreateAsyncScope())
         {
             var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            // ponytail: backoff linear 30s×tentativas via UpdatedAt; usar NextAttemptAt se precisar de política melhor.
-            var pending = await db.AgentMessages
-                .Where(m => m.Status == AgentMessageStatus.Pending)
-                .Select(m => new { m.Id, m.ConversationId, m.Attempts, m.UpdatedAt })
-                .ToListAsync(ct);
-            conversationIds = pending
-                .Where(m => IsDue(m.Attempts, m.UpdatedAt, now))
+            conversationIds = await db.AgentMessages
+                .Where(m => m.Status == AgentMessageStatus.Pending
+                    && (m.Attempts == 0 || (m.Attempts == 1 && m.UpdatedAt <= t30) || (m.Attempts >= 2 && m.UpdatedAt <= t60)))
                 .GroupBy(m => m.ConversationId)
                 .OrderBy(g => g.Min(m => m.Id)).Take(20)
                 .Select(g => g.Key)
-                .ToList();
+                .ToListAsync(ct);
         }
 
         // ponytail: processamento sequencial em instância única; com várias instâncias, usar FOR UPDATE SKIP LOCKED.
@@ -34,7 +33,7 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
         {
             try
             {
-                await ProcessConversationAsync(id, now, ct);
+                await ProcessConversationAsync(id, ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -43,24 +42,28 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
         }
     }
 
-    private async Task ProcessConversationAsync(int conversationId, DateTime now, CancellationToken ct)
+    private async Task ProcessConversationAsync(int conversationId, CancellationToken ct)
     {
         await using var scope = scopes.CreateAsyncScope();
         var sp = scope.ServiceProvider;
         var db = sp.GetRequiredService<AppDbContext>();
         var telegram = sp.GetRequiredService<ITelegramClient>();
         var conversation = await db.AgentConversations.FirstAsync(c => c.Id == conversationId, ct);
-        var chatId = long.Parse(conversation.ExternalChatId);
 
-        // Snapshot antes do LLM: só estas mensagens são marcadas; o que chegar durante a chamada fica Pending para o próximo ciclo.
-        var batch = (await db.AgentMessages
-                .Where(m => m.ConversationId == conversationId && m.Status == AgentMessageStatus.Pending)
-                .Select(m => new { m.Id, m.Attempts, m.UpdatedAt })
-                .ToListAsync(ct))
-            .Where(m => IsDue(m.Attempts, m.UpdatedAt, now))
+        // Snapshot antes do LLM: TODAS as Pending da conversa, porque o histórico enviado ao modelo traz as Pending (LoadHistoryAsync).
+        // O que chegar durante a chamada fica Pending (Attempts 0) para o próximo ciclo.
+        var batch = await db.AgentMessages
+            .Where(m => m.ConversationId == conversationId && m.Status == AgentMessageStatus.Pending)
             .Select(m => m.Id)
-            .ToList();
+            .ToListAsync(ct);
         if (batch.Count == 0) return;
+
+        if (!long.TryParse(conversation.ExternalChatId, out var chatId))
+        {
+            logger.LogWarning("Conversa {ConversationId} com chat id não numérico; mensagens pendentes marcadas como falha", conversationId);
+            await SetStatusAsync(db, batch, AgentMessageStatus.Failed, ct);
+            return;
+        }
 
         var owner = await db.Users.Include(u => u.Clinica).FirstOrDefaultAsync(u => u.Id == conversation.UserId, ct);
         if (owner is null || !owner.IsActive || owner.IsDeleted || owner.Role != UserRole.Administrador
@@ -98,10 +101,6 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
                 await SendSafelyAsync(telegram, chatId, FailureReply, ct);
         }
     }
-
-    // Sem tentativa: já é elegível. Depois da n-ésima falha, espera 30s×n desde a última gravação (UpdatedAt).
-    private static bool IsDue(int attempts, DateTime updatedAt, DateTime now)
-        => attempts == 0 || updatedAt <= now - TimeSpan.FromSeconds(30 * attempts);
 
     private static async Task SetStatusAsync(AppDbContext db, List<int> ids, AgentMessageStatus status, CancellationToken ct)
     {

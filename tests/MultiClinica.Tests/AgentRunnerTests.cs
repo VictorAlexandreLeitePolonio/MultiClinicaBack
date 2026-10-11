@@ -193,4 +193,78 @@ public class AgentRunnerTests
         Assert.DoesNotContain(messages, m => m.ToolCalls is { Count: > 0 } calls && calls.Any(c => c.Id == "x"));
         Assert.Equal(["antiga", "nova"], messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
     }
+
+    [Fact]
+    public async Task Tool_row_without_an_assistant_is_dropped_from_the_history()
+    {
+        var (app, model, conversationId) = await SetupAsync();
+        await using var _ = app;
+        await app.SeedAsync(async db =>
+        {
+            db.AgentMessages.AddRange(
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "z" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("ok");
+
+        await RunAsync(app, conversationId);
+
+        Assert.DoesNotContain(model.Requests[0].Messages, m => m.Role == AgentChatRole.Tool);
+    }
+
+    [Fact]
+    public async Task Assistant_with_one_missing_result_is_dropped_together_with_the_present_one()
+    {
+        var (app, model, conversationId) = await SetupAsync();
+        await using var _ = app;
+        await app.SeedAsync(async db =>
+        {
+            var callsJson = JsonSerializer.Serialize(new[]
+            {
+                new AgentToolCall("x", "buscar_paciente", "{}"),
+                new AgentToolCall("y", "buscar_paciente", "{}"),
+            });
+            db.AgentMessages.AddRange(
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "x" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("ok");
+
+        await RunAsync(app, conversationId);
+
+        var roles = model.Requests[0].Messages.Skip(1).Select(m => m.Role);
+        Assert.Equal([AgentChatRole.User, AgentChatRole.User], roles);
+    }
+
+    [Fact]
+    public async Task Tool_result_is_placed_right_after_its_assistant_past_interleaved_user_rows()
+    {
+        var (app, model, conversationId) = await SetupAsync();
+        await using var _ = app;
+        await app.SeedAsync(async db =>
+        {
+            var callsJson = JsonSerializer.Serialize(new[] { new AgentToolCall("x", "buscar_paciente", "{}") });
+            db.AgentMessages.AddRange(
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "no meio", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "x" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+            await db.SaveChangesAsync();
+        });
+        model.Reply("ok");
+
+        await RunAsync(app, conversationId);
+
+        var messages = model.Requests[0].Messages.Skip(1).ToList();
+        Assert.Equal([AgentChatRole.User, AgentChatRole.Assistant, AgentChatRole.Tool, AgentChatRole.User, AgentChatRole.User],
+            messages.Select(m => m.Role));
+        Assert.Equal("x", messages[2].ToolCallId);
+        Assert.Equal(["antiga", "no meio", "nova"], messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
+    }
 }
