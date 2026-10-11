@@ -141,6 +141,19 @@ public class OwnerAgentToolsTests
     }
 
     [Fact]
+    public async Task Free_slots_treats_null_optional_args_as_absent()
+    {
+        var (app, clinicId, adminId, _) = await SetupAsync();
+        await using var _ = app;
+        var day = FutureLocal()[..10];
+
+        var slots = await RunAsync(app, clinicId, adminId, "consultar_horarios",
+            new { data_inicio = day, profissional_id = (int?)null, data_fim = (string?)null });
+
+        Assert.True(slots.GetProperty("ok").GetBoolean());
+    }
+
+    [Fact]
     public async Task Cancel_refuses_appointment_that_is_not_scheduled()
     {
         var (app, clinicId, adminId, patientId) = await SetupAsync();

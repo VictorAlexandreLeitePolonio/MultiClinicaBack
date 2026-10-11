@@ -215,7 +215,7 @@ public sealed class OwnerAgentTools(
 
     private static int? OptInt(JsonElement args, string name)
     {
-        if (!args.TryGetProperty(name, out var v)) return null;
+        if (!args.TryGetProperty(name, out var v) || v.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined) return null;
         if (v.ValueKind == JsonValueKind.Number && v.TryGetInt32(out var n)) return n;
         if (v.ValueKind == JsonValueKind.String && int.TryParse(v.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var s)) return s;
         throw new ArgumentException($"Parâmetro inválido: {name}.");
