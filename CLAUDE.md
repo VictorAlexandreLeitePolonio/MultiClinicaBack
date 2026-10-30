@@ -53,6 +53,13 @@ The owner copilot runs on the platform's WhatsApp number (Cloud API): webhook `G
 - Platform subscription runs on AbacatePay (`Services/Billing`, webhook `POST /api/billing/webhooks/abacatepay`, idempotent via `ProcessedWebhookEvents`). Product ids come from `AbacatePay__Products__<key>` env vars — keys never contain `:`.
 - Existing clinics are founders (`IsFounder`, Premium forever). Self-service signup (`/api/public/signup`) creates Free clinics that only show in the hub after SuperAdmin approval (`IsHubApproved`).
 
+### Online payments (Mercado Pago)
+- Each clinic connects its own Mercado Pago account via OAuth + PKCE: `POST api/mercadopago/connect` returns the authorization URL, `GET api/mercadopago/callback` (`[AllowAnonymous]`, state is single-use, 10 min) stores the encrypted tokens and redirects to `{FRONTEND_URL}/app/configuracoes?mp=conectado|erro|conta-em-uso`. Settings (`GET status`, `PUT settings`, `DELETE`) require Administrador + `OnlinePayments`.
+- Tokens are AES-GCM encrypted by `TokenCipher` (`MercadoPago__TokenEncryptionKey`); without the key connecting returns 503 `MERCADOPAGO_NOT_CONFIGURED`.
+- `MercadoPagoTokenRefresher` runs every 24h (first pass after 1 min, outside `Testing`) and renews accounts expiring in < 30 days. MP 400/401/403 on refresh (or any clinic-token 401) marks the account `Revoked`.
+- Paid charges arrive via webhook `POST /api/payments/webhooks/mercadopago` (HMAC `x-signature` with `MercadoPago__WebhookSecret`, always re-reads the payment from MP).
+- Config: `MercadoPago__ClientId`, `__ClientSecret`, `__RedirectUri`, `__WebhookSecret`, `__TokenEncryptionKey` (32 bytes base64), optional `__ApiBaseUrl`/`__AuthBaseUrl`. Spec: `docs/superpowers/specs/2026-10-30-mercadopago-pagamento-online-design.md`.
+
 ### Data Model
 
 | Entity | Key Fields | Notes |
