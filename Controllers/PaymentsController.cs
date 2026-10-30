@@ -75,7 +75,7 @@ public class PaymentsController(IPaymentService service) : ControllerBase
             {
                 ErrorCodes.NotFound       => NotFound(new { message = result.ErrorMessage }),
                 ErrorCodes.DuplicatePayment => Conflict(new { message = result.ErrorMessage }),
-                _                         => BadRequest(new { message = result.ErrorMessage })
+                _                         => BadRequest(new { message = result.ErrorMessage, code = result.ErrorCode })
             };
 
         return Ok(result.Value);
@@ -88,7 +88,7 @@ public class PaymentsController(IPaymentService service) : ControllerBase
         if (!result.IsSuccess)
             return result.ErrorCode == ErrorCodes.NotFound
                 ? NotFound(new { message = result.ErrorMessage })
-                : BadRequest(new { message = result.ErrorMessage });
+                : BadRequest(new { message = result.ErrorMessage, code = result.ErrorCode });
 
         return NoContent();
     }
