@@ -201,21 +201,21 @@ public sealed class OnlinePaymentService(
             .Include(p => p.Patient)
             .Include(p => p.Plan)
             .Include(p => p.Clinica)
-            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token
-                && !p.IsDeleted
-                && !p.Clinica.IsDeleted, ct);
+            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token, ct);
 
         if (payment is null)
             return Result<PublicPaymentDto>.Fail(ErrorCodes.NotFound, "Link de pagamento inválido.");
 
         var connected = await accounts.GetConnectedAsync(payment.ClinicaId, ct);
-        // Só o pagamento online confirmado mostra "Pagamento confirmado". Cobrança paga
-        // manualmente (ou cancelada) não está mais disponível na página pública.
-        var status = payment.Status == PaymentStatus.Paid && payment.PaidOnline
-            ? "Paid"
-            : payment.Status == PaymentStatus.Pending && connected is not null
-                ? "Pending"
-                : "Unavailable";
+        // Só o pagamento online confirmado mostra "Pagamento confirmado". Cobrança excluída,
+        // paga manualmente ou cancelada não está mais disponível na página pública.
+        var status = payment.IsDeleted || payment.Clinica.IsDeleted
+            ? "Unavailable"
+            : payment.Status == PaymentStatus.Paid && payment.PaidOnline
+                ? "Paid"
+                : payment.Status == PaymentStatus.Pending && connected is not null
+                    ? "Pending"
+                    : "Unavailable";
 
         return Result<PublicPaymentDto>.Ok(new PublicPaymentDto
         {
@@ -243,12 +243,14 @@ public sealed class OnlinePaymentService(
             .Include(p => p.Patient)
             .Include(p => p.Plan)
             .Include(p => p.Clinica)
-            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token
-                && !p.IsDeleted
-                && !p.Clinica.IsDeleted, ct);
+            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token, ct);
 
         if (payment is null)
             return Result<PublicPayResultDto>.Fail(ErrorCodes.NotFound, "Link de pagamento inválido.");
+
+        if (payment.IsDeleted || payment.Clinica.IsDeleted)
+            return Result<PublicPayResultDto>.Fail(ErrorCodes.PaymentNotPending,
+                "Esta cobrança não está mais disponível.");
 
         if (payment.Status != PaymentStatus.Pending)
             return Result<PublicPayResultDto>.Fail(ErrorCodes.PaymentNotPending,

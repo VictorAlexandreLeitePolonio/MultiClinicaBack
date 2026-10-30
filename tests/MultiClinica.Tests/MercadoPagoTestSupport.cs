@@ -157,6 +157,7 @@ internal static class MercadoPagoTestSupport
                 RefundedAt = options.RefundedAt,
                 OnlineAlert = options.OnlineAlert,
                 PaymentLinkToken = options.PaymentLinkToken,
+                IsDeleted = options.IsDeleted,
             };
             db.Payments.Add(payment);
             await db.SaveChangesAsync();
@@ -244,4 +245,5 @@ internal sealed record ClinicSeedOptions
     public DateTime? RefundedAt { get; init; }
     public string? OnlineAlert { get; init; }
     public string? PaymentLinkToken { get; init; }
+    public bool IsDeleted { get; init; }
 }

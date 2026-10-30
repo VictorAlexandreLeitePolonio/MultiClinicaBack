@@ -192,6 +192,13 @@ public class OnlinePaymentTests
             PaidOnline = true,
             MpPaymentId = 77,
         });
+        await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions
+        {
+            AdminEmail = "excluida@test.local",
+            ClinicName = "Clínica Excluída",
+            PaymentLinkToken = "tok-deleted",
+            IsDeleted = true,
+        });
         using var client = app.CreateClient();
 
         Assert.Equal(HttpStatusCode.NotFound,
@@ -208,6 +215,14 @@ public class OnlinePaymentTests
 
         var paidOnline = await ReadJsonAsync(await client.GetAsync("/api/public/payments/tok-paid-online"));
         Assert.Equal("Paid", paidOnline.GetProperty("status").GetString());
+
+        var deleted = await ReadJsonAsync(await client.GetAsync("/api/public/payments/tok-deleted"));
+        Assert.Equal("Unavailable", deleted.GetProperty("status").GetString());
+
+        var payDeleted = await client.PostAsJsonAsync("/api/public/payments/tok-deleted/pay",
+            Payload("pix", payerEmail: "ana@example.com"));
+        Assert.Equal(HttpStatusCode.BadRequest, payDeleted.StatusCode);
+        Assert.Equal("PAYMENT_NOT_PENDING", (await ReadJsonAsync(payDeleted)).GetProperty("code").GetString());
     }
 
     // ── /pay ─────────────────────────────────────────────────────────────────
