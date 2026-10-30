@@ -21,6 +21,11 @@ public class Clinica : AuditableEntity
     public ClinicPlan Plan { get; set; } = ClinicPlan.Free;
     public BillingCycle? BillingCycle { get; set; }
     public bool IsFounder { get; set; }
+    // Formas aceitas no pagamento online (Mercado Pago).
+    public bool OnlineAcceptPix { get; set; } = true;
+    public bool OnlineAcceptCredit { get; set; } = true;
+    public int OnlineMaxInstallments { get; set; } = 1;
+    public bool OnlineAcceptDebit { get; set; } = true;
     public int ExtraProfessionals { get; set; }
     public string? AbacateCustomerId { get; set; }
     public string? AbacateSubscriptionId { get; set; }

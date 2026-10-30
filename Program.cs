@@ -128,6 +128,11 @@ builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcesso
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.WhatsAppLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
+builder.Services.Configure<MultiClinica.API.Services.MercadoPago.MercadoPagoOptions>(builder.Configuration.GetSection("MercadoPago"));
+builder.Services.AddSingleton<MultiClinica.API.Services.MercadoPago.TokenCipher>();
+builder.Services.AddScoped<MultiClinica.API.Services.MercadoPago.MercadoPagoAccounts>();
+MultiClinica.API.Services.MercadoPago.MercadoPagoRegistration.AddMercadoPagoOAuth(builder.Services, builder.Environment);
+MultiClinica.API.Services.MercadoPago.MercadoPagoRegistration.AddMercadoPagoPayments(builder.Services);
 builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
 builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client) =>
 {
@@ -250,6 +255,14 @@ if (rateLimitingEnabled)
                 cancellationToken);
         };
         options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+        // Página pública de pagamento: POST /api/public/payments/{token}/pay.
+        options.AddPolicy("public-pay", context => RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {

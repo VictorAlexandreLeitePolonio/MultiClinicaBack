@@ -659,6 +659,59 @@ namespace MultiClinica.API.Migrations
                     b.ToTable("ClinicMedia");
                 });
 
+            modelBuilder.Entity("MultiClinica.API.Models.ClinicMercadoPagoAccount", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AccessTokenEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("ClinicaId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("ConnectedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<bool>("LiveMode")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("MpUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("PublicKey")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RefreshTokenEncrypted")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ClinicaId")
+                        .IsUnique();
+
+                    b.HasIndex("MpUserId")
+                        .IsUnique();
+
+                    b.ToTable("ClinicMercadoPagoAccounts");
+                });
+
             modelBuilder.Entity("MultiClinica.API.Models.ClinicUsage", b =>
                 {
                     b.Property<int>("ClinicaId")
@@ -817,6 +870,18 @@ namespace MultiClinica.API.Migrations
                     b.Property<string>("Numero")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("OnlineAcceptCredit")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("OnlineAcceptDebit")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("OnlineAcceptPix")
+                        .HasColumnType("boolean");
+
+                    b.Property<int>("OnlineMaxInstallments")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Plan")
                         .IsRequired()
@@ -1253,6 +1318,39 @@ namespace MultiClinica.API.Migrations
                     b.ToTable("MedicalRecords");
                 });
 
+            modelBuilder.Entity("MultiClinica.API.Models.MercadoPagoOAuthState", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int>("ClinicaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("CodeVerifier")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("StateHash")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("UserId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("StateHash")
+                        .IsUnique();
+
+                    b.ToTable("MercadoPagoOAuthStates");
+                });
+
             modelBuilder.Entity("MultiClinica.API.Models.Patient", b =>
                 {
                     b.Property<int>("Id")
@@ -1493,10 +1591,13 @@ namespace MultiClinica.API.Migrations
                     b.Property<DateTime>("NextAttemptAt")
                         .HasColumnType("timestamp with time zone");
 
-                    b.Property<int>("PatientAccountId")
+                    b.Property<int?>("PatientAccountId")
                         .HasColumnType("integer");
 
                     b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("PaymentId")
                         .HasColumnType("integer");
 
                     b.Property<string>("Status")
@@ -1839,14 +1940,32 @@ namespace MultiClinica.API.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<long?>("MpPaymentId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("MpStatus")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MpStatusDetail")
+                        .HasColumnType("text");
+
+                    b.Property<string>("OnlineAlert")
+                        .HasColumnType("text");
+
                     b.Property<DateOnly?>("PaidAt")
                         .HasColumnType("date");
+
+                    b.Property<bool>("PaidOnline")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("PatientId")
                         .HasColumnType("integer");
 
                     b.Property<DateOnly?>("PaymentDate")
                         .HasColumnType("date");
+
+                    b.Property<string>("PaymentLinkToken")
+                        .HasColumnType("text");
 
                     b.Property<string>("PaymentMethod")
                         .IsRequired()
@@ -1857,6 +1976,9 @@ namespace MultiClinica.API.Migrations
 
                     b.Property<DateOnly>("ReferenceMonth")
                         .HasColumnType("date");
+
+                    b.Property<DateTime?>("RefundedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("Status")
                         .IsRequired()
@@ -1876,6 +1998,9 @@ namespace MultiClinica.API.Migrations
                     b.HasIndex("ClinicaId");
 
                     b.HasIndex("PatientId");
+
+                    b.HasIndex("PaymentLinkToken")
+                        .IsUnique();
 
                     b.HasIndex("PlanId");
 
@@ -2311,6 +2436,17 @@ namespace MultiClinica.API.Migrations
                     b.Navigation("Clinica");
                 });
 
+            modelBuilder.Entity("MultiClinica.API.Models.ClinicMercadoPagoAccount", b =>
+                {
+                    b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
+                        .WithMany()
+                        .HasForeignKey("ClinicaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Clinica");
+                });
+
             modelBuilder.Entity("MultiClinica.API.Models.ClinicalAttachment", b =>
                 {
                     b.HasOne("MultiClinica.API.Models.Clinica", "Clinica")
@@ -2445,8 +2581,7 @@ namespace MultiClinica.API.Migrations
                     b.HasOne("MultiClinica.API.Models.PatientAccount", "PatientAccount")
                         .WithMany()
                         .HasForeignKey("PatientAccountId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                        .OnDelete(DeleteBehavior.Restrict);
 
                     b.HasOne("MultiClinica.API.Models.Patient", "Patient")
                         .WithMany()

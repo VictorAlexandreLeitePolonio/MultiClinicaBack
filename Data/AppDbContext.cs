@@ -37,6 +37,8 @@ public class AppDbContext : DbContext
     public DbSet<AgentConversation> AgentConversations { get; set; } = null!;
     public DbSet<AgentMessage> AgentMessages { get; set; } = null!;
     public DbSet<ClinicUsage> ClinicUsages { get; set; } = null!;
+    public DbSet<ClinicMercadoPagoAccount> ClinicMercadoPagoAccounts { get; set; } = null!;
+    public DbSet<MercadoPagoOAuthState> MercadoPagoOAuthStates { get; set; } = null!;
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -500,6 +502,17 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(l => l.ClinicaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ── Mercado Pago ────────────────────────────────────────────────────
+        modelBuilder.Entity<ClinicMercadoPagoAccount>(e =>
+        {
+            e.Property(a => a.Status).HasConversion<string>();
+            e.HasIndex(a => a.ClinicaId).IsUnique();
+            e.HasIndex(a => a.MpUserId).IsUnique();
+            e.HasOne(a => a.Clinica).WithMany().HasForeignKey(a => a.ClinicaId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<MercadoPagoOAuthState>().HasIndex(s => s.StateHash).IsUnique();
+        modelBuilder.Entity<Payment>().HasIndex(p => p.PaymentLinkToken).IsUnique();
 
         // ── Agente IA (WhatsApp) ─────────────────────────────────────────────
         modelBuilder.Entity<User>()
