@@ -41,6 +41,9 @@ public static class ErrorCodes
     public const string MercadoPagoRefundFailed = "MERCADOPAGO_REFUND_FAILED";
     public const string PaymentNotPending    = "PAYMENT_NOT_PENDING";
     public const string PaymentInProgress    = "PAYMENT_IN_PROGRESS";
+    public const string InvalidPaymentMethod = "INVALID_PAYMENT_METHOD";
+    public const string OnlinePaymentsNotAvailable = "ONLINE_PAYMENTS_NOT_AVAILABLE";
+    public const string OnlinePaymentMustBePending = "ONLINE_PAYMENT_MUST_BE_PENDING";
     public const string PaymentMethodNotAllowed = "PAYMENT_METHOD_NOT_ALLOWED";
     public const string InstallmentsNotAllowed = "INSTALLMENTS_NOT_ALLOWED";
     public const string PatientEmailRequired = "PATIENT_EMAIL_REQUIRED";

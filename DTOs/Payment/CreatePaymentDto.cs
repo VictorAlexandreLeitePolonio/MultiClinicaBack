@@ -12,4 +12,6 @@ public class CreatePaymentDto
     public PaymentStatus Status { get; set; } = PaymentStatus.Pending;
     public DateOnly? PaidAt { get; set; }
     public DateOnly? PaymentDate { get; set; }
+    // Só tem efeito quando PaymentMethod é "Online (Mercado Pago)".
+    public bool SendOnline { get; set; }
 }
