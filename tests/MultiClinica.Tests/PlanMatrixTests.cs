@@ -12,8 +12,8 @@ public class PlanMatrixTests_Plans
         Assert.Equal(0m, PlanMatrix.For(ClinicPlan.Free).MonthlyPrice);
         Assert.Equal(49.90m, PlanMatrix.For(ClinicPlan.Pro).MonthlyPrice);
         Assert.Equal(79.90m, PlanMatrix.For(ClinicPlan.Premium).MonthlyPrice);
-        Assert.Equal(499.00m, PlanMatrix.AnnualPrice(ClinicPlan.Pro));
-        Assert.Equal(799.00m, PlanMatrix.AnnualPrice(ClinicPlan.Premium));
+        Assert.Equal(499.90m, PlanMatrix.AnnualPrice(ClinicPlan.Pro));
+        Assert.Equal(799.90m, PlanMatrix.AnnualPrice(ClinicPlan.Premium));
     }
 
     [Theory]
@@ -63,6 +63,8 @@ public class PlanMatrixTests_Plans
     {
         var ids = PlanMatrix.Packs.Select(p => p.Id).ToArray();
         Assert.Equal(["pro-conversations-200", "premium-conversations-500", "premium-transcription-300"], ids);
-        Assert.Equal(59m, PlanMatrix.ExtraProfessionalPrice);
+        Assert.Equal(59.90m, PlanMatrix.ExtraProfessionalPrice);
+        // Mesmos valores cadastrados no AbacatePay: se mudar lá, mude aqui (o app mostra estes preços).
+        Assert.Equal([29.90m, 59.90m, 29.90m], PlanMatrix.Packs.Select(p => p.Price));
     }
 }

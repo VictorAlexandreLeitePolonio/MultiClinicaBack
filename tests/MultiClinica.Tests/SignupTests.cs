@@ -55,7 +55,7 @@ public class SignupTests
 
         var pro = plans.EnumerateArray().Single(plan => plan.GetProperty("plan").GetString() == "Pro");
         Assert.Equal(49.90m, pro.GetProperty("monthlyPrice").GetDecimal());
-        Assert.Equal(499.00m, pro.GetProperty("annualPrice").GetDecimal());
+        Assert.Equal(499.90m, pro.GetProperty("annualPrice").GetDecimal());
 
         var premium = plans.EnumerateArray().Single(plan => plan.GetProperty("plan").GetString() == "Premium");
         Assert.Equal(JsonValueKind.Null, premium.GetProperty("includedProfessionals").ValueKind);
@@ -63,7 +63,7 @@ public class SignupTests
         Assert.Equal(1200, premium.GetProperty("quotas").GetProperty("TranscriptionMinutes").GetInt32());
 
         Assert.Equal(3, root.GetProperty("packs").GetArrayLength());
-        Assert.Equal(59m, root.GetProperty("extraProfessionalPrice").GetDecimal());
+        Assert.Equal(59.90m, root.GetProperty("extraProfessionalPrice").GetDecimal());
     }
 
     [Fact]
