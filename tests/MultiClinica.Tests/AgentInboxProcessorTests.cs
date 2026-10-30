@@ -8,43 +8,43 @@ namespace MultiClinica.Tests;
 
 public class AgentInboxProcessorTests
 {
-    private static async Task<(MultiClinicaFactory App, FakeChatModel Model, FakeTelegramClient Telegram, ManualClock Clock)> SetupAsync(
+    private static async Task<(MultiClinicaFactory App, FakeChatModel Model, FakeWhatsAppClient WhatsApp, ManualClock Clock)> SetupAsync(
         bool billingBlocked = false, bool clinicDeleted = false, ClinicPlan plan = ClinicPlan.Pro)
     {
         var model = new FakeChatModel();
-        var telegram = new FakeTelegramClient();
+        var whatsApp = new FakeWhatsAppClient();
         var clock = new ManualClock();
         var app = new MultiClinicaFactory
         {
             ConfigureTestServices = s =>
             {
                 s.AddSingleton<IChatModel>(model);
-                s.AddSingleton<ITelegramClient>(telegram);
+                s.AddSingleton<IWhatsAppClient>(whatsApp);
                 s.AddSingleton<TimeProvider>(clock);
                 s.Configure<AgentOptions>(o => o.Model = "modelo-teste");
             },
         };
-        var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, telegramChatId: 777);
+        var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, whatsAppPhone: "5511999998888");
         await app.SeedAsync(async db =>
         {
             var clinic = await db.Clinicas.SingleAsync(c => c.Id == clinicId);
             clinic.IsBlockedByBilling = billingBlocked;
             clinic.IsDeleted = clinicDeleted;
             clinic.Plan = plan;
-            var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
-                Profile = AgentProfile.Owner, ExternalChatId = "777", UserId = adminId, LastInboundAt = DateTime.UtcNow };
-            conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.Telegram, Role = AgentMessageRole.User,
-                Content = "oi", Status = AgentMessageStatus.Pending, ExternalMessageId = "777:1" });
+            var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.WhatsApp,
+                Profile = AgentProfile.Owner, ExternalChatId = "5511999998888", UserId = adminId, LastInboundAt = DateTime.UtcNow };
+            conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User,
+                Content = "oi", Status = AgentMessageStatus.Pending, ExternalMessageId = "wamid.1" });
             db.AgentConversations.Add(conversation);
             await db.SaveChangesAsync();
         });
-        return (app, model, telegram, clock);
+        return (app, model, whatsApp, clock);
     }
 
     private static Task ProcessAsync(MultiClinicaFactory app)
         => app.Services.GetRequiredService<AgentInboxProcessor>().ProcessBatchAsync(CancellationToken.None);
 
-    private static async Task<AgentMessage> InboundAsync(MultiClinicaFactory app, string externalId = "777:1")
+    private static async Task<AgentMessage> InboundAsync(MultiClinicaFactory app, string externalId = "wamid.1")
     {
         AgentMessage? message = null;
         await app.SeedAsync(async db => message = await db.AgentMessages.SingleAsync(m => m.ExternalMessageId == externalId));
@@ -52,22 +52,22 @@ public class AgentInboxProcessorTests
     }
 
     [Fact]
-    public async Task Replies_on_telegram_and_marks_done()
+    public async Task Replies_on_whatsapp_and_marks_done()
     {
-        var (app, model, telegram, _) = await SetupAsync();
+        var (app, model, whatsApp, _) = await SetupAsync();
         await using var _ = app;
         model.Reply("Olá, Victor!");
 
         await ProcessAsync(app);
 
-        Assert.Equal([(777L, "Olá, Victor!")], telegram.Sent);
+        Assert.Equal([("5511999998888", "Olá, Victor!")], whatsApp.Sent);
         Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
     }
 
     [Fact]
     public async Task Retries_then_gives_up_with_apology()
     {
-        var (app, model, telegram, clock) = await SetupAsync();
+        var (app, model, whatsApp, clock) = await SetupAsync();
         await using var _ = app;
         model.Throw().Throw().Throw();
 
@@ -75,7 +75,7 @@ public class AgentInboxProcessorTests
         var afterFirst = await InboundAsync(app);
         Assert.Equal(AgentMessageStatus.Pending, afterFirst.Status);
         Assert.Equal(1, afterFirst.Attempts);
-        Assert.Empty(telegram.Sent);
+        Assert.Empty(whatsApp.Sent);
 
         // Backoff: sem tempo passar, a mensagem que acabou de falhar não volta ao LLM.
         await ProcessAsync(app);
@@ -89,13 +89,13 @@ public class AgentInboxProcessorTests
 
         Assert.Equal(3, model.Requests.Count);
         Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
-        Assert.Equal([(777L, AgentInboxProcessor.FailureReply)], telegram.Sent);
+        Assert.Equal([("5511999998888", AgentInboxProcessor.FailureReply)], whatsApp.Sent);
     }
 
     [Fact]
     public async Task Blocked_clinic_is_not_processed()
     {
-        var (app, model, telegram, _) = await SetupAsync(billingBlocked: true);
+        var (app, model, whatsApp, _) = await SetupAsync(billingBlocked: true);
         await using var _ = app;
 
         await ProcessAsync(app);
@@ -107,37 +107,37 @@ public class AgentInboxProcessorTests
     [Fact]
     public async Task Soft_deleted_clinic_is_not_processed()
     {
-        var (app, model, telegram, _) = await SetupAsync(clinicDeleted: true);
+        var (app, model, whatsApp, _) = await SetupAsync(clinicDeleted: true);
         await using var _ = app;
 
         await ProcessAsync(app);
 
         Assert.Empty(model.Requests);
-        Assert.Empty(telegram.Sent);
+        Assert.Empty(whatsApp.Sent);
         Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
     }
 
     [Fact]
     public async Task Clinic_without_owner_copilot_plan_is_not_processed()
     {
-        var (app, model, telegram, _) = await SetupAsync(plan: ClinicPlan.Free);
+        var (app, model, whatsApp, _) = await SetupAsync(plan: ClinicPlan.Free);
         await using var _ = app;
 
         await ProcessAsync(app);
 
         Assert.Empty(model.Requests);
-        Assert.Empty(telegram.Sent);
+        Assert.Empty(whatsApp.Sent);
         Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
     }
 
     [Fact]
     public async Task Non_admin_owner_is_not_processed()
     {
-        var (app, model, telegram, _) = await SetupAsync();
+        var (app, model, whatsApp, _) = await SetupAsync();
         await using var _ = app;
         await app.SeedAsync(async db =>
         {
-            var owner = await db.Users.SingleAsync(u => u.TelegramChatId == 777);
+            var owner = await db.Users.SingleAsync(u => u.WhatsAppPhone == "5511999998888");
             owner.Role = UserRole.Recepcao;
             await db.SaveChangesAsync();
         });
@@ -145,7 +145,41 @@ public class AgentInboxProcessorTests
         await ProcessAsync(app);
 
         Assert.Empty(model.Requests);
-        Assert.Empty(telegram.Sent);
+        Assert.Empty(whatsApp.Sent);
+        Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
+    }
+
+    [Fact]
+    public async Task Owner_with_other_whatsapp_number_fails_pending_messages()
+    {
+        var model = new FakeChatModel();
+        var whatsApp = new FakeWhatsAppClient();
+        var app = new MultiClinicaFactory
+        {
+            ConfigureTestServices = s =>
+            {
+                s.AddSingleton<IChatModel>(model);
+                s.AddSingleton<IWhatsAppClient>(whatsApp);
+                s.Configure<AgentOptions>(o => o.Model = "modelo-teste");
+            },
+        };
+        await using var _ = app;
+        var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, whatsAppPhone: "5511000000000");
+        await app.SeedAsync(async db =>
+        {
+            var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.WhatsApp,
+                Profile = AgentProfile.Owner, ExternalChatId = "5511999998888", UserId = adminId, LastInboundAt = DateTime.UtcNow };
+            conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User,
+                Content = "oi", Status = AgentMessageStatus.Pending, ExternalMessageId = "wamid.1" });
+            db.AgentConversations.Add(conversation);
+            await db.SaveChangesAsync();
+        });
+        model.Reply("Olá!");
+
+        await ProcessAsync(app);
+
+        Assert.Empty(model.Requests);
+        Assert.Empty(whatsApp.Sent);
         Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
     }
 
@@ -154,16 +188,16 @@ public class AgentInboxProcessorTests
     [InlineData(true)]
     public async Task Message_arriving_during_the_run_stays_pending_for_next_cycle(bool llmFails)
     {
-        var (app, model, telegram, clock) = await SetupAsync();
+        var (app, model, whatsApp, clock) = await SetupAsync();
         await using var _ = app;
         if (llmFails) model.Throw();
         else model.Reply("Olá!");
         model.OnCall = () => app.SeedAsync(async db =>
         {
             var conversation = await db.AgentConversations.SingleAsync();
-            db.AgentMessages.Add(new AgentMessage { ConversationId = conversation.Id, Channel = AgentChannel.Telegram,
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversation.Id, Channel = AgentChannel.WhatsApp,
                 Role = AgentMessageRole.User, Content = "chegou agora", Status = AgentMessageStatus.Pending,
-                ExternalMessageId = "777:2" });
+                ExternalMessageId = "wamid.2" });
             await db.SaveChangesAsync();
         });
 
@@ -171,7 +205,7 @@ public class AgentInboxProcessorTests
 
         // Chegou durante o LLM: não entra no request desta execução.
         Assert.Equal(["oi"], model.Requests[0].Messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
-        var late = await InboundAsync(app, "777:2");
+        var late = await InboundAsync(app, "wamid.2");
         Assert.Equal(AgentMessageStatus.Pending, late.Status);
         Assert.Equal(0, late.Attempts);
         var first = await InboundAsync(app);
@@ -184,17 +218,17 @@ public class AgentInboxProcessorTests
         clock.Advance(TimeSpan.FromMinutes(10));
         await ProcessAsync(app);
 
-        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app, "777:2")).Status);
+        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app, "wamid.2")).Status);
         Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
         List<string> expectedReplies = llmFails ? ["Olá de novo!"] : ["Olá!", "Olá de novo!"];
-        Assert.Equal(expectedReplies, telegram.Sent.Select(s => s.Text));
+        Assert.Equal(expectedReplies, whatsApp.Sent.Select(s => s.Text));
     }
 
     // A falha uma vez; B chega dentro da janela de backoff de A. A conversa entra pelo B, então A vai no mesmo lote.
     [Fact]
     public async Task Message_arriving_during_backoff_is_answered_with_the_failed_one_only_once()
     {
-        var (app, model, telegram, clock) = await SetupAsync();
+        var (app, model, whatsApp, clock) = await SetupAsync();
         await using var _ = app;
         model.Throw().Reply("Olá, as duas!");
 
@@ -204,81 +238,52 @@ public class AgentInboxProcessorTests
         await app.SeedAsync(async db =>
         {
             var conversation = await db.AgentConversations.SingleAsync();
-            db.AgentMessages.Add(new AgentMessage { ConversationId = conversation.Id, Channel = AgentChannel.Telegram,
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversation.Id, Channel = AgentChannel.WhatsApp,
                 Role = AgentMessageRole.User, Content = "chegou depois", Status = AgentMessageStatus.Pending,
-                ExternalMessageId = "777:2" });
+                ExternalMessageId = "wamid.2" });
             await db.SaveChangesAsync();
         });
         await ProcessAsync(app);
 
         Assert.Equal(["oi", "chegou depois"], model.Requests[1].Messages.Where(m => m.Role == AgentChatRole.User).Select(m => m.Content));
         Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
-        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app, "777:2")).Status);
-        Assert.Equal([(777L, "Olá, as duas!")], telegram.Sent);
+        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app, "wamid.2")).Status);
+        Assert.Equal([("5511999998888", "Olá, as duas!")], whatsApp.Sent);
 
         // Passou o backoff de A, mas não sobrou Pending: nenhum request novo e nenhuma segunda resposta.
         clock.Advance(TimeSpan.FromMinutes(10));
         await ProcessAsync(app);
         Assert.Equal(2, model.Requests.Count);
-        Assert.Single(telegram.Sent);
+        Assert.Single(whatsApp.Sent);
     }
 
     [Fact]
-    public async Task Broken_conversation_does_not_block_the_others()
+    public async Task Long_reply_is_cut_at_the_whatsapp_limit()
     {
-        var model = new FakeChatModel();
-        var telegram = new FakeTelegramClient();
-        var app = new MultiClinicaFactory
-        {
-            ConfigureTestServices = s =>
-            {
-                s.AddSingleton<IChatModel>(model);
-                s.AddSingleton<ITelegramClient>(telegram);
-                s.Configure<AgentOptions>(o => o.Model = "modelo-teste");
-            },
-        };
+        var (app, model, whatsApp, _) = await SetupAsync();
         await using var _ = app;
-        var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, telegramChatId: 777);
-        // Chat id não numérico: a conversa vira Failed sem chamar o modelo. Entra primeiro para provar que não bloqueia a outra.
-        await app.SeedAsync(async db =>
-        {
-            var broken = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
-                Profile = AgentProfile.Owner, ExternalChatId = "nao-numerico", UserId = adminId, LastInboundAt = DateTime.UtcNow };
-            broken.Messages.Add(new AgentMessage { Channel = AgentChannel.Telegram, Role = AgentMessageRole.User,
-                Content = "quebrada", Status = AgentMessageStatus.Pending, ExternalMessageId = "nao-numerico:1" });
-            db.AgentConversations.Add(broken);
-            await db.SaveChangesAsync();
-        });
-        await app.SeedAsync(async db =>
-        {
-            var good = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
-                Profile = AgentProfile.Owner, ExternalChatId = "777", UserId = adminId, LastInboundAt = DateTime.UtcNow };
-            good.Messages.Add(new AgentMessage { Channel = AgentChannel.Telegram, Role = AgentMessageRole.User,
-                Content = "oi", Status = AgentMessageStatus.Pending, ExternalMessageId = "777:1" });
-            db.AgentConversations.Add(good);
-            await db.SaveChangesAsync();
-        });
-        model.Reply("Olá!");
+        model.Reply(new string('a', 5000));
 
         await ProcessAsync(app);
 
-        Assert.Equal([(777L, "Olá!")], telegram.Sent);
-        Assert.Equal(AgentMessageStatus.Done, (await InboundAsync(app)).Status);
-        Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app, "nao-numerico:1")).Status);
-        Assert.Single(model.Requests);
+        var sent = Assert.Single(whatsApp.Sent);
+        Assert.Equal("5511999998888", sent.To);
+        Assert.Equal(4096, sent.Text.Length);
+        Assert.EndsWith("…", sent.Text);
+        Assert.Equal(new string('a', 4095) + "…", sent.Text);
     }
 
     [Fact]
-    public async Task Long_reply_is_cut_for_telegram_without_splitting_an_emoji()
+    public async Task Long_reply_is_cut_without_splitting_an_emoji()
     {
-        var (app, model, telegram, _) = await SetupAsync();
+        var (app, model, whatsApp, _) = await SetupAsync();
         await using var _ = app;
-        // 3999 letras + emoji (par substituto de 2 chars) cruza o corte de 4000: o corte recua para não partir o par.
-        model.Reply(new string('a', 3999) + "😀" + new string('b', 100));
+        // 4094 letras + emoji (par substituto de 2 chars) cruza o corte de 4095: o corte recua para não partir o par.
+        model.Reply(new string('a', 4094) + "😀" + new string('b', 100));
 
         await ProcessAsync(app);
 
-        Assert.Equal([(777L, new string('a', 3999) + "…")], telegram.Sent);
+        Assert.Equal([("5511999998888", new string('a', 4094) + "…")], whatsApp.Sent);
     }
 
     // Relógio manual: o backoff lê o TimeProvider, e o UpdatedAt gravado pelo banco usa o relógio real.
