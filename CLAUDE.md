@@ -42,9 +42,9 @@ Program.cs does three things in order:
 ### Background Services (`/Services`)
 - `AppointmentStatusUpdater` — auto-cancels past Scheduled appointments
 - `PatientEmailOutboxWorker` — sends queued patient e-mails
-- `Agent/AgentWorker` — processes the AI agent inbox (owner copilot)
+- `Agent/AgentWorker` — processes the AI agent inbox (owner copilot on WhatsApp)
 
-There are no WhatsApp reminders today: the Evolution API integration was removed. Reminders, the patient chatbot and the copilot channel will come back on the official WhatsApp Cloud API (separate spec).
+The owner copilot runs on the platform's WhatsApp number (Cloud API): webhook `GET|POST /webhooks/whatsapp` (verify token + `X-Hub-Signature-256`), owners link via `api/me/whatsapp-link` (one-time code sent as `conectar <code>`), each new 24h window consumes 1 `WhatsAppConversations`. Config: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__DisplayNumber`, `WhatsApp__AppSecret`, `WhatsApp__VerifyToken`. Reminders, patient chatbot (each clinic's own number via Embedded Signup) and transcription come in later specs.
 
 ### Platform plans and billing
 - `Common/PlanMatrix.cs` is the single source of plans (Free / Pro / Premium): features, professional limits, monthly quotas, hub rank, prices and packs. Spec: `docs/superpowers/specs/2026-10-30-planos-plataforma-design.md`.
