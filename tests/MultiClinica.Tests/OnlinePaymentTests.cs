@@ -867,6 +867,14 @@ public class OnlinePaymentTests
         Assert.Contains("R$", message.Body);
         Assert.Contains("Mensal", message.Body);
         Assert.Contains("/pagar/tok-email", message.Body);
+
+        await app.SeedAsync(async db =>
+        {
+            var job = await db.PatientEmailOutbox.SingleAsync();
+            Assert.Equal(PatientEmailOutboxType.PaymentCharge, job.Type); // não vira ActivationInvitation
+            Assert.Equal(PatientEmailOutboxStatus.Completed, job.Status);
+            Assert.Null(job.LastError);
+        });
     }
 
     // ── Auxiliares ───────────────────────────────────────────────────────────
