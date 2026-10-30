@@ -36,6 +36,7 @@ public sealed class PublicClinicSummaryDto
     public IReadOnlyList<ClinicCategoryDto> Categories { get; set; } = [];
     public int LikeCount { get; set; }
     public bool AcceptsAppointmentRequests { get; set; }
+    public string? Badge { get; set; }
 }
 
 // ── Categorias ───────────────────────────────────────────────────────────────

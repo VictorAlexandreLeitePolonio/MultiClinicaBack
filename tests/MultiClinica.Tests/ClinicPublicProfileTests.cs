@@ -37,7 +37,7 @@ public class ClinicPublicProfileTests
             {
                 Nome = $"Clinica {suffix}", NomeFantasia = $"Clinica {suffix}", NomeResponsavel = "Victor",
                 Email = $"clinic-{suffix}@test.local", Cidade = "São Paulo", Estado = "SP",
-                IsActive = isActive, IsPublic = isPublic, PublicSlug = slug
+                IsActive = isActive, IsPublic = isPublic, IsHubApproved = isPublic, PublicSlug = slug
             };
             db.Clinicas.Add(clinic);
             await db.SaveChangesAsync();
@@ -134,7 +134,8 @@ public class ClinicPublicProfileTests
             {
                 Nome = "Publica", NomeFantasia = "Publica", NomeResponsavel = "Victor",
                 Cnpj = "12345678000199", Email = "pub@test.local",
-                IsPublic = true, IsActive = true, PublicSlug = "publica", AcceptsAppointmentRequests = true
+                IsPublic = true, IsHubApproved = true, IsActive = true, PublicSlug = "publica",
+                AcceptsAppointmentRequests = true
             };
             db.Clinicas.Add(clinic);
             await db.SaveChangesAsync();

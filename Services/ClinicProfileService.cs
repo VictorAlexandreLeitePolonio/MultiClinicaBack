@@ -123,7 +123,8 @@ public class ClinicProfileService(
             .Include(c => c.Categories)
             .Include(c => c.Media)
             .Include(c => c.BusinessHours)
-            .FirstOrDefaultAsync(c => c.PublicSlug == normalized && c.IsPublic && c.IsActive && !c.IsDeleted);
+            .FirstOrDefaultAsync(c => c.PublicSlug == normalized
+                && c.IsPublic && c.IsHubApproved && c.IsActive && !c.IsDeleted);
 
         if (clinic is null)
             return Result<PublicClinicDto>.Fail(ErrorCodes.NotFound, "Clínica não encontrada.");
@@ -171,7 +172,7 @@ public class ClinicProfileService(
         var clinics = await db.Clinicas
             .AsNoTracking()
             .Include(c => c.Categories)
-            .Where(c => c.IsPublic && c.IsActive && !c.IsDeleted && c.PublicSlug != null)
+            .Where(c => c.IsPublic && c.IsHubApproved && c.IsActive && !c.IsDeleted && c.PublicSlug != null)
             .OrderByDescending(c => c.LikeCount)
             .ThenBy(c => c.Id)
             .Take(limit)
@@ -190,6 +191,7 @@ public class ClinicProfileService(
             Categories  = MapCategories(c.Categories),
             LikeCount   = c.LikeCount,
             AcceptsAppointmentRequests = c.AcceptsAppointmentRequests,
+            Badge       = ResolveBadge(c),
         }).ToList();
 
         return Result<IReadOnlyList<PublicClinicSummaryDto>>.Ok(result);
@@ -222,4 +224,7 @@ public class ClinicProfileService(
     {
         Id = h.Id, DayOfWeek = h.DayOfWeek, StartTime = h.StartTime, EndTime = h.EndTime
     };
+
+    private static string? ResolveBadge(Clinica clinic)
+        => clinic.IsFounder ? "Founder" : clinic.Plan == ClinicPlan.Premium ? "Featured" : null;
 }
