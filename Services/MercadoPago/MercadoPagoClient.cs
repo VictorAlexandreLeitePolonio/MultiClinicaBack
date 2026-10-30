@@ -13,7 +13,7 @@ public sealed class MercadoPagoClient(HttpClient http, IOptions<MercadoPagoOptio
 
     public async Task<MpTokenResponse> ExchangeCodeAsync(string code, string codeVerifier, CancellationToken ct)
     {
-        using var response = await http.PostAsync("oauth/token", new FormUrlEncodedContent(new Dictionary<string, string>
+        var form = new Dictionary<string, string>
         {
             ["client_id"] = _options.ClientId,
             ["client_secret"] = _options.ClientSecret,
@@ -21,7 +21,9 @@ public sealed class MercadoPagoClient(HttpClient http, IOptions<MercadoPagoOptio
             ["code"] = code,
             ["redirect_uri"] = _options.RedirectUri,
             ["code_verifier"] = codeVerifier,
-        }), ct);
+        };
+        if (_options.TestMode) form["test_token"] = "true";
+        using var response = await http.PostAsync("oauth/token", new FormUrlEncodedContent(form), ct);
 
         return await ReadTokenAsync(response, ct);
     }

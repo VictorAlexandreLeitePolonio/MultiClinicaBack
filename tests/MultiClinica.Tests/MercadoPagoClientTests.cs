@@ -57,7 +57,7 @@ public class MercadoPagoClientTests
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
     private static (MercadoPagoClient Client, FakeHandler Handler) Build(
-        Func<HttpRequestMessage, HttpResponseMessage> respond)
+        Func<HttpRequestMessage, HttpResponseMessage> respond, bool testMode = false)
     {
         var handler = new FakeHandler(respond);
         var http = new HttpClient(handler) { BaseAddress = new Uri("https://api.test/") };
@@ -67,6 +67,7 @@ public class MercadoPagoClientTests
             ClientSecret = "secret-1",
             RedirectUri = "https://api.test/api/mercadopago/callback",
             ApiBaseUrl = "https://api.test/",
+            TestMode = testMode,
         });
         return (new MercadoPagoClient(http, options), handler);
     }
@@ -102,6 +103,17 @@ public class MercadoPagoClientTests
         Assert.Equal("code-1", form["code"]);
         Assert.Equal("verifier-1", form["code_verifier"]);
         Assert.Equal("https://api.test/api/mercadopago/callback", form["redirect_uri"]);
+        Assert.False(form.ContainsKey("test_token"));
+    }
+
+    [Fact]
+    public async Task ExchangeCodeAsync_asks_for_sandbox_token_in_test_mode()
+    {
+        var (client, handler) = Build(_ => Json(TokenJson), testMode: true);
+
+        await client.ExchangeCodeAsync("code-1", "verifier-1", CancellationToken.None);
+
+        Assert.Equal("true", ParseForm(Assert.Single(handler.Calls).Body)["test_token"]);
     }
 
     [Fact]
