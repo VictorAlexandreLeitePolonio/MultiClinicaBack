@@ -23,7 +23,7 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
     public async Task<string> CreateSubscriptionCheckoutAsync(
         string productId, int clinicaId, AbacateCustomer customer, CancellationToken ct = default)
     {
-        var customerId = await CreateCustomerAsync(customer, ct);
+        var customerId = await ResolveCustomerIdAsync(customer, ct);
         var body = CheckoutBody(clinicaId, $"clinica:{clinicaId}", customerId);
         body["items"] = new[] { new { id = productId, quantity = 1 } };
         body["methods"] = new[] { "CARD", "PIX" };
@@ -36,7 +36,7 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
         int clinicaId, string item, string description, decimal amount, AbacateCustomer customer,
         CancellationToken ct = default)
     {
-        var customerId = await CreateCustomerAsync(customer, ct);
+        var customerId = await ResolveCustomerIdAsync(customer, ct);
         var productId = await ResolveOneTimeProductAsync(item, description, amount, ct);
         var body = CheckoutBody(clinicaId, $"clinica:{clinicaId}|{item}", customerId);
         body["items"] = new[] { new { id = productId, quantity = 1 } };
@@ -80,8 +80,11 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
         return body;
     }
 
-    private async Task<string> CreateCustomerAsync(AbacateCustomer customer, CancellationToken ct)
+    private async Task<string> ResolveCustomerIdAsync(AbacateCustomer customer, CancellationToken ct)
     {
+        if (!string.IsNullOrWhiteSpace(customer.ExistingId))
+            return customer.ExistingId;
+
         var body = new Dictionary<string, string> { ["email"] = customer.Email };
         if (!string.IsNullOrWhiteSpace(customer.Name))
             body["name"] = customer.Name;

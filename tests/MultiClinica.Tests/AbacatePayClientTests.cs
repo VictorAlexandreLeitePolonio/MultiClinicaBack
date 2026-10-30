@@ -77,6 +77,21 @@ public class AbacatePayClientTests
     }
 
     [Fact]
+    public async Task CreateSubscriptionCheckoutAsync_reaproveita_customer_existente()
+    {
+        var (client, handler) = Build(SuccessHandler());
+
+        var url = await client.CreateSubscriptionCheckoutAsync(
+            "prod_pro_m", 42,
+            new AbacateCustomer("Clínica Teste", "admin@teste.com", null, null, "cust_existente"));
+
+        Assert.Equal("https://pay.test/checkout", url);
+        Assert.DoesNotContain(handler.Calls, call => call.Path == "/v2/customers/create");
+        var body = JsonDocument.Parse(handler.Calls.Single(c => c.Path == "/v2/subscriptions/create").Body!).RootElement;
+        Assert.Equal("cust_existente", body.GetProperty("customerId").GetString());
+    }
+
+    [Fact]
     public async Task CreateOneTimeCheckoutAsync_envia_valor_em_centavos_e_referencia()
     {
         var (client, handler) = Build(SuccessHandler());
@@ -95,6 +110,20 @@ public class AbacatePayClientTests
         Assert.Equal("clinica:42|pack:pro-conversations-200", checkout.GetProperty("externalId").GetString());
         Assert.Equal("prod_dyn", checkout.GetProperty("items")[0].GetProperty("id").GetString());
         Assert.Equal("cust_1", checkout.GetProperty("customerId").GetString());
+    }
+
+    [Fact]
+    public async Task CreateOneTimeCheckoutAsync_reaproveita_customer_existente()
+    {
+        var (client, handler) = Build(SuccessHandler());
+
+        await client.CreateOneTimeCheckoutAsync(
+            42, "extra-professional", "Vaga extra de profissional", 59m,
+            new AbacateCustomer("Clínica Teste", "admin@teste.com", null, null, "cust_existente"));
+
+        Assert.DoesNotContain(handler.Calls, call => call.Path == "/v2/customers/create");
+        var checkout = JsonDocument.Parse(handler.Calls.Single(c => c.Path == "/v2/checkouts/create").Body!).RootElement;
+        Assert.Equal("cust_existente", checkout.GetProperty("customerId").GetString());
     }
 
     [Fact]

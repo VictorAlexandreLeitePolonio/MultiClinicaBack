@@ -135,6 +135,7 @@ builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client)
     client.BaseAddress = new Uri(options.BaseUrl);
     client.DefaultRequestHeaders.Authorization = new("Bearer", options.ApiKey);
 });
+builder.Services.AddScoped<BillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
 builder.Services.AddScoped<IEvolutionService, EvolutionService>();

@@ -11,7 +11,8 @@ public sealed class AbacatePayOptions
     public Dictionary<string, string> Products { get; set; } = [];
 }
 
-public sealed record AbacateCustomer(string Name, string Email, string? Phone, string? TaxId);
+public sealed record AbacateCustomer(
+    string Name, string Email, string? Phone, string? TaxId, string? ExistingId = null);
 
 public interface IAbacatePayClient
 {
