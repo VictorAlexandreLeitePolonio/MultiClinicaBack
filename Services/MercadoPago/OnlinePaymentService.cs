@@ -209,7 +209,9 @@ public sealed class OnlinePaymentService(
             return Result<PublicPaymentDto>.Fail(ErrorCodes.NotFound, "Link de pagamento inválido.");
 
         var connected = await accounts.GetConnectedAsync(payment.ClinicaId, ct);
-        var status = payment.Status == PaymentStatus.Paid
+        // Só o pagamento online confirmado mostra "Pagamento confirmado". Cobrança paga
+        // manualmente (ou cancelada) não está mais disponível na página pública.
+        var status = payment.Status == PaymentStatus.Paid && payment.PaidOnline
             ? "Paid"
             : payment.Status == PaymentStatus.Pending && connected is not null
                 ? "Pending"

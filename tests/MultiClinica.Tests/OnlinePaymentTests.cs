@@ -176,6 +176,22 @@ public class OnlinePaymentTests
             ConnectMp = false,
             PaymentLinkToken = "tok-sem-mp",
         });
+        await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions
+        {
+            AdminEmail = "pago-manual@test.local",
+            ClinicName = "Clínica Pago Manual",
+            PaymentLinkToken = "tok-paid-manual",
+            Status = PaymentStatus.Paid,
+        });
+        await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions
+        {
+            AdminEmail = "pago-online@test.local",
+            ClinicName = "Clínica Pago Online",
+            PaymentLinkToken = "tok-paid-online",
+            Status = PaymentStatus.Paid,
+            PaidOnline = true,
+            MpPaymentId = 77,
+        });
         using var client = app.CreateClient();
 
         Assert.Equal(HttpStatusCode.NotFound,
@@ -186,6 +202,12 @@ public class OnlinePaymentTests
 
         var disconnected = await ReadJsonAsync(await client.GetAsync("/api/public/payments/tok-sem-mp"));
         Assert.Equal("Unavailable", disconnected.GetProperty("status").GetString());
+
+        var manuallyPaid = await ReadJsonAsync(await client.GetAsync("/api/public/payments/tok-paid-manual"));
+        Assert.Equal("Unavailable", manuallyPaid.GetProperty("status").GetString());
+
+        var paidOnline = await ReadJsonAsync(await client.GetAsync("/api/public/payments/tok-paid-online"));
+        Assert.Equal("Paid", paidOnline.GetProperty("status").GetString());
     }
 
     // ── /pay ─────────────────────────────────────────────────────────────────
