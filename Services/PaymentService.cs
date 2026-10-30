@@ -5,6 +5,7 @@ using MultiClinica.API.DTOs.Payment;
 using MultiClinica.API.Models;
 using MultiClinica.API.Repositories.Interfaces;
 using MultiClinica.API.Services.Interfaces;
+using MultiClinica.API.Services.MercadoPago;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
@@ -14,6 +15,7 @@ public class PaymentService(
     IPaymentRepository repository,
     AppDbContext db,
     IUsuarioLogadoService usuario,
+    MercadoPagoAccounts mercadoPagoAccounts,
     TimeProvider timeProvider) : IPaymentService
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
@@ -77,6 +79,38 @@ public class PaymentService(
         return DateOnly.FromDateTime(TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), timeZone).DateTime);
     }
 
+    // Bloqueios da cobrança online, todos antes de gravar qualquer coisa.
+    private async Task<Result<PaymentResponseDto>?> ValidateOnlineChargeAsync(
+        CreatePaymentDto dto, Patient patient)
+    {
+        var clinicPlan = await db.Clinicas
+            .Where(clinic => clinic.Id == usuario.ClinicaId)
+            .Select(clinic => clinic.Plan)
+            .FirstOrDefaultAsync();
+
+        if (!PlanMatrix.Has(clinicPlan, Features.OnlinePayments))
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.OnlinePaymentsNotAvailable,
+                "O pagamento online não está disponível no plano da clínica.");
+
+        if (await mercadoPagoAccounts.GetConnectedAsync(usuario.ClinicaId) is null)
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.MercadoPagoNotConnected,
+                "Conecte o Mercado Pago para criar cobranças online.");
+
+        if (dto.Status != PaymentStatus.Pending)
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.OnlinePaymentMustBePending,
+                "Cobranças online devem ser criadas como pendentes.");
+
+        if (dto.SendOnline && string.IsNullOrWhiteSpace(patient.Email))
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.PatientEmailRequired,
+                "O paciente precisa ter um e-mail cadastrado para receber a cobrança.");
+
+        return null;
+    }
+
     // ── Criação ──────────────────────────────────────────────────────────────
 
     public async Task<Result<PaymentResponseDto>> CreateAsync(CreatePaymentDto dto)
@@ -85,9 +119,9 @@ public class PaymentService(
         if (referenceValidation is not null)
             return referenceValidation;
 
-        if (string.IsNullOrWhiteSpace(dto.PaymentMethod))
+        if (!PaymentMethods.IsKnown(dto.PaymentMethod))
             return Result<PaymentResponseDto>.Fail(
-                ErrorCodes.EmptyField, "O método de pagamento é obrigatório.");
+                ErrorCodes.InvalidPaymentMethod, "Forma de pagamento inválida.");
 
         // Validações de existência
         var user = await db.Users.FirstOrDefaultAsync(u => u.Id == dto.ResponsavelId && u.ClinicaId == usuario.ClinicaId && !u.IsDeleted);
@@ -97,6 +131,13 @@ public class PaymentService(
         if (user    is null) return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Usuário não encontrado.");
         if (patient is null) return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
         if (plan    is null) return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Plano não encontrado.");
+
+        if (PaymentMethods.IsOnline(dto.PaymentMethod))
+        {
+            var onlineValidation = await ValidateOnlineChargeAsync(dto, patient);
+            if (onlineValidation is not null)
+                return onlineValidation;
+        }
 
         // Regras de negócio
         if (!patient.IsActive)
@@ -167,13 +208,30 @@ public class PaymentService(
         if (referenceValidation is not null)
             return referenceValidation;
 
-        if (string.IsNullOrWhiteSpace(dto.PaymentMethod))
-            return Result<PaymentResponseDto>.Fail(
-                ErrorCodes.EmptyField, "O método de pagamento é obrigatório.");
-
         var payment = await repository.GetByIdAsync(id);
         if (payment is null)
             return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Pagamento não encontrado.");
+
+        // Cobranças antigas (ex.: "Boleto", "Cartão") continuam editáveis sem trocar a forma;
+        // trocar para online ou para um valor desconhecido não é permitido.
+        var methodUnchanged = string.Equals(
+            dto.PaymentMethod, payment.PaymentMethod, StringComparison.Ordinal);
+
+        if (!PaymentMethods.IsKnown(dto.PaymentMethod) && !methodUnchanged)
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.InvalidPaymentMethod, "Forma de pagamento inválida.");
+
+        if (PaymentMethods.IsOnline(dto.PaymentMethod) && !methodUnchanged)
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.InvalidPaymentMethod,
+                "Não é possível alterar a forma de pagamento para online. Crie uma nova cobrança.");
+
+        if (PaymentMethods.IsOnline(payment.PaymentMethod)
+            && !PaymentMethods.IsOnline(dto.PaymentMethod)
+            && payment.MpStatus is "pending" or "in_process")
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.PaymentHasPendingOnlinePayment,
+                "Não é possível alterar a forma de pagamento enquanto houver um pagamento online em andamento.");
 
         if (await repository.ExistsAsync(payment.PatientId, dto.ReferenceMonth, id))
             return Result<PaymentResponseDto>.Fail(
