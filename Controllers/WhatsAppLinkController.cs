@@ -11,8 +11,8 @@ namespace MultiClinica.API.Controllers;
 [Authorize(Roles = "Administrador")]
 [RequireFeature(Features.OwnerCopilot)]
 [ApiController]
-[Route("api/me/telegram-link")]
-public class TelegramLinkController(TelegramLinkService links, IUsuarioLogadoService usuario) : ControllerBase
+[Route("api/me/whatsapp-link")]
+public class WhatsAppLinkController(WhatsAppLinkService links, IUsuarioLogadoService usuario) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> Status() => Ok(new { connected = await links.IsConnectedAsync(usuario.UserId) });

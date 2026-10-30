@@ -17,8 +17,8 @@ public class RequireFeatureTests
     {
         ConfigureTestServices = s =>
         {
-            s.AddSingleton<ITelegramClient>(new FakeTelegramClient());
-            s.Configure<TelegramOptions>(o => o.BotUsername = "TestBot");
+            s.AddSingleton<IWhatsAppClient>(new FakeWhatsAppClient());
+            s.Configure<WhatsAppOptions>(o => o.DisplayNumber = "5511900000000");
         },
     };
 
@@ -56,14 +56,14 @@ public class RequireFeatureTests
         })).EnsureSuccessStatusCode();
 
     [Fact]
-    public async Task Telegram_link_requires_owner_copilot_plan()
+    public async Task WhatsApp_link_requires_owner_copilot_plan()
     {
         await using var app = CreateApp();
         await SeedClinicAsync(app);
         using var client = app.CreateClient();
         await LoginAsync(client);
 
-        var response = await client.PostAsync("/api/me/telegram-link", null);
+        var response = await client.PostAsync("/api/me/whatsapp-link", null);
 
         Assert.Equal(HttpStatusCode.PaymentRequired, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
@@ -73,14 +73,14 @@ public class RequireFeatureTests
     }
 
     [Fact]
-    public async Task Upgrade_to_pro_unlocks_telegram_link_without_new_login()
+    public async Task Upgrade_to_pro_unlocks_whatsapp_link_without_new_login()
     {
         await using var app = CreateApp();
         await SeedClinicAsync(app);
         using var client = app.CreateClient();
         await LoginAsync(client);
         Assert.Equal(HttpStatusCode.PaymentRequired,
-            (await client.PostAsync("/api/me/telegram-link", null)).StatusCode);
+            (await client.PostAsync("/api/me/whatsapp-link", null)).StatusCode);
 
         await app.SeedAsync(async db =>
         {
@@ -89,11 +89,11 @@ public class RequireFeatureTests
             await db.SaveChangesAsync();
         });
 
-        var response = await client.PostAsync("/api/me/telegram-link", null);
+        var response = await client.PostAsync("/api/me/whatsapp-link", null);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         using var body = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-        Assert.StartsWith("https://t.me/TestBot?start=", body.RootElement.GetProperty("url").GetString());
+        Assert.StartsWith("https://wa.me/5511900000000?text=", body.RootElement.GetProperty("url").GetString());
     }
 
     [Fact]

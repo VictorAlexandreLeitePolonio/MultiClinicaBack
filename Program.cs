@@ -132,7 +132,7 @@ builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.IWhatsAppClient, 
     client.Timeout = TimeSpan.FromSeconds(10);
 }).RemoveAllLoggers();
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcessor>();
-builder.Services.AddScoped<MultiClinica.API.Services.Agent.TelegramLinkService>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.WhatsAppLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
 builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
