@@ -70,7 +70,7 @@ public class AbacatePayClientTests
         Assert.Equal("Bearer chave-teste", call.Authorization);
         var body = JsonDocument.Parse(call.Body!).RootElement;
         Assert.Equal("prod_pro_m", body.GetProperty("items")[0].GetProperty("id").GetString());
-        Assert.Equal("clinica:42", body.GetProperty("externalId").GetString());
+        Assert.StartsWith("clinica:42#", body.GetProperty("externalId").GetString());
         Assert.Equal("cust_1", body.GetProperty("customerId").GetString());
         Assert.Equal("https://app.test/configuracoes/plano?checkout=success",
             body.GetProperty("completionUrl").GetString());
@@ -107,7 +107,7 @@ public class AbacatePayClientTests
         Assert.Contains("válido até o fim deste mês", product.GetProperty("name").GetString());
 
         var checkout = JsonDocument.Parse(handler.Calls.Single(c => c.Path == "/v2/checkouts/create").Body!).RootElement;
-        Assert.Equal("clinica:42|pack:pro-conversations-200", checkout.GetProperty("externalId").GetString());
+        Assert.StartsWith("clinica:42|pack:pro-conversations-200#", checkout.GetProperty("externalId").GetString());
         Assert.Equal("prod_dyn", checkout.GetProperty("items")[0].GetProperty("id").GetString());
         Assert.Equal("cust_1", checkout.GetProperty("customerId").GetString());
     }
@@ -316,6 +316,41 @@ public class AbacatePayClientTests
         Assert.Null(parsed.SubscriptionId);
         Assert.Equal("cust_3", parsed.CustomerId);
         Assert.Equal("prod_pack", parsed.ProductId);
+    }
+
+    [Fact]
+    public async Task Cada_checkout_tem_externalId_unico()
+    {
+        // O AbacatePay deduplica por externalId: repetir "clinica:42" devolvia o checkout antigo (outro plano).
+        var (client, handler) = Build(SuccessHandler());
+        var customer = new AbacateCustomer("Clínica Teste", "admin@teste.com", null, null, "cust_1");
+
+        await client.CreateSubscriptionCheckoutAsync("prod_pro_m", 42, customer);
+        await client.CreateSubscriptionCheckoutAsync("prod_prem_a", 42, customer);
+
+        var ids = handler.Calls.Where(c => c.Path == "/v2/subscriptions/create")
+            .Select(c => JsonDocument.Parse(c.Body!).RootElement.GetProperty("externalId").GetString())
+            .ToList();
+        Assert.Equal(2, ids.Distinct().Count());
+    }
+
+    [Theory]
+    [InlineData("clinica:42#a1b2c3", 42, null)]
+    [InlineData("clinica:42|pack:pro-conversations-200#a1b2c3", 42, "pack:pro-conversations-200")]
+    [InlineData("clinica:42|extra-professional#a1b2c3", 42, "extra-professional")]
+    [InlineData("clinica:42", 42, null)]
+    public void Parse_ignora_o_sufixo_unico_da_referencia(string externalId, int clinicaId, string? item)
+    {
+        var payload = $$"""
+            { "id": "log_9", "event": "checkout.completed",
+              "data": { "checkout": { "id": "bill_9", "externalId": "{{externalId}}", "status": "PAID", "customerId": "cust_9" } } }
+            """;
+
+        var parsed = AbacateWebhook.Parse(payload);
+
+        Assert.NotNull(parsed);
+        Assert.Equal(clinicaId, parsed.ClinicaId);
+        Assert.Equal(item, parsed.Item);
     }
 
     [Fact]

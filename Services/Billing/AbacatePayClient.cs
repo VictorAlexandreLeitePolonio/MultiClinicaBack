@@ -63,7 +63,9 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
     {
         var body = new Dictionary<string, object?>
         {
-            ["externalId"] = externalId,
+            // O AbacatePay deduplica pelo externalId: sem o sufixo único, uma nova tentativa
+            // devolvia o checkout antigo (outro plano). O webhook descarta o que vem após '#'.
+            ["externalId"] = $"{externalId}#{Guid.NewGuid():N}",
             ["customerId"] = customerId,
             ["metadata"] = new Dictionary<string, string>
             {

@@ -92,6 +92,8 @@ public static class AbacateWebhook
             return (null, null);
 
         var rest = reference[ClinicPrefix.Length..];
+        var nonce = rest.IndexOf('#');
+        if (nonce >= 0) rest = rest[..nonce];
         var separator = rest.IndexOf('|');
         var idPart = separator >= 0 ? rest[..separator] : rest;
         var item = separator >= 0 ? rest[(separator + 1)..] : null;
