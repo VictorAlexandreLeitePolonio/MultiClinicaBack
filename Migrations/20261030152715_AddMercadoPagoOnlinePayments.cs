@@ -69,33 +69,34 @@ namespace MultiClinica.API.Migrations
                 type: "integer",
                 nullable: true);
 
+            // Clínicas existentes começam aceitando Pix, crédito à vista e débito (mesmo padrão do modelo).
             migrationBuilder.AddColumn<bool>(
                 name: "OnlineAcceptCredit",
                 table: "Clinicas",
                 type: "boolean",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: true);
 
             migrationBuilder.AddColumn<bool>(
                 name: "OnlineAcceptDebit",
                 table: "Clinicas",
                 type: "boolean",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: true);
 
             migrationBuilder.AddColumn<bool>(
                 name: "OnlineAcceptPix",
                 table: "Clinicas",
                 type: "boolean",
                 nullable: false,
-                defaultValue: false);
+                defaultValue: true);
 
             migrationBuilder.AddColumn<int>(
                 name: "OnlineMaxInstallments",
                 table: "Clinicas",
                 type: "integer",
                 nullable: false,
-                defaultValue: 0);
+                defaultValue: 1);
 
             migrationBuilder.CreateTable(
                 name: "ClinicMercadoPagoAccounts",
