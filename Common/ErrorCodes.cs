@@ -34,4 +34,17 @@ public static class ErrorCodes
     public const string ProfessionalLimit  = "PROFESSIONAL_LIMIT";
     public const string InvalidSignature   = "INVALID_SIGNATURE";
     public const string InvalidToken       = "INVALID_TOKEN";
+
+    // ── Pagamento online (Mercado Pago) ─────────────────────────────────────
+    public const string MercadoPagoNotConnected = "MERCADOPAGO_NOT_CONNECTED";
+    public const string MercadoPagoPaymentFailed = "MERCADOPAGO_PAYMENT_FAILED";
+    public const string MercadoPagoRefundFailed = "MERCADOPAGO_REFUND_FAILED";
+    public const string PaymentNotPending    = "PAYMENT_NOT_PENDING";
+    public const string PaymentInProgress    = "PAYMENT_IN_PROGRESS";
+    public const string PaymentMethodNotAllowed = "PAYMENT_METHOD_NOT_ALLOWED";
+    public const string InstallmentsNotAllowed = "INSTALLMENTS_NOT_ALLOWED";
+    public const string PatientEmailRequired = "PATIENT_EMAIL_REQUIRED";
+    public const string PaymentHasPendingOnlinePayment = "PAYMENT_HAS_PENDING_ONLINE_PAYMENT";
+    public const string PaymentPaidOnline    = "PAYMENT_PAID_ONLINE";
+    public const string PaymentNotRefundable = "PAYMENT_NOT_REFUNDABLE";
 }
