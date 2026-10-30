@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Data;
@@ -12,6 +13,7 @@ using MultiClinica.API.Models;
 using MultiClinica.API.Services;
 using MultiClinica.API.Repositories;
 using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Billing;
 using MultiClinica.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -124,6 +126,13 @@ builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcesso
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.TelegramLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
+builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
+builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<AbacatePayOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.DefaultRequestHeaders.Authorization = new("Bearer", options.ApiKey);
+});
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
 builder.Services.AddScoped<IEvolutionService, EvolutionService>();
