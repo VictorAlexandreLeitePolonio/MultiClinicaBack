@@ -15,12 +15,15 @@ public class UserInvitationService(
     IUsuarioLogadoService currentUser,
     IEmailSender emailSender,
     IConfiguration configuration,
-    ILogger<UserInvitationService> logger)
+    ILogger<UserInvitationService> logger,
+    ClinicPlanService clinicPlans)
 {
     public async Task<Result<UserInvitationResponseDto>> InviteAsync(InviteUserDto dto)
     {
         if (dto.Role is not (UserRole.Profissional or UserRole.Recepcao))
             return Result<UserInvitationResponseDto>.Fail(ErrorCodes.Forbidden, "Convide um profissional ou recepcionista.");
+        if (dto.Role == UserRole.Profissional && !await clinicPlans.CanAddProfessionalAsync(currentUser.ClinicaId))
+            return Result<UserInvitationResponseDto>.Fail(ErrorCodes.ProfessionalLimit, "Limite de profissionais do plano atingido.");
         var email = dto.Email.Trim().ToLowerInvariant();
         if (await db.Users.AnyAsync(user => user.Email == email))
             return Result<UserInvitationResponseDto>.Fail(ErrorCodes.DuplicateEmail, "E-mail já cadastrado. Reenvie o convite pela lista de usuários.");

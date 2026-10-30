@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using MultiClinica.API.Common;
 using MultiClinica.API.Data;
 using MultiClinica.API.Models;
 
@@ -70,6 +71,7 @@ public sealed class AgentInboxProcessor(IServiceScopeFactory scopes, ILogger<Age
         var owner = await db.Users.Include(u => u.Clinica).FirstOrDefaultAsync(u => u.Id == conversation.UserId, ct);
         if (owner is null || !owner.IsActive || owner.IsDeleted || owner.Role != UserRole.Administrador
             || owner.TelegramChatId != chatId || !owner.Clinica.IsActive || owner.Clinica.IsBlockedByBilling
+            || !PlanMatrix.Has(owner.Clinica.Plan, Features.OwnerCopilot)
             || owner.Clinica.IsDeleted)
         {
             await SetStatusAsync(db, batch, AgentMessageStatus.Failed, ct);
