@@ -312,7 +312,7 @@ public class OnlinePaymentTests
     }
 
     [Fact]
-    public async Task Pay_accepts_debit_and_credit_with_installments_up_to_the_limit()
+    public async Task Pay_accepts_credit_with_installments_up_to_the_limit()
     {
         var fake = new FakeMercadoPagoClient();
         await using var app = MercadoPagoTestSupport.CreateApp(fake);
