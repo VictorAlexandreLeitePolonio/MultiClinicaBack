@@ -25,12 +25,9 @@ public class User : AuditableEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string? InvitationTokenHash { get; set; }
     public DateTime? InvitationExpiresAt { get; set; }
-    public long? TelegramChatId { get; set; }
-    // ponytail: sem índice (resgate do vínculo é raro); indexar se a busca por hash ficar frequente.
-    public string? TelegramLinkCodeHash { get; set; }
-    public DateTime? TelegramLinkExpiresAt { get; set; }
     // Número do dono como a Meta envia no webhook (dígitos com DDI). Só o vínculo grava.
     public string? WhatsAppPhone { get; set; }
+    // ponytail: sem índice (resgate do vínculo é raro); indexar se a busca por hash ficar frequente.
     public string? WhatsAppLinkCodeHash { get; set; }
     public DateTime? WhatsAppLinkExpiresAt { get; set; }
     public UserRole Role { get; set; } = UserRole.Profissional;

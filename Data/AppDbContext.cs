@@ -501,10 +501,7 @@ public class AppDbContext : DbContext
             .HasForeignKey(l => l.ClinicaId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // ── Agente IA (Telegram) ─────────────────────────────────────────────
-        modelBuilder.Entity<User>()
-            .HasIndex(u => u.TelegramChatId)
-            .IsUnique();
+        // ── Agente IA (WhatsApp) ─────────────────────────────────────────────
         modelBuilder.Entity<User>()
             .HasIndex(u => u.WhatsAppPhone)
             .IsUnique();

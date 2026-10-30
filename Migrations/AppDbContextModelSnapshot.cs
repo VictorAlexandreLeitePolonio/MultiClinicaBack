@@ -2120,20 +2120,20 @@ namespace MultiClinica.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<long?>("TelegramChatId")
-                        .HasColumnType("bigint");
-
-                    b.Property<string>("TelegramLinkCodeHash")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("TelegramLinkExpiresAt")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int?>("UpdatedByUserId")
                         .HasColumnType("integer");
+
+                    b.Property<string>("WhatsAppLinkCodeHash")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("WhatsAppLinkExpiresAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("WhatsAppPhone")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -2142,7 +2142,7 @@ namespace MultiClinica.API.Migrations
                     b.HasIndex("Email")
                         .IsUnique();
 
-                    b.HasIndex("TelegramChatId")
+                    b.HasIndex("WhatsAppPhone")
                         .IsUnique();
 
                     b.ToTable("Users");

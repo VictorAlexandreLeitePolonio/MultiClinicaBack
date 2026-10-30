@@ -117,13 +117,6 @@ builder.Services.Configure<MultiClinica.API.Services.Agent.AgentOptions>(builder
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.IChatModel, MultiClinica.API.Services.Agent.OpenAiChatModel>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.OwnerAgentTools>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentRunner>();
-builder.Services.Configure<MultiClinica.API.Services.Agent.TelegramOptions>(builder.Configuration.GetSection("Telegram"));
-// O token vai na URL (bot{token}/sendMessage): sem loggers, o HttpClient não o registra em nenhum nível.
-builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.ITelegramClient, MultiClinica.API.Services.Agent.TelegramClient>(client =>
-{
-    client.BaseAddress = new Uri("https://api.telegram.org/");
-    client.Timeout = TimeSpan.FromSeconds(10);
-}).RemoveAllLoggers();
 builder.Services.Configure<MultiClinica.API.Services.Agent.WhatsAppOptions>(builder.Configuration.GetSection("WhatsApp"));
 // O token vai no header Authorization: sem loggers, o HttpClient não o registra.
 builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.IWhatsAppClient, MultiClinica.API.Services.Agent.WhatsAppClient>((sp, client) =>

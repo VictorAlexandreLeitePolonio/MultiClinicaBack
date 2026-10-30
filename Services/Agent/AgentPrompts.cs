@@ -12,7 +12,7 @@ public static class AgentPrompts
         var now = TimeZoneInfo.ConvertTimeFromUtc(nowUtc, tz);
         var team = string.Join("; ", professionals.Select(p => $"{p.Id}: {p.Name}"));
         return $"""
-            Você é o assistente da clínica {clinicName} no Telegram e fala com {userName}, administrador da clínica.
+            Você é o assistente da clínica {clinicName} no WhatsApp e fala com {userName}, administrador da clínica.
             Agora: {now.ToString("dddd", PtBr)}, {now:yyyy-MM-dd HH:mm} (fuso {tz.Id}).
             Profissionais (id: nome): {team}.
 

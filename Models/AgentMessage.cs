@@ -13,7 +13,7 @@ public class AgentMessage : AuditableEntity
     public string? Content { get; set; }
     public string? ToolCallsJson { get; set; }
     public string? ToolCallId { get; set; }
-    // Id da mensagem de ENTRADA do webhook (ex.: "chatId:messageId" no Telegram); mensagens de saída não usam este campo.
+    // Id da mensagem de ENTRADA do webhook (ex.: o wamid no WhatsApp); mensagens de saída não usam este campo.
     public string? ExternalMessageId { get; set; }
     public AgentMessageStatus? Status { get; set; }
     public int Attempts { get; set; }

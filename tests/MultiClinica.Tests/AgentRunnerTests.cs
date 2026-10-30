@@ -25,15 +25,15 @@ public class AgentRunnerTests
                 s.Configure<AgentOptions>(o => { o.Model = "modelo-teste"; o.MaxToolIterations = 3; o.HistoryHours = historyHours; });
             },
         };
-        var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, telegramChatId: 555);
+        var (clinicId, adminId) = await AgentSeed.ClinicWithAdminAsync(app, whatsAppPhone: "5511955555555");
         var conversationId = 0;
         await app.SeedAsync(async db =>
         {
             db.Patients.Add(new Patient { ClinicaId = clinicId, Name = "Maria Aparecida" });
-            var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
-                Profile = AgentProfile.Owner, ExternalChatId = "555", UserId = adminId, LastInboundAt = DateTime.UtcNow };
+            var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.WhatsApp,
+                Profile = AgentProfile.Owner, ExternalChatId = "5511955555555", UserId = adminId, LastInboundAt = DateTime.UtcNow };
             foreach (var text in pending)
-                conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.Telegram, Role = AgentMessageRole.User,
+                conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User,
                     Content = text, Status = AgentMessageStatus.Pending });
             db.AgentConversations.Add(conversation);
             await db.SaveChangesAsync();
@@ -140,7 +140,7 @@ public class AgentRunnerTests
 
         await app.SeedAsync(async db =>
         {
-            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram,
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp,
                 Role = AgentMessageRole.User, Content = "e a próxima?", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
@@ -165,8 +165,8 @@ public class AgentRunnerTests
         await app.SeedAsync(async db =>
         {
             db.AgentMessages.AddRange(
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "velho" },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "velho" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
         model.Reply("ok");
@@ -185,9 +185,9 @@ public class AgentRunnerTests
         {
             var callsJson = JsonSerializer.Serialize(new[] { new AgentToolCall("x", "buscar_paciente", "{}") });
             db.AgentMessages.AddRange(
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
         model.Reply("ok");
@@ -207,9 +207,9 @@ public class AgentRunnerTests
         await app.SeedAsync(async db =>
         {
             db.AgentMessages.AddRange(
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "z" },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "z" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
         model.Reply("ok");
@@ -232,10 +232,10 @@ public class AgentRunnerTests
                 new AgentToolCall("y", "buscar_paciente", "{}"),
             });
             db.AgentMessages.AddRange(
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "x" },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "x" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
         model.Reply("ok");
@@ -255,11 +255,11 @@ public class AgentRunnerTests
         {
             var callsJson = JsonSerializer.Serialize(new[] { new AgentToolCall("x", "buscar_paciente", "{}") });
             db.AgentMessages.AddRange(
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "no meio", Status = AgentMessageStatus.Done },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "x" },
-                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Assistant, ToolCallsJson = callsJson },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "no meio", Status = AgentMessageStatus.Done },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.Tool, Content = "{}", ToolCallId = "x" },
+                new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp, Role = AgentMessageRole.User, Content = "nova", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
         model.Reply("ok");
@@ -282,7 +282,7 @@ public class AgentRunnerTests
         await app.SeedAsync(async db => batchMax = await db.AgentMessages.Where(m => m.ConversationId == conversationId).MaxAsync(m => m.Id));
         await app.SeedAsync(async db =>
         {
-            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram,
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp,
                 Role = AgentMessageRole.User, Content = "chegou depois", Status = AgentMessageStatus.Pending });
             await db.SaveChangesAsync();
         });
@@ -303,7 +303,7 @@ public class AgentRunnerTests
         await using var _ = app;
         await app.SeedAsync(async db =>
         {
-            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.Telegram,
+            db.AgentMessages.Add(new AgentMessage { ConversationId = conversationId, Channel = AgentChannel.WhatsApp,
                 Role = AgentMessageRole.User, Content = "antiga", Status = AgentMessageStatus.Done });
             await db.SaveChangesAsync();
         });
