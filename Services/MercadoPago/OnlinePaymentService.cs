@@ -201,7 +201,9 @@ public sealed class OnlinePaymentService(
             .Include(p => p.Patient)
             .Include(p => p.Plan)
             .Include(p => p.Clinica)
-            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token && !p.IsDeleted, ct);
+            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token
+                && !p.IsDeleted
+                && !p.Clinica.IsDeleted, ct);
 
         if (payment is null)
             return Result<PublicPaymentDto>.Fail(ErrorCodes.NotFound, "Link de pagamento inválido.");
@@ -239,7 +241,9 @@ public sealed class OnlinePaymentService(
             .Include(p => p.Patient)
             .Include(p => p.Plan)
             .Include(p => p.Clinica)
-            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token && !p.IsDeleted, ct);
+            .FirstOrDefaultAsync(p => p.PaymentLinkToken == token
+                && !p.IsDeleted
+                && !p.Clinica.IsDeleted, ct);
 
         if (payment is null)
             return Result<PublicPayResultDto>.Fail(ErrorCodes.NotFound, "Link de pagamento inválido.");
