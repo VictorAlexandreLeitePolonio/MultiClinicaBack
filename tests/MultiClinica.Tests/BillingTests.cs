@@ -33,8 +33,8 @@ public class BillingTests
                 options.WebhookHmacKey = HmacKey;
                 options.Products = new Dictionary<string, string>
                 {
-                    ["Pro:Monthly"] = "prod_pro_m",
-                    ["Premium:Annual"] = "prod_prem_a",
+                    ["Pro_Monthly"] = "prod_pro_m",
+                    ["Premium_Annual"] = "prod_prem_a",
                 };
             });
         },

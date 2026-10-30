@@ -40,17 +40,18 @@ Program.cs does three things in order:
 3. Seeds initial data on first run (2 users, 5 plans, sample patients/appointments/payments)
 
 ### Background Services (`/Services`)
-Three `IHostedService` implementations run hourly:
 - `AppointmentStatusUpdater` — auto-cancels past Scheduled appointments
-- `AppointmentReminderJob` — sends WhatsApp reminders 23–25h before appointments; uses `ReminderSent` flag to prevent duplicate sends
-- `PaymentReminderJob` — sends WhatsApp reminders 23–25h before payment due dates; uses `PaymentReminderSent` flag
+- `PatientEmailOutboxWorker` — sends queued patient e-mails
+- `Agent/AgentWorker` — processes the AI agent inbox (owner copilot)
 
-### WhatsApp Integration
-`WhatsAppService` is a typed `HttpClient` that POSTs to the Evolution API:
-- Endpoint: `POST /message/sendText/{instance}`
-- Payload: `{ "number": "55XXXXXXXXXX", "textMessage": { "text": "..." } }`
-- Normalizes Brazilian phone numbers to always include country code `55`
-- All sends are logged to `WhatsAppLog` table for auditing
+There are no WhatsApp reminders today: the Evolution API integration was removed. Reminders, the patient chatbot and the copilot channel will come back on the official WhatsApp Cloud API (separate spec).
+
+### Platform plans and billing
+- `Common/PlanMatrix.cs` is the single source of plans (Free / Pro / Premium): features, professional limits, monthly quotas, hub rank, prices and packs. Spec: `docs/superpowers/specs/2026-10-30-planos-plataforma-design.md`.
+- `[RequireFeature(Features.X)]` gates endpoints (402 `PLAN_REQUIRED`); the plan is read from the DB, not the JWT. Jobs call `PlanMatrix.Has` directly.
+- `ClinicPlanService` applies plan changes and deactivates professionals above the limit; `UsageService` consumes quotas atomically (`ClinicUsages`).
+- Platform subscription runs on AbacatePay (`Services/Billing`, webhook `POST /api/billing/webhooks/abacatepay`, idempotent via `ProcessedWebhookEvents`). Product ids come from `AbacatePay__Products__<key>` env vars — keys never contain `:`.
+- Existing clinics are founders (`IsFounder`, Premium forever). Self-service signup (`/api/public/signup`) creates Free clinics that only show in the hub after SuperAdmin approval (`IsHubApproved`).
 
 ### Data Model
 
@@ -63,7 +64,6 @@ Three `IHostedService` implementations run hourly:
 | `Plans` | TipoPlano (Mensal/Avulso), TipoSessao, Valor, IsActive | |
 | `MedicalRecord` | PDF contract + image exams stored in `wwwroot/` with GUID names | |
 | `Expense` | ReferenceMonth (YYYY-MM) | Used for monthly P&L balance |
-| `WhatsAppLog` | Phone, Message, Status, PatientId (nullable) | Audit trail |
 
 ### Authorization
 - `[AllowAnonymous]`: `POST /api/auth/login` only

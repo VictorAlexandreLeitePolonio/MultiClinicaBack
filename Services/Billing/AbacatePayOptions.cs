@@ -7,8 +7,14 @@ public sealed class AbacatePayOptions
     public string WebhookSecret { get; set; } = string.Empty;   // vai na query ?webhookSecret=
     public string WebhookHmacKey { get; set; } = string.Empty;  // chave do X-Webhook-Signature (chave pública da doc por padrão)
     public string ReturnUrl { get; set; } = string.Empty;       // front: {FRONTEND_URL}/app/configuracoes/plano?checkout=success
-    // Products["Pro:Monthly"], ["Pro:Annual"], ["Premium:Monthly"], ["Premium:Annual"]
+    // Chaves: "Pro_Monthly", "Premium_Annual", "extra-professional", "pack_<id>".
+    // Sem ':' porque na configuração do .NET ':' vira hierarquia e o id nunca seria lido.
     public Dictionary<string, string> Products { get; set; } = [];
+
+    public static string ProductKey(string name) => name.Replace(':', '_');
+
+    public string? ProductFor(string name)
+        => Products.TryGetValue(ProductKey(name), out var id) && !string.IsNullOrWhiteSpace(id) ? id : null;
 }
 
 public sealed record AbacateCustomer(

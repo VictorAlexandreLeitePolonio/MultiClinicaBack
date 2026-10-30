@@ -100,7 +100,7 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
     private async Task<string> ResolveOneTimeProductAsync(
         string item, string description, decimal amount, CancellationToken ct)
     {
-        if (_options.Products.TryGetValue(item, out var configured) && !string.IsNullOrWhiteSpace(configured))
+        if (_options.ProductFor(item) is { } configured)
             return configured;
 
         // A API v2 só cria checkout a partir de produto cadastrado: a cobrança avulsa vira um produto de uso único.

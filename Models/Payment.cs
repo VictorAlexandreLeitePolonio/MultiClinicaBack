@@ -34,7 +34,7 @@ public class Payment : AuditableEntity
     // Não tem valor padrão pois começa nulo (ainda não foi pago).
     public DateOnly? PaidAt { get; set; }
 
-    // Data de vencimento do pagamento — usada pelo PaymentReminderJob para enviar lembrete 24h antes.
+    // Data de vencimento do pagamento.
     public DateOnly? PaymentDate { get; set; }
 
     public Clinica Clinica { get; set; } = null!;

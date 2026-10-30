@@ -51,8 +51,7 @@ public class BillingService(
                 "Já existe uma assinatura ativa. Use a troca de plano.");
         if (dto.Plan is not (ClinicPlan.Pro or ClinicPlan.Premium))
             return Result<CheckoutUrlDto>.Fail(ErrorCodes.InvalidValue, "Escolha os planos Pro ou Premium.");
-        if (!_options.Products.TryGetValue($"{dto.Plan}:{dto.Cycle}", out var productId)
-            || string.IsNullOrWhiteSpace(productId))
+        if (_options.ProductFor($"{dto.Plan}_{dto.Cycle}") is not { } productId)
             return Result<CheckoutUrlDto>.Fail(ErrorCodes.InvalidValue, "Plano indisponível para assinatura.");
 
         var url = await abacate.CreateSubscriptionCheckoutAsync(
@@ -71,8 +70,7 @@ public class BillingService(
             return Result<bool>.Fail(ErrorCodes.NotFound, "Clínica sem assinatura ativa.");
         if (dto.Plan is not (ClinicPlan.Pro or ClinicPlan.Premium))
             return Result<bool>.Fail(ErrorCodes.InvalidValue, "Escolha os planos Pro ou Premium.");
-        if (!_options.Products.TryGetValue($"{dto.Plan}:{dto.Cycle}", out var productId)
-            || string.IsNullOrWhiteSpace(productId))
+        if (_options.ProductFor($"{dto.Plan}_{dto.Cycle}") is not { } productId)
             return Result<bool>.Fail(ErrorCodes.InvalidValue, "Plano indisponível para assinatura.");
 
         await abacate.ChangeSubscriptionAsync(clinic.AbacateSubscriptionId, productId);
@@ -263,7 +261,7 @@ public class BillingService(
         {
             if (value != productId)
                 continue;
-            var parts = key.Split(':');
+            var parts = key.Split('_');
             if (parts.Length == 2
                 && Enum.TryParse<ClinicPlan>(parts[0], out plan)
                 && Enum.TryParse<BillingCycle>(parts[1], out cycle))
