@@ -505,6 +505,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<User>()
             .HasIndex(u => u.TelegramChatId)
             .IsUnique();
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.WhatsAppPhone)
+            .IsUnique();
 
         modelBuilder.Entity<AgentConversation>(e =>
         {

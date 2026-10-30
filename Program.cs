@@ -124,6 +124,13 @@ builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.ITelegramClient, 
     client.BaseAddress = new Uri("https://api.telegram.org/");
     client.Timeout = TimeSpan.FromSeconds(10);
 }).RemoveAllLoggers();
+builder.Services.Configure<MultiClinica.API.Services.Agent.WhatsAppOptions>(builder.Configuration.GetSection("WhatsApp"));
+// O token vai no header Authorization: sem loggers, o HttpClient não o registra.
+builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.IWhatsAppClient, MultiClinica.API.Services.Agent.WhatsAppClient>((sp, client) =>
+{
+    client.BaseAddress = new Uri(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MultiClinica.API.Services.Agent.WhatsAppOptions>>().Value.GraphBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+}).RemoveAllLoggers();
 builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcessor>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.TelegramLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))

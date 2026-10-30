@@ -5,7 +5,7 @@ namespace MultiClinica.Tests;
 public static class AgentSeed
 {
     public static async Task<(int ClinicId, int AdminId)> ClinicWithAdminAsync(MultiClinicaFactory app,
-        string email = "agent-admin@test.local", long? telegramChatId = null)
+        string email = "agent-admin@test.local", long? telegramChatId = null, string? whatsAppPhone = null)
     {
         var ids = (0, 0);
         await app.SeedAsync(async db =>
@@ -17,7 +17,7 @@ public static class AgentSeed
             await db.SaveChangesAsync();
             var admin = new User { ClinicaId = clinic.Id, Name = "Victor", Email = email,
                 PasswordHash = BCrypt.Net.BCrypt.HashPassword("secret123"), Role = UserRole.Administrador,
-                TelegramChatId = telegramChatId };
+                TelegramChatId = telegramChatId, WhatsAppPhone = whatsAppPhone };
             db.Users.Add(admin);
             await db.SaveChangesAsync();
             ids = (clinic.Id, admin.Id);
@@ -69,6 +69,19 @@ public sealed class FakeTelegramClient : MultiClinica.API.Services.Agent.ITelegr
     public Task SendMessageAsync(long chatId, string text, CancellationToken ct)
     {
         Sent.Add((chatId, text));
+        return Task.CompletedTask;
+    }
+}
+
+public sealed class FakeWhatsAppClient : MultiClinica.API.Services.Agent.IWhatsAppClient
+{
+    public List<(string To, string Text)> Sent { get; } = [];
+    public bool Fail { get; set; }
+
+    public Task SendTextAsync(string to, string text, CancellationToken ct)
+    {
+        if (Fail) throw new HttpRequestException("WhatsApp fora do ar");
+        Sent.Add((to, text));
         return Task.CompletedTask;
     }
 }
