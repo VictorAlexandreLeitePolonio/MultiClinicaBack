@@ -94,32 +94,6 @@ public class FinancialBalanceTests
                 Status = PaymentStatus.Paid,
                 PaidAt = DateOnly.FromDateTime(monthStart.AddDays(1))
             });
-
-            var produto = new Produto
-            {
-                ClinicaId = clinica.Id,
-                Nome = "Creme",
-                ValorCompra = 10,
-                ValorVenda = 25,
-                QuantidadeAtual = 1,
-                QuantidadeMinima = 5
-            };
-            db.Produtos.Add(produto);
-            await db.SaveChangesAsync();
-
-            db.MovimentacoesEstoque.Add(new MovimentacaoEstoque
-            {
-                ClinicaId = clinica.Id,
-                ProdutoId = produto.Id,
-                Tipo = TipoMovimentacaoEstoque.Venda,
-                Quantidade = 1,
-                QuantidadeAnterior = 2,
-                QuantidadeAtual = 1,
-                UnitValue = 25,
-                TotalValue = 25,
-                UsuarioId = admin.Id,
-                CreatedAt = monthStart.AddDays(2)
-            });
             await db.SaveChangesAsync();
         });
 
@@ -133,10 +107,8 @@ public class FinancialBalanceTests
         Assert.Equal(1, balance!.Patients.Active);
         Assert.Equal(1, balance.Appointments.Completed);
         Assert.Equal(150, balance.Money.AppointmentIncome);
-        Assert.Equal(25, balance.Money.ProductSalesIncome);
-        Assert.Equal(175, balance.Money.TotalIncome);
-        Assert.Equal(1, balance.Stock.ProductsBelowMinimum);
-        Assert.Single(balance.Stock.LowStockProducts);
+        Assert.Equal(150, balance.Money.TotalIncome);
+        Assert.Equal(1, balance.Money.PaidAppointmentCount);
         Assert.NotEmpty(balance.RecentMovements);
     }
 
@@ -254,84 +226,6 @@ public class FinancialBalanceTests
 
         Assert.Equal(150, balance!.Money.AppointmentIncome);
         Assert.Equal(1, balance.Money.PaidAppointmentCount);
-    }
-
-    [Fact]
-    public async Task GetBalance_WithProductSales_ReturnsProductSalesIncome()
-    {
-        await using var app = new MultiClinicaFactory();
-        var (clinica, admin, _) = await SeedClinicaAsync(app, "Clinica Vendas", "admin.balance6@a.local");
-
-        int produtoId = 0;
-        await app.SeedAsync(async db =>
-        {
-            var produto = new Produto
-            {
-                ClinicaId = clinica.Id, Nome = "Produto Venda", ValorCompra = 10, ValorVenda = 40,
-                QuantidadeAtual = 5, QuantidadeMinima = 1
-            };
-            db.Produtos.Add(produto);
-            await db.SaveChangesAsync();
-            produtoId = produto.Id;
-        });
-
-        using var client = app.CreateClient();
-        await LoginAsync(client, "admin.balance6@a.local");
-
-        var saleResponse = await client.PostAsJsonAsync("/api/stock/movements/sale",
-            new { ProductId = produtoId, Quantity = 3 });
-        Assert.Equal(HttpStatusCode.Created, saleResponse.StatusCode);
-
-        var response = await client.GetAsync("/api/financial/balance");
-        var balance = await response.Content.ReadFromJsonAsync<FinancialBalanceDto>();
-
-        Assert.Equal(120, balance!.Money.ProductSalesIncome);
-        Assert.Equal(1, balance.Money.ProductSaleCount);
-    }
-
-    [Fact]
-    public async Task GetBalance_WithStockCosts_ReturnsOutcome()
-    {
-        await using var app = new MultiClinicaFactory();
-        var (clinica, admin, _) = await SeedClinicaAsync(app, "Clinica Custos", "admin.balance7@a.local");
-        var now = DateTime.UtcNow;
-
-        await app.SeedAsync(async db =>
-        {
-            var produto = new Produto
-            {
-                ClinicaId = clinica.Id, Nome = "Produto Custo", ValorCompra = 10, ValorVenda = 20,
-                QuantidadeAtual = 10, QuantidadeMinima = 1
-            };
-            db.Produtos.Add(produto);
-            await db.SaveChangesAsync();
-
-            db.MovimentacoesEstoque.AddRange(
-                new MovimentacaoEstoque
-                {
-                    ClinicaId = clinica.Id, ProdutoId = produto.Id, Tipo = TipoMovimentacaoEstoque.Compra,
-                    Quantidade = 5, QuantidadeAnterior = 5, QuantidadeAtual = 10, UnitValue = 10, TotalValue = 50,
-                    UsuarioId = admin.Id, CreatedAt = now
-                },
-                new MovimentacaoEstoque
-                {
-                    ClinicaId = clinica.Id, ProdutoId = produto.Id, Tipo = TipoMovimentacaoEstoque.Perda,
-                    Quantidade = 1, QuantidadeAnterior = 10, QuantidadeAtual = 9, UnitValue = 10, TotalValue = 10,
-                    UsuarioId = admin.Id, CreatedAt = now
-                });
-            await db.SaveChangesAsync();
-        });
-
-        using var client = app.CreateClient();
-        await LoginAsync(client, "admin.balance7@a.local");
-
-        var response = await client.GetAsync("/api/financial/balance");
-        var balance = await response.Content.ReadFromJsonAsync<FinancialBalanceDto>();
-
-        Assert.Equal(50, balance!.Money.ProductPurchaseCost);
-        Assert.Equal(10, balance.Money.ProductLossCost);
-        Assert.Equal(60, balance.Money.TotalOutcome);
-        Assert.Equal(-60, balance.Money.EstimatedProfit);
     }
 
     [Fact]

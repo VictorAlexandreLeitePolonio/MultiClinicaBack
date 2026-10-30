@@ -20,9 +20,6 @@ public static class PermissionMatrix
 
         var recepcao = new HashSet<string>
         {
-            Permissions.Produtos.Visualizar,
-            Permissions.Produtos.VisualizarPrecoVenda,
-            Permissions.Estoque.MovimentacoesVisualizar,
             Permissions.ClinicSettings.View,
         };
 

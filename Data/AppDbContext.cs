@@ -25,13 +25,6 @@ public class AppDbContext : DbContext
     public DbSet<ProfessionalAvailability> ProfessionalAvailabilities { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<SessionType> SessionTypes { get; set; } = null!;
-    public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
-    public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
-    public DbSet<CategoriaProduto> CategoriasProduto { get; set; } = null!;
-    public DbSet<Produto> Produtos { get; set; } = null!;
-    public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
-    public DbSet<Compra> Compras { get; set; } = null!;
-    public DbSet<CompraItem> ComprasItens { get; set; } = null!;
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
@@ -172,33 +165,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(p => p.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<Fornecedor>()
-            .HasOne(f => f.Clinica)
-            .WithMany()
-            .HasForeignKey(f => f.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Fornecedor>().HasIndex(f => f.ClinicaId);
-
         modelBuilder.Entity<ClinicExpense>()
             .HasOne(e => e.Clinica)
             .WithMany()
             .HasForeignKey(e => e.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<ClinicExpense>().HasIndex(e => e.ClinicaId);
-
-        modelBuilder.Entity<AuditoriaFinanceira>()
-            .HasOne(a => a.Clinica)
-            .WithMany()
-            .HasForeignKey(a => a.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<AuditoriaFinanceira>().HasIndex(a => a.ClinicaId);
-
-        modelBuilder.Entity<CategoriaProduto>()
-            .HasOne(c => c.Clinica)
-            .WithMany()
-            .HasForeignKey(c => c.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<CategoriaProduto>().HasIndex(c => c.ClinicaId);
 
         modelBuilder.Entity<SessionType>()
             .Property(item => item.Name)
@@ -214,61 +186,6 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(plan => plan.TipoSessaoId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Produto>()
-            .HasOne(p => p.Clinica)
-            .WithMany()
-            .HasForeignKey(p => p.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Produto>()
-            .HasOne(p => p.CategoriaProduto)
-            .WithMany()
-            .HasForeignKey(p => p.CategoriaProdutoId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Produto>().HasIndex(p => p.ClinicaId);
-
-        modelBuilder.Entity<MovimentacaoEstoque>()
-            .Property(m => m.Tipo)
-            .HasConversion<string>();
-        modelBuilder.Entity<MovimentacaoEstoque>()
-            .HasOne(m => m.Clinica)
-            .WithMany()
-            .HasForeignKey(m => m.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<MovimentacaoEstoque>()
-            .HasOne(m => m.Produto)
-            .WithMany()
-            .HasForeignKey(m => m.ProdutoId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ClinicaId);
-        modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ProdutoId);
-
-        modelBuilder.Entity<Compra>()
-            .Property(c => c.Status)
-            .HasConversion<string>();
-        modelBuilder.Entity<Compra>()
-            .HasOne(c => c.Clinica)
-            .WithMany()
-            .HasForeignKey(c => c.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Compra>()
-            .HasOne(c => c.Fornecedor)
-            .WithMany()
-            .HasForeignKey(c => c.FornecedorId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Compra>().HasIndex(c => c.ClinicaId);
-
-        modelBuilder.Entity<CompraItem>()
-            .HasOne(i => i.Compra)
-            .WithMany(c => c.Itens)
-            .HasForeignKey(i => i.CompraId)
-            .OnDelete(DeleteBehavior.Cascade);
-        modelBuilder.Entity<CompraItem>()
-            .HasOne(i => i.Produto)
-            .WithMany()
-            .HasForeignKey(i => i.ProdutoId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<CompraItem>().HasIndex(i => i.CompraId);
 
         modelBuilder.Entity<Patient>()
             .HasMany(p => p.Appointments)

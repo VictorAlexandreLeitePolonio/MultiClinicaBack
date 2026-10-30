@@ -42,10 +42,8 @@ public class MeEndpointTests
             .EnumerateArray()
             .Select(e => e.GetString())
             .ToList();
-        Assert.Contains("estoque.movimentacoes.visualizar", perms);
-        Assert.Contains("estoque.produtos.visualizar", perms);
         Assert.Contains("clinic.settings.view", perms);
-        Assert.DoesNotContain("compras.aprovar", perms);
-        Assert.Equal(4, perms.Count);
+        Assert.DoesNotContain("clinic.settings.update", perms);
+        Assert.Single(perms);
     }
 }

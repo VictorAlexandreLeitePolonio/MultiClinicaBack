@@ -28,7 +28,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_RecepcaoSemPermissao_Retorna403()
     {
-        var attr = new RequirePermissionAttribute(Permissions.Compras.Aprovar);
+        var attr = new RequirePermissionAttribute(Permissions.ClinicSettings.Update);
         var ctx = ContextFor("Recepcao");
 
         attr.OnAuthorization(ctx);
@@ -40,7 +40,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_RecepcaoComPermissao_NaoBloqueia()
     {
-        var attr = new RequirePermissionAttribute(Permissions.Estoque.MovimentacoesVisualizar);
+        var attr = new RequirePermissionAttribute(Permissions.ClinicSettings.View);
         var ctx = ContextFor("Recepcao");
 
         attr.OnAuthorization(ctx);
@@ -51,7 +51,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_SemClaimRole_Retorna403()
     {
-        var attr = new RequirePermissionAttribute(Permissions.Compras.Aprovar);
+        var attr = new RequirePermissionAttribute(Permissions.ClinicSettings.Update);
         var ctx = ContextFor(null);
 
         attr.OnAuthorization(ctx);
@@ -63,7 +63,7 @@ public class RequirePermissionAttributeTests
     [Fact]
     public void OnAuthorization_SuperAdmin_NaoBloqueia()
     {
-        var attr = new RequirePermissionAttribute(Permissions.Compras.Aprovar);
+        var attr = new RequirePermissionAttribute(Permissions.ClinicSettings.Update);
         var ctx = ContextFor("SuperAdmin");
 
         attr.OnAuthorization(ctx);

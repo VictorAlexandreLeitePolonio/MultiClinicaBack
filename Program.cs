@@ -49,20 +49,6 @@ builder.Services.AddScoped<IClinicExpenseRepository, ClinicExpenseRepository>();
 builder.Services.AddScoped<IClinicExpenseService, ClinicExpenseService>();
 builder.Services.AddScoped<IClinicSettingsService, ClinicSettingsService>();
 
-// Estoque/Compras — Repository e Service
-builder.Services.AddScoped<IFornecedorRepository, FornecedorRepository>();
-builder.Services.AddScoped<IFornecedorService, FornecedorService>();
-builder.Services.AddScoped<IAuditoriaFinanceiraRepository, AuditoriaFinanceiraRepository>();
-builder.Services.AddScoped<IAuditoriaFinanceiraService, AuditoriaFinanceiraService>();
-builder.Services.AddScoped<CategoriaProdutoRepository>();
-builder.Services.AddScoped<CategoriaProdutoService>();
-builder.Services.AddScoped<ProdutoRepository>();
-builder.Services.AddScoped<ProdutoService>();
-builder.Services.AddScoped<MovimentacaoEstoqueRepository>();
-builder.Services.AddScoped<MovimentacaoEstoqueService>();
-builder.Services.AddScoped<CompraRepository>();
-builder.Services.AddScoped<CompraService>();
-
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
 builder.Services.AddScoped<IPatientService, PatientService>();
