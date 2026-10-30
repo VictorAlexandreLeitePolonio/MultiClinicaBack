@@ -139,6 +139,34 @@ public class AbacatePayClientTests
     }
 
     [Fact]
+    public async Task Assinatura_pede_so_cartao_por_padrao()
+    {
+        // Pix Automático precisa ser liberado na loja; pedir PIX sem isso faz o AbacatePay responder 400.
+        var (client, handler) = Build(SuccessHandler());
+
+        await client.CreateSubscriptionCheckoutAsync(
+            "prod_pro_m", 42, new AbacateCustomer("Clínica Teste", "admin@teste.com", null, null, "cust_1"));
+
+        var body = JsonDocument.Parse(handler.Calls.Single(c => c.Path == "/v2/subscriptions/create").Body!).RootElement;
+        Assert.Equal(["CARD"], body.GetProperty("methods").EnumerateArray().Select(m => m.GetString()));
+    }
+
+    [Fact]
+    public async Task Erro_da_AbacatePay_aparece_na_excecao()
+    {
+        var handler = new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.BadRequest)
+        {
+            Content = new StringContent("""{"success":false,"data":null,"error":"PIX Automático is not available for this store"}"""),
+        });
+        var (client, _) = Build(handler);
+
+        var error = await Assert.ThrowsAsync<HttpRequestException>(() => client.CreateSubscriptionCheckoutAsync(
+            "prod_pro_m", 42, new AbacateCustomer("Clínica Teste", "admin@teste.com", null, null, "cust_1")));
+
+        Assert.Contains("PIX Automático is not available for this store", error.Message);
+    }
+
+    [Fact]
     public async Task Resposta_nao_2xx_lanca_HttpRequestException()
     {
         var handler = new FakeHandler(_ => new HttpResponseMessage(HttpStatusCode.InternalServerError)

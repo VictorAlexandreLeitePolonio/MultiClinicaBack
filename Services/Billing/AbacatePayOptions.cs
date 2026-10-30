@@ -10,6 +10,11 @@ public sealed class AbacatePayOptions
     // Chaves: "Pro_Monthly", "Premium_Annual", "extra-professional", "pack_<id>".
     // Sem ':' porque na configuração do .NET ':' vira hierarquia e o id nunca seria lido.
     public Dictionary<string, string> Products { get; set; } = [];
+    // Pix Automático só depois de liberado na loja do AbacatePay; aí configure ["CARD", "PIX"].
+    // Vazio por padrão: com default no array, o binder do .NET acrescentaria em vez de substituir.
+    public string[] SubscriptionMethods { get; set; } = [];
+
+    public string[] EffectiveSubscriptionMethods => SubscriptionMethods.Length > 0 ? SubscriptionMethods : ["CARD"];
 
     public static string ProductKey(string name) => name.Replace(':', '_');
 

@@ -26,7 +26,7 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
         var customerId = await ResolveCustomerIdAsync(customer, ct);
         var body = CheckoutBody(clinicaId, $"clinica:{clinicaId}", customerId);
         body["items"] = new[] { new { id = productId, quantity = 1 } };
-        body["methods"] = new[] { "CARD", "PIX" };
+        body["methods"] = _options.EffectiveSubscriptionMethods;
 
         using var response = await http.PostAsJsonAsync("v2/subscriptions/create", body, ct);
         return await ReadUrlAsync(response, ct);
@@ -49,14 +49,14 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
     {
         using var response = await http.PostAsJsonAsync("v2/subscriptions/change-plan",
             new { id = subscriptionId, productId, quantity = 1 }, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
     }
 
     public async Task CancelSubscriptionAsync(string subscriptionId, CancellationToken ct = default)
     {
         using var response = await http.PostAsJsonAsync("v2/subscriptions/cancel",
             new { id = subscriptionId }, ct);
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
     }
 
     private Dictionary<string, object?> CheckoutBody(int clinicaId, string externalId, string customerId)
@@ -121,7 +121,7 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
 
     private static async Task<string> ReadUrlAsync(HttpResponseMessage response, CancellationToken ct)
     {
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         var data = await ReadDataAsync(response, ct);
 
         if (data.TryGetProperty("url", out var url) && url.ValueKind == JsonValueKind.String)
@@ -133,13 +133,22 @@ public sealed class AbacatePayClient(HttpClient http, IOptions<AbacatePayOptions
     private static async Task<string> ReadDataIdAsync(
         HttpResponseMessage response, string resource, CancellationToken ct)
     {
-        response.EnsureSuccessStatusCode();
+        await EnsureSuccessAsync(response, ct);
         var data = await ReadDataAsync(response, ct);
 
         if (data.TryGetProperty("id", out var id) && id.ValueKind == JsonValueKind.String)
             return id.GetString()!;
 
         throw new InvalidOperationException($"Resposta da AbacatePay sem id de {resource}.");
+    }
+
+    // Mantém a mensagem do AbacatePay no erro: sem ela o log só mostra "400 (Bad Request)".
+    private static async Task EnsureSuccessAsync(HttpResponseMessage response, CancellationToken ct)
+    {
+        if (response.IsSuccessStatusCode) return;
+        var body = await response.Content.ReadAsStringAsync(ct);
+        throw new HttpRequestException(
+            $"AbacatePay respondeu {(int)response.StatusCode}: {body}", null, response.StatusCode);
     }
 
     private static async Task<JsonElement> ReadDataAsync(HttpResponseMessage response, CancellationToken ct)

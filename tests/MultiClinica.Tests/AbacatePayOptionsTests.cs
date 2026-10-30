@@ -26,4 +26,18 @@ public class AbacatePayOptionsTests
         Assert.Equal("prod_pack", options.ProductFor("pack:pro-conversations-200"));
         Assert.Null(options.ProductFor("Premium_Annual"));
     }
+
+    [Fact]
+    public void Metodos_da_assinatura_substituem_o_padrao()
+    {
+        Assert.Equal(["CARD"], new AbacatePayOptions().EffectiveSubscriptionMethods);
+
+        var options = Bind(new()
+        {
+            ["AbacatePay:SubscriptionMethods:0"] = "CARD",
+            ["AbacatePay:SubscriptionMethods:1"] = "PIX",
+        });
+
+        Assert.Equal(["CARD", "PIX"], options.EffectiveSubscriptionMethods);
+    }
 }
