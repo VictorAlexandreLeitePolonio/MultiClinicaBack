@@ -19,4 +19,10 @@ public class PaymentResponseDto
     public DateOnly?     PaidAt              { get; set; }
     public DateOnly?     PaymentDate         { get; set; }
     public DateTime      CreatedAt           { get; set; }
+
+    // Pagamento online (Mercado Pago).
+    public bool           PaidOnline     { get; set; }
+    public string?        MpStatus       { get; set; }
+    public string?        OnlineAlert    { get; set; }
+    public bool           HasPaymentLink { get; set; }
 }

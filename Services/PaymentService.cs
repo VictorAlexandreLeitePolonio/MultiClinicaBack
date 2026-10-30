@@ -151,7 +151,11 @@ public class PaymentService(
             Status              = payment.Status,
             PaidAt              = payment.PaidAt,
             PaymentDate         = payment.PaymentDate,
-            CreatedAt           = payment.CreatedAt
+            CreatedAt           = payment.CreatedAt,
+            PaidOnline          = payment.PaidOnline,
+            MpStatus            = payment.MpStatus,
+            OnlineAlert         = payment.OnlineAlert,
+            HasPaymentLink      = payment.PaymentLinkToken is not null
         });
     }
 
@@ -174,6 +178,12 @@ public class PaymentService(
         if (await repository.ExistsAsync(payment.PatientId, dto.ReferenceMonth, id))
             return Result<PaymentResponseDto>.Fail(
                 ErrorCodes.DuplicatePayment, "Já existe um pagamento para este paciente neste mês.");
+
+        // Com um pagamento online em andamento o valor não pode mudar (o plano define o valor).
+        if (dto.PlanId != payment.PlanId && payment.MpStatus is "pending" or "in_process")
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.PaymentHasPendingOnlinePayment,
+                "Não é possível alterar o valor enquanto houver um pagamento online em andamento.");
 
         // Se o plano mudou, atualiza Amount
         if (dto.PlanId != payment.PlanId)
@@ -217,6 +227,11 @@ public class PaymentService(
         if (payment is null)
             return Result<bool>.Fail(ErrorCodes.NotFound, "Pagamento não encontrado.");
 
+        if (payment.PaidOnline)
+            return Result<bool>.Fail(
+                ErrorCodes.PaymentPaidOnline,
+                "Não é possível excluir uma cobrança paga online. Reembolse antes de excluir.");
+
         if (payment.Status == PaymentStatus.Paid)
             return Result<bool>.Fail(
                 ErrorCodes.CannotDelete,
@@ -242,7 +257,11 @@ public class PaymentService(
         Status              = p.Status,
         PaidAt              = p.PaidAt,
         PaymentDate         = p.PaymentDate,
-        CreatedAt           = p.CreatedAt
+        CreatedAt           = p.CreatedAt,
+        PaidOnline          = p.PaidOnline,
+        MpStatus            = p.MpStatus,
+        OnlineAlert         = p.OnlineAlert,
+        HasPaymentLink      = p.PaymentLinkToken is not null
     };
 
     private static bool IsMonthlyDuplicate(DbUpdateException exception)

@@ -13,6 +13,9 @@ public interface IPatientNotificationService
     Task<bool> SendNewLinkNoticeAsync(PatientAccount account, string clinicName);
     Task<bool> SendPasswordResetAsync(PatientAccount account);
 
+    // Cobrança online: destinatário é Patient.Email (o paciente pode não ter conta no portal).
+    Task<bool> SendPaymentChargeAsync(Patient patient, Payment payment, string clinicName, string payUrl);
+
     // ── Solicitações de consulta (BACK-4) ────────────────────────────────────
     Task NotifyRequestCreatedAsync(Clinica clinic, PatientAccount account, AppointmentRequest request);
     Task NotifyRequestAcceptedAsync(PatientAccount account, Clinica clinic, AppointmentRequest request);

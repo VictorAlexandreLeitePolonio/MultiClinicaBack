@@ -28,6 +28,8 @@ public static class MercadoPagoRegistration
     // Trilha B: MercadoPagoPaymentSync, OnlinePaymentService.
     public static IServiceCollection AddMercadoPagoPayments(this IServiceCollection services)
     {
+        services.AddScoped<MercadoPagoPaymentSync>();
+        services.AddScoped<OnlinePaymentService>();
         return services;
     }
 }
