@@ -659,6 +659,30 @@ namespace MultiClinica.API.Migrations
                     b.ToTable("ClinicMedia");
                 });
 
+            modelBuilder.Entity("MultiClinica.API.Models.ClinicUsage", b =>
+                {
+                    b.Property<int>("ClinicaId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Period")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)");
+
+                    b.Property<string>("Metric")
+                        .HasMaxLength(40)
+                        .HasColumnType("character varying(40)");
+
+                    b.Property<int>("ExtraGranted")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("Used")
+                        .HasColumnType("integer");
+
+                    b.HasKey("ClinicaId", "Period", "Metric");
+
+                    b.ToTable("ClinicUsages");
+                });
+
             modelBuilder.Entity("MultiClinica.API.Models.Clinica", b =>
                 {
                     b.Property<int>("Id")
@@ -666,6 +690,12 @@ namespace MultiClinica.API.Migrations
                         .HasColumnType("integer");
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AbacateCustomerId")
+                        .HasColumnType("text");
+
+                    b.Property<string>("AbacateSubscriptionId")
+                        .HasColumnType("text");
 
                     b.Property<string>("AccentColor")
                         .HasColumnType("text");
@@ -688,6 +718,10 @@ namespace MultiClinica.API.Migrations
                     b.Property<DateTime?>("BillingBlockedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<string>("BillingCycle")
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("Cep")
                         .IsRequired()
                         .HasColumnType("text");
@@ -699,9 +733,6 @@ namespace MultiClinica.API.Migrations
                     b.Property<string>("Cnpj")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<bool>("CobrancaAtiva")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("ContactEmail")
                         .HasColumnType("text");
@@ -715,9 +746,6 @@ namespace MultiClinica.API.Migrations
                     b.Property<int?>("CreatedByUserId")
                         .HasColumnType("integer");
 
-                    b.Property<DateOnly?>("DataInicioCobranca")
-                        .HasColumnType("date");
-
                     b.Property<DateTime?>("DeletedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -726,9 +754,6 @@ namespace MultiClinica.API.Migrations
 
                     b.Property<string>("Description")
                         .HasColumnType("text");
-
-                    b.Property<int>("DiaVencimento")
-                        .HasColumnType("integer");
 
                     b.Property<string>("DisplayName")
                         .HasColumnType("text");
@@ -741,6 +766,12 @@ namespace MultiClinica.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<int>("ExtraProfessionals")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime?>("HubApprovedAt")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<bool>("IsActive")
                         .HasColumnType("boolean");
 
@@ -748,6 +779,12 @@ namespace MultiClinica.API.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsFounder")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsHubApproved")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsPublic")
@@ -781,6 +818,11 @@ namespace MultiClinica.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("Plan")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("PrimaryColor")
                         .HasColumnType("text");
 
@@ -809,9 +851,6 @@ namespace MultiClinica.API.Migrations
 
                     b.Property<int?>("UpdatedByUserId")
                         .HasColumnType("integer");
-
-                    b.Property<decimal>("ValorMensalidade")
-                        .HasColumnType("numeric");
 
                     b.HasKey("Id");
 
@@ -1900,6 +1939,22 @@ namespace MultiClinica.API.Migrations
                     b.HasIndex("TipoSessaoId");
 
                     b.ToTable("Plans");
+                });
+
+            modelBuilder.Entity("MultiClinica.API.Models.ProcessedWebhookEvent", b =>
+                {
+                    b.Property<string>("Provider")
+                        .HasColumnType("text");
+
+                    b.Property<string>("EventId")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("ProcessedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.HasKey("Provider", "EventId");
+
+                    b.ToTable("ProcessedWebhookEvents");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.ProfessionalAvailability", b =>

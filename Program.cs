@@ -106,6 +106,7 @@ builder.Services.AddScoped<SessionTypeService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<UserInvitationService>();
+builder.Services.AddScoped<ClinicPlanService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentIdentity>();
 builder.Services.Configure<MultiClinica.API.Services.Agent.AgentOptions>(builder.Configuration.GetSection("Agent"));
@@ -123,7 +124,6 @@ builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcesso
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.TelegramLinkService>();
 if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
-builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
 builder.Services.AddScoped<IEvolutionService, EvolutionService>();
@@ -143,7 +143,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddHostedService<AppointmentStatusUpdater>();
-builder.Services.AddHostedService<ClinicBillingBackgroundJob>();
 if (builder.Configuration.GetValue<bool?>("PatientEmailOutbox:Enabled") ?? !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<PatientEmailOutboxWorker>();
 
@@ -382,8 +381,7 @@ internal static class AppBootstrapper
                     NomeFantasia = "Admin Interno",
                     NomeResponsavel = name.Trim(),
                     Email = email.Trim().ToLowerInvariant(),
-                    IsActive = true,
-                    CobrancaAtiva = false
+                    IsActive = true
                 };
                 db.Clinicas.Add(adminClinic);
                 await db.SaveChangesAsync();

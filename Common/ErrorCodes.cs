@@ -30,4 +30,8 @@ public static class ErrorCodes
     public const string NotLinked          = "NOT_LINKED";
     public const string SlotUnavailable    = "SlotUnavailable";
     public const string ProfessionalUnavailable = "ProfessionalUnavailable";
+    public const string PlanRequired       = "PLAN_REQUIRED";
+    public const string ProfessionalLimit  = "PROFESSIONAL_LIMIT";
+    public const string InvalidSignature   = "INVALID_SIGNATURE";
+    public const string InvalidToken       = "INVALID_TOKEN";
 }

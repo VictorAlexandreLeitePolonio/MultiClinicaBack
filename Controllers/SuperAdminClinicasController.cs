@@ -24,7 +24,9 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
         var activeClinics = await db.Clinicas.CountAsync(c => c.IsActive && !c.IsDeleted);
         var inactiveClinics = await db.Clinicas.CountAsync(c => !c.IsActive && !c.IsDeleted);
         var billingBlocked = await db.Clinicas.CountAsync(c => c.IsBlockedByBilling && !c.IsDeleted);
-        var billingEnabled = await db.Clinicas.CountAsync(c => c.CobrancaAtiva && !c.IsDeleted);
+        var freeClinics = await db.Clinicas.CountAsync(c => c.Plan == ClinicPlan.Free && !c.IsDeleted);
+        var proClinics = await db.Clinicas.CountAsync(c => c.Plan == ClinicPlan.Pro && !c.IsDeleted);
+        var premiumClinics = await db.Clinicas.CountAsync(c => c.Plan == ClinicPlan.Premium && !c.IsDeleted);
         var overdueCharges = await db.ClinicCharges.CountAsync(c =>
             c.Status == ClinicChargeStatus.Pending && c.DueDate < today && !c.IsDeleted);
         var monthlyReceived = await db.ClinicCharges
@@ -54,7 +56,7 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
             activeClinics,
             inactiveClinics,
             billingBlocked,
-            billingEnabled,
+            planCounts = new { free = freeClinics, pro = proClinics, premium = premiumClinics },
             overdueCharges,
             monthlyReceived,
             monthlyPending,
@@ -65,7 +67,6 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
     [HttpGet]
     public async Task<IActionResult> GetClinicas(
         [FromQuery] bool? isActive,
-        [FromQuery] bool? cobrancaAtiva,
         [FromQuery] bool? isBlockedByBilling,
         [FromQuery] bool? overdue,
         [FromQuery] int page = 1,
@@ -75,8 +76,6 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
 
         if (isActive.HasValue)
             query = query.Where(c => c.IsActive == isActive.Value);
-        if (cobrancaAtiva.HasValue)
-            query = query.Where(c => c.CobrancaAtiva == cobrancaAtiva.Value);
         if (isBlockedByBilling.HasValue)
             query = query.Where(c => c.IsBlockedByBilling == isBlockedByBilling.Value);
         if (overdue.HasValue)
@@ -120,7 +119,6 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
         var clinica = new Clinica();
         ApplyClinicaFields(clinica, dto);
         clinica.IsActive = true;
-        clinica.CobrancaAtiva = false;
         clinica.CreatedByUserId = usuario.UserId;
         db.Clinicas.Add(clinica);
         await db.SaveChangesAsync();
@@ -170,25 +168,6 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
             dto.IsActive ? CommercialHistoryEventType.ClinicActivated : CommercialHistoryEventType.ClinicDeactivated,
             string.IsNullOrWhiteSpace(dto.Reason) ? (dto.IsActive ? "Clínica ativada." : "Clínica desativada.") : dto.Reason);
 
-        await db.SaveChangesAsync();
-        return Ok(ToClinicaResponse(clinica));
-    }
-
-    [HttpPut("{id:int}/billing")]
-    public async Task<IActionResult> UpdateBilling(int id, UpdateBillingConfigDto dto)
-    {
-        var clinica = await db.Clinicas.FirstOrDefaultAsync(c => c.Id == id && !c.IsDeleted);
-        if (clinica is null)
-            return NotFound(new { message = "Clínica não encontrada." });
-        if (dto.ValorMensalidade < 0 || dto.DiaVencimento is < 1 or > 28)
-            return BadRequest(new { message = "Configuração de cobrança inválida." });
-
-        clinica.ValorMensalidade = dto.ValorMensalidade;
-        clinica.DiaVencimento = dto.DiaVencimento;
-        clinica.CobrancaAtiva = dto.CobrancaAtiva;
-        clinica.DataInicioCobranca = dto.DataInicioCobranca;
-        clinica.UpdatedByUserId = usuario.UserId;
-        AddHistory(clinica.Id, CommercialHistoryEventType.BillingConfigChanged, "Configuração de cobrança alterada.");
         await db.SaveChangesAsync();
         return Ok(ToClinicaResponse(clinica));
     }
@@ -400,10 +379,9 @@ public class SuperAdminClinicasController(AppDbContext db, IUsuarioLogadoService
         c.Cep,
         c.IsActive,
         c.IsBlockedByBilling,
-        c.ValorMensalidade,
-        c.DiaVencimento,
-        c.CobrancaAtiva,
-        c.DataInicioCobranca,
+        Plan = c.Plan.ToString(),
+        c.IsFounder,
+        c.IsHubApproved,
         c.CreatedAt
     };
 

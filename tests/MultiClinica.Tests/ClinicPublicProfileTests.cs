@@ -133,7 +133,7 @@ public class ClinicPublicProfileTests
             var clinic = new Clinica
             {
                 Nome = "Publica", NomeFantasia = "Publica", NomeResponsavel = "Victor",
-                Cnpj = "12345678000199", ValorMensalidade = 999m, Email = "pub@test.local",
+                Cnpj = "12345678000199", Email = "pub@test.local",
                 IsPublic = true, IsActive = true, PublicSlug = "publica", AcceptsAppointmentRequests = true
             };
             db.Clinicas.Add(clinic);

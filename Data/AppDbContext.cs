@@ -36,11 +36,19 @@ public class AppDbContext : DbContext
     public DbSet<ClinicExpense> ClinicExpenses { get; set; } = null!;
     public DbSet<AgentConversation> AgentConversations { get; set; } = null!;
     public DbSet<AgentMessage> AgentMessages { get; set; } = null!;
+    public DbSet<ClinicUsage> ClinicUsages { get; set; } = null!;
+    public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Clinica>()
             .HasIndex(c => c.Cnpj);
+        modelBuilder.Entity<Clinica>().Property(c => c.Plan).HasConversion<string>().HasMaxLength(20);
+        modelBuilder.Entity<Clinica>().Property(c => c.BillingCycle).HasConversion<string>().HasMaxLength(20);
+        modelBuilder.Entity<ClinicUsage>().HasKey(u => new { u.ClinicaId, u.Period, u.Metric });
+        modelBuilder.Entity<ClinicUsage>().Property(u => u.Metric).HasConversion<string>().HasMaxLength(40);
+        modelBuilder.Entity<ClinicUsage>().Property(u => u.Period).HasMaxLength(7);
+        modelBuilder.Entity<ProcessedWebhookEvent>().HasKey(e => new { e.Provider, e.EventId });
         modelBuilder.Entity<Clinica>()
             .Property(c => c.AppointmentSlotDurationMinutes)
             .HasDefaultValue(60);

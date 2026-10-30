@@ -14,13 +14,18 @@ public class Clinica : AuditableEntity
     public string Cidade { get; set; } = string.Empty;
     public string Estado { get; set; } = string.Empty;
     public string Cep { get; set; } = string.Empty;
-    public decimal ValorMensalidade { get; set; }
-    public int DiaVencimento { get; set; } = 10;
-    public bool CobrancaAtiva { get; set; }
-    public DateOnly? DataInicioCobranca { get; set; }
     public bool IsBlockedByBilling { get; set; }
     public string? BillingBlockReason { get; set; }
     public DateTime? BillingBlockedAt { get; set; }
+
+    public ClinicPlan Plan { get; set; } = ClinicPlan.Free;
+    public BillingCycle? BillingCycle { get; set; }
+    public bool IsFounder { get; set; }
+    public int ExtraProfessionals { get; set; }
+    public string? AbacateCustomerId { get; set; }
+    public string? AbacateSubscriptionId { get; set; }
+    public bool IsHubApproved { get; set; }
+    public DateTime? HubApprovedAt { get; set; }
 
     public string? DisplayName { get; set; }
     public string? LogoUrl { get; set; }
