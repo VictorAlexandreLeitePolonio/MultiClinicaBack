@@ -76,7 +76,7 @@ public class MercadoPagoWebhookTests
         Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, unknownUser)).StatusCode);
 
         // Tipo diferente de payment: 200 sem efeitos.
-        var otherType = Sign(PaymentBody(900, type: "merchant_order", id: "notif-2"), "900");
+        var otherType = Sign(PaymentBody(900, type: "merchant_order", id: 12346), "900");
         Assert.Equal(HttpStatusCode.OK, (await PostAsync(client, otherType)).StatusCode);
 
         await app.SeedAsync(async db => Assert.Equal(1, await db.ProcessedWebhookEvents.CountAsync()));
@@ -120,7 +120,7 @@ public class MercadoPagoWebhookTests
 
         var body = $$"""
             {
-              "id": "notif-3",
+              "id": 12347,
               "live_mode": false,
               "type": "payment",
               "action": "payment.updated",
@@ -148,11 +148,11 @@ public class MercadoPagoWebhookTests
         long dataId,
         long userId = MercadoPagoTestSupport.DefaultMpUserId,
         string type = "payment",
-        string id = "notif-1",
+        long id = 12345,
         string action = "payment.updated")
         => $$"""
             {
-              "id": "{{id}}",
+              "id": {{id}},
               "live_mode": false,
               "type": "{{type}}",
               "date_created": "2026-10-30T12:00:00Z",

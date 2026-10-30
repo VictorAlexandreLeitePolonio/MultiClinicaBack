@@ -146,7 +146,7 @@ public class MercadoPagoWebhookController(
                 return false;
 
             notification = new Notification(
-                Id: GetString(root, "id"),
+                Id: GetScalarString(root, "id"),
                 Type: GetString(root, "type"),
                 Action: GetString(root, "action"),
                 UserId: GetLong(GetProperty(root, "user_id")),
@@ -166,6 +166,20 @@ public class MercadoPagoWebhookController(
 
     private static string? GetString(JsonElement parent, string name)
         => GetProperty(parent, name) is { ValueKind: JsonValueKind.String } value ? value.GetString() : null;
+
+    // O id da notificação vem como número no JSON do Mercado Pago (data.id vem como string).
+    private static string? GetScalarString(JsonElement parent, string name)
+    {
+        if (GetProperty(parent, name) is not { } value)
+            return null;
+
+        return value.ValueKind switch
+        {
+            JsonValueKind.String => value.GetString(),
+            JsonValueKind.Number => value.GetRawText(),
+            _ => null,
+        };
+    }
 
     private static long? GetLong(JsonElement? element)
     {
