@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Common;
+using MultiClinica.API.Data;
 using MultiClinica.API.DTOs.User;
 using MultiClinica.API.Services.Interfaces;
 
@@ -9,7 +11,7 @@ namespace MultiClinica.API.Controllers;
 [Authorize(Roles = "Administrador")]
 [ApiController]
 [Route("api/[controller]")]
-public class UsersController(IUserService service) : ControllerBase
+public class UsersController(IUserService service, AppDbContext db, IUsuarioLogadoService usuario) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetUsers(
@@ -33,6 +35,13 @@ public class UsersController(IUserService service) : ControllerBase
     public async Task<IActionResult> CreateUser(CreateUserDto dto)
     {
         var result = await service.CreateAsync(dto);
+        if (!result.IsSuccess && result.ErrorCode == ErrorCodes.ProfessionalLimit)
+        {
+            var clinic = await db.Clinicas.Where(c => c.Id == usuario.ClinicaId)
+                .Select(c => new { c.Plan, c.ExtraProfessionals }).SingleAsync();
+            return PlanErrors.ProfessionalLimit(
+                PlanMatrix.ProfessionalLimit(clinic.Plan, clinic.ExtraProfessionals) ?? 0);
+        }
         if (!result.IsSuccess)
             return result.ErrorCode switch
             {

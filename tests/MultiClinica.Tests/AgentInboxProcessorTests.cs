@@ -9,7 +9,7 @@ namespace MultiClinica.Tests;
 public class AgentInboxProcessorTests
 {
     private static async Task<(MultiClinicaFactory App, FakeChatModel Model, FakeTelegramClient Telegram, ManualClock Clock)> SetupAsync(
-        bool billingBlocked = false, bool clinicDeleted = false)
+        bool billingBlocked = false, bool clinicDeleted = false, ClinicPlan plan = ClinicPlan.Pro)
     {
         var model = new FakeChatModel();
         var telegram = new FakeTelegramClient();
@@ -30,6 +30,7 @@ public class AgentInboxProcessorTests
             var clinic = await db.Clinicas.SingleAsync(c => c.Id == clinicId);
             clinic.IsBlockedByBilling = billingBlocked;
             clinic.IsDeleted = clinicDeleted;
+            clinic.Plan = plan;
             var conversation = new AgentConversation { ClinicaId = clinicId, Channel = AgentChannel.Telegram,
                 Profile = AgentProfile.Owner, ExternalChatId = "777", UserId = adminId, LastInboundAt = DateTime.UtcNow };
             conversation.Messages.Add(new AgentMessage { Channel = AgentChannel.Telegram, Role = AgentMessageRole.User,
@@ -107,6 +108,19 @@ public class AgentInboxProcessorTests
     public async Task Soft_deleted_clinic_is_not_processed()
     {
         var (app, model, telegram, _) = await SetupAsync(clinicDeleted: true);
+        await using var _ = app;
+
+        await ProcessAsync(app);
+
+        Assert.Empty(model.Requests);
+        Assert.Empty(telegram.Sent);
+        Assert.Equal(AgentMessageStatus.Failed, (await InboundAsync(app)).Status);
+    }
+
+    [Fact]
+    public async Task Clinic_without_owner_copilot_plan_is_not_processed()
+    {
+        var (app, model, telegram, _) = await SetupAsync(plan: ClinicPlan.Free);
         await using var _ = app;
 
         await ProcessAsync(app);
