@@ -59,6 +59,7 @@ public class PatientEmailOutboxProcessor(
                 continue;
 
             var job = await db.PatientEmailOutbox
+                .Include(item => item.Patient)
                 .Include(item => item.PatientAccount)
                 .Include(item => item.Clinica)
                 .SingleOrDefaultAsync(item => item.Id == jobId && item.LeaseToken == leaseToken, cancellationToken);
@@ -66,20 +67,48 @@ public class PatientEmailOutboxProcessor(
                 continue;
 
             var sent = false;
+            var failureMessage = "Falha no envio da notificação.";
             try
             {
-                if (!job.PatientAccount.IsDeleted && job.PatientAccount.Status == PatientAccountStatus.PendingActivation)
+                if (job.Type == PatientEmailOutboxType.PaymentCharge)
+                {
+                    failureMessage = "Falha no envio da cobrança.";
+                    var payment = job.PaymentId is { } paymentId
+                        ? await db.Payments
+                            .Include(item => item.Plan)
+                            .FirstOrDefaultAsync(item => item.Id == paymentId, cancellationToken)
+                        : null;
+                    if (payment?.PaymentLinkToken is null)
+                    {
+                        failureMessage = "A cobrança não está disponível.";
+                    }
+                    else
+                    {
+                        var clinicName = string.IsNullOrWhiteSpace(job.Clinica.NomeFantasia)
+                            ? job.Clinica.Nome
+                            : job.Clinica.NomeFantasia;
+                        var frontend = (configuration["FRONTEND_URL"] ?? "https://cliniqcare.com.br").TrimEnd('/');
+                        sent = await notifications.SendPaymentChargeAsync(job.Patient, payment, clinicName,
+                            $"{frontend}/pagar/{payment.PaymentLinkToken}");
+                    }
+                }
+                else if (job.PatientAccount is { IsDeleted: false } pendingAccount
+                    && pendingAccount.Status == PatientAccountStatus.PendingActivation)
                 {
                     job.Type = PatientEmailOutboxType.ActivationInvitation;
-                    sent = await notifications.SendActivationInviteAsync(job.PatientAccount);
+                    sent = await notifications.SendActivationInviteAsync(pendingAccount);
                 }
-                else if (!job.PatientAccount.IsDeleted)
+                else if (job.PatientAccount is { IsDeleted: false } account)
                 {
                     job.Type = PatientEmailOutboxType.ClinicLinkNotice;
                     var clinicName = string.IsNullOrWhiteSpace(job.Clinica.NomeFantasia)
                         ? job.Clinica.Nome
                         : job.Clinica.NomeFantasia;
-                    sent = await notifications.SendNewLinkNoticeAsync(job.PatientAccount, clinicName);
+                    sent = await notifications.SendNewLinkNoticeAsync(account, clinicName);
+                }
+                else
+                {
+                    failureMessage = "A conta do paciente não está disponível.";
                 }
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -105,9 +134,7 @@ public class PatientEmailOutboxProcessor(
                     ? PatientEmailOutboxStatus.Failed
                     : PatientEmailOutboxStatus.Pending;
                 job.NextAttemptAt = finishedAt.AddSeconds(RetryDelaySeconds(job.AttemptCount));
-                job.LastError = job.PatientAccount.IsDeleted
-                    ? "A conta do paciente não está disponível."
-                    : "Falha no envio da notificação.";
+                job.LastError = failureMessage;
                 logger.LogWarning("Job de e-mail do paciente {JobId} falhou na tentativa {AttemptCount}.",
                     job.Id, job.AttemptCount);
             }
