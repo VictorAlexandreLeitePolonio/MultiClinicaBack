@@ -1,24 +1,28 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
 using MultiClinica.API.Common;
+using MultiClinica.API.Data;
 using MultiClinica.API.DTOs.User;
 using MultiClinica.API.Services;
+using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Controllers;
 
 [ApiController]
 [Route("api/user-invitations")]
 [EnableRateLimiting("auth")]
-public class UserInvitationsController(UserInvitationService service) : ControllerBase
+public class UserInvitationsController(UserInvitationService service, AppDbContext db, IUsuarioLogadoService usuario)
+    : ControllerBase
 {
     [Authorize(Roles = "Administrador")]
     [HttpPost]
-    public async Task<IActionResult> Invite(InviteUserDto dto) => Map(await service.InviteAsync(dto));
+    public async Task<IActionResult> Invite(InviteUserDto dto) => await Map(await service.InviteAsync(dto));
 
     [Authorize(Roles = "Administrador")]
     [HttpPost("{id:int}/resend")]
-    public async Task<IActionResult> Resend(int id) => Map(await service.ResendAsync(id));
+    public async Task<IActionResult> Resend(int id) => await Map(await service.ResendAsync(id));
 
     [AllowAnonymous]
     [HttpPost("accept")]
@@ -27,12 +31,22 @@ public class UserInvitationsController(UserInvitationService service) : Controll
             ? Ok(new { message = "Convite aceito. Sua senha foi definida." })
             : BadRequest(new { message = "Convite inválido ou expirado. Solicite um novo convite ao administrador." });
 
-    private IActionResult Map(Result<UserInvitationResponseDto> result) =>
-        result.IsSuccess ? Ok(result.Value) : result.ErrorCode switch
+    private async Task<IActionResult> Map(Result<UserInvitationResponseDto> result)
+    {
+        if (result.IsSuccess) return Ok(result.Value);
+        if (result.ErrorCode == ErrorCodes.ProfessionalLimit)
+        {
+            var clinic = await db.Clinicas.Where(c => c.Id == usuario.ClinicaId)
+                .Select(c => new { c.Plan, c.ExtraProfessionals }).SingleAsync();
+            return PlanErrors.ProfessionalLimit(
+                PlanMatrix.ProfessionalLimit(clinic.Plan, clinic.ExtraProfessionals) ?? 0);
+        }
+        return result.ErrorCode switch
         {
             ErrorCodes.Forbidden => Forbid(),
             ErrorCodes.NotFound => NotFound(new { message = result.ErrorMessage }),
             ErrorCodes.DuplicateEmail => Conflict(new { message = result.ErrorMessage }),
             _ => BadRequest(new { message = result.ErrorMessage }),
         };
+    }
 }

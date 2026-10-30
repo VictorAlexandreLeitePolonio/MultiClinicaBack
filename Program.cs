@@ -110,6 +110,7 @@ builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<UserInvitationService>();
 builder.Services.AddScoped<ClinicPlanService>();
 builder.Services.AddScoped<SignupService>();
+builder.Services.AddScoped<UsageService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
 builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentIdentity>();
 builder.Services.Configure<MultiClinica.API.Services.Agent.AgentOptions>(builder.Configuration.GetSection("Agent"));

@@ -11,7 +11,8 @@ public static class AgentSeed
         await app.SeedAsync(async db =>
         {
             var clinic = new Clinica { Nome = "Clínica Agente", NomeFantasia = "Clínica Agente",
-                Email = $"clinic-{email}", TimeZoneId = "America/Sao_Paulo", AppointmentSlotDurationMinutes = 60 };
+                Email = $"clinic-{email}", TimeZoneId = "America/Sao_Paulo", AppointmentSlotDurationMinutes = 60,
+                Plan = ClinicPlan.Pro };
             db.Clinicas.Add(clinic);
             await db.SaveChangesAsync();
             var admin = new User { ClinicaId = clinic.Id, Name = "Victor", Email = email,
