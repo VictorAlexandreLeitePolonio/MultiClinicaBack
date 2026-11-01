@@ -15,7 +15,10 @@ public sealed record ConsultationReportDto(
 
 public sealed record UpdateConsultationReportDto(string? Subjective, string? Objective, string? Assessment, string? Plan);
 
-public sealed record ChargeSuggestionDto(int? PlanId, string? PlanName, string? PlanType, bool AlreadyChargedThisMonth);
+// Plans e OnlineAvailable vêm aqui porque o Profissional não acessa api/plans nem api/mercadopago/status.
+public sealed record ChargePlanOptionDto(int Id, string Name, string PlanType, decimal Amount);
+public sealed record ChargeSuggestionDto(int? PlanId, string? PlanName, string? PlanType, bool AlreadyChargedThisMonth,
+    IReadOnlyList<ChargePlanOptionDto> Plans, bool OnlineAvailable);
 
 public sealed record CreateEvolutionFromConsultationDto(int TreatmentId);
 public sealed record CreateEvolutionFromConsultationResponse(int EvolutionId);

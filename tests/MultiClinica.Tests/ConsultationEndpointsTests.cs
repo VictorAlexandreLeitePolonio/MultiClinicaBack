@@ -575,6 +575,12 @@ public class ConsultationEndpointsTests
         Assert.Equal(JsonValueKind.Null, body.GetProperty("planId").ValueKind);
         Assert.Equal(JsonValueKind.Null, body.GetProperty("planName").ValueKind);
         Assert.False(body.GetProperty("alreadyChargedThisMonth").GetBoolean());
+        // Profissional não acessa api/plans: os planos ativos vêm na sugestão.
+        var plans = body.GetProperty("plans").EnumerateArray().ToList();
+        Assert.Single(plans);
+        Assert.Equal(seed.PlanId, plans[0].GetProperty("id").GetInt32());
+        Assert.Equal("Avulso", plans[0].GetProperty("planType").GetString());
+        Assert.False(body.GetProperty("onlineAvailable").GetBoolean()); // sem Mercado Pago conectado
     }
 
     [Fact]

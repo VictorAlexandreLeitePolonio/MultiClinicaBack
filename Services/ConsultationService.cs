@@ -19,6 +19,7 @@ public class ConsultationService(
     UsageService usage,
     IPaymentService payments,
     OnlinePaymentService onlinePayments,
+    MercadoPagoAccounts mercadoPagoAccounts,
     TimeProvider time,
     ILogger<ConsultationService> logger)
 {
@@ -358,11 +359,24 @@ public class ConsultationService(
             && p.ReferenceMonth >= monthStart
             && p.ReferenceMonth < monthEnd);
 
+        var plans = await db.Plans.AsNoTracking()
+            .Where(p => p.ClinicaId == usuario.ClinicaId && p.IsActive && !p.IsDeleted)
+            .OrderBy(p => p.Name)
+            .Select(p => new ChargePlanOptionDto(p.Id, p.Name, p.TipoPlano.ToString(), p.Valor))
+            .ToListAsync();
+
+        // Mesma regra do PaymentService.ValidateOnlineChargeAsync.
+        var clinicPlan = await db.Clinicas.Where(c => c.Id == usuario.ClinicaId).Select(c => c.Plan).SingleAsync();
+        var onlineAvailable = PlanMatrix.Has(clinicPlan, Features.OnlinePayments)
+            && await mercadoPagoAccounts.GetConnectedAsync(usuario.ClinicaId) is not null;
+
         return Result<ChargeSuggestionDto>.Ok(new ChargeSuggestionDto(
             lastPayment?.PlanId,
             lastPayment?.Plan.Name,
             lastPayment?.Plan.TipoPlano.ToString(),
-            alreadyCharged));
+            alreadyCharged,
+            plans,
+            onlineAvailable));
     }
 
     public async Task<Result<CreateEvolutionFromConsultationResponse>> CreateEvolutionAsync(
