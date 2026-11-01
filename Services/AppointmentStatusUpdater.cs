@@ -47,7 +47,9 @@ public class AppointmentStatusUpdater : BackgroundService
         var now = DateTime.UtcNow;
 
         var outdated = await db.Appointments
-            .Where(a => a.Status == AppointmentStatus.Scheduled && a.AppointmentDate < now)
+            .Where(a => a.Status == AppointmentStatus.Scheduled
+                && a.AppointmentDate < now
+                && !db.ConsultationReports.Any(r => r.AppointmentId == a.Id))
             .ToListAsync(cancellationToken);
 
         if (outdated.Count == 0) return;

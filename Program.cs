@@ -138,6 +138,7 @@ builder.Services.AddSingleton<MultiClinica.API.Services.Transcription.Consultati
 builder.Services.AddHttpClient<MultiClinica.API.Services.Transcription.ITranscriber, MultiClinica.API.Services.Transcription.HttpTranscriber>(
     client => client.Timeout = TimeSpan.FromMinutes(10)).RemoveAllLoggers();
 // Consulta: registros da Trilha A
+builder.Services.AddScoped<ConsultationService>();
 // Consulta: registros da Trilha B
 builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
 builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client) =>
