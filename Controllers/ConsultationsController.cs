@@ -25,8 +25,17 @@ public class ConsultationsController(ConsultationService service) : ControllerBa
     [RequestSizeLimit(2 * 1024 * 1024 + 4096)]
     public async Task<IActionResult> SaveChunk(int id, int n, CancellationToken ct)
     {
-        var result = await service.SaveChunkAsync(id, n, Request.Body, Request.ContentLength, ct);
-        return result.IsSuccess ? NoContent() : Error(result);
+        try
+        {
+            var result = await service.SaveChunkAsync(id, n, Request.Body, Request.ContentLength, ct);
+            return result.IsSuccess ? NoContent() : Error(result);
+        }
+        catch (BadHttpRequestException exception) when (exception.StatusCode == StatusCodes.Status413PayloadTooLarge)
+        {
+            // Kestrel corta o corpo acima do [RequestSizeLimit] no meio da leitura.
+            return StatusCode(StatusCodes.Status413PayloadTooLarge,
+                new { code = ErrorCodes.FileTooLarge, message = "O pedaço de áudio excede o limite de 2 MB." });
+        }
     }
 
     [HttpPost("appointments/{id:int}/consultation/finish")]
