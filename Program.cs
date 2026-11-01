@@ -144,6 +144,7 @@ builder.Services.AddSingleton<MultiClinica.API.Services.Transcription.Consultati
 if (!builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<MultiClinica.API.Services.Transcription.ConsultationWorker>();
 // Prontuário: registros da Trilha B (PatientRecordService)
+builder.Services.AddScoped<PatientRecordService>();
 builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
 builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client) =>
 {
