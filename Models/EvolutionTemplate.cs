@@ -10,5 +10,4 @@ public class EvolutionTemplate : AuditableEntity
 
     public Clinica Clinica { get; set; } = null!;
     public ICollection<EvolutionTemplateField> Fields { get; set; } = [];
-    public ICollection<PatientTreatment> Treatments { get; set; } = [];
 }

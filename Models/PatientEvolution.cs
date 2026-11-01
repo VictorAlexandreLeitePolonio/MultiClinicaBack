@@ -11,7 +11,8 @@ public class PatientEvolution : AuditableEntity
 {
     public int ClinicaId { get; set; }
     public int PatientId { get; set; }
-    public int TreatmentId { get; set; }
+    // Consulta de origem, quando a evolução nasce de uma consulta.
+    public int? AppointmentId { get; set; }
     public int ProfessionalId { get; set; }
     public int? ServiceId { get; set; }
 
@@ -25,7 +26,7 @@ public class PatientEvolution : AuditableEntity
     public EvolutionStatus Status { get; set; } = EvolutionStatus.Draft;
 
     public Patient Patient { get; set; } = null!;
-    public PatientTreatment Treatment { get; set; } = null!;
+    public Appointment? Appointment { get; set; }
     public User Professional { get; set; } = null!;
     public ICollection<PatientEvolutionValue> Values { get; set; } = [];
 }

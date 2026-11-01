@@ -112,17 +112,9 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             e.ClinicaId == clinicaId && !e.IsDeleted && e.Status == EvolutionStatus.Completed
             && e.Date >= start && e.Date < endExclusive);
 
-        var treatmentsInProgress = await db.PatientTreatments.CountAsync(t =>
-            t.ClinicaId == clinicaId && !t.IsDeleted && t.Status == TreatmentStatus.Active);
-
-        var completedTreatments = await db.PatientTreatments.CountAsync(t =>
-            t.ClinicaId == clinicaId && !t.IsDeleted && t.Status == TreatmentStatus.Completed);
-
         return new BalanceEvolutionSummaryDto
         {
-            EvolutionsInPeriod = evolutionsInPeriod,
-            TreatmentsInProgress = treatmentsInProgress,
-            CompletedTreatments = completedTreatments
+            EvolutionsInPeriod = evolutionsInPeriod
         };
     }
 

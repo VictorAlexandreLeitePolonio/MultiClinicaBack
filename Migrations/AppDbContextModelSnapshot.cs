@@ -1760,6 +1760,9 @@ namespace MultiClinica.API.Migrations
 
                     NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
+                    b.Property<int?>("AppointmentId")
+                        .HasColumnType("integer");
+
                     b.Property<int>("ClinicaId")
                         .HasColumnType("integer");
 
@@ -1809,9 +1812,6 @@ namespace MultiClinica.API.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<int>("TreatmentId")
-                        .HasColumnType("integer");
-
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -1820,13 +1820,15 @@ namespace MultiClinica.API.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AppointmentId");
+
                     b.HasIndex("ClinicaId");
 
                     b.HasIndex("PatientId");
 
                     b.HasIndex("ProfessionalId");
 
-                    b.HasIndex("TreatmentId");
+                    b.HasIndex("ClinicaId", "PatientId", "Date");
 
                     b.ToTable("PatientEvolutions");
                 });
@@ -1954,80 +1956,6 @@ namespace MultiClinica.API.Migrations
                         .IsUnique();
 
                     b.ToTable("PatientImportOperations");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.PatientTreatment", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<int>("ClinicaId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("CreatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime?>("DeletedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("DeletedByUserId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Description")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("EndedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<int>("PatientId")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("ProfessionalId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<int>("TemplateId")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("Title")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<DateTime>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<int?>("UpdatedByUserId")
-                        .HasColumnType("integer");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ClinicaId");
-
-                    b.HasIndex("PatientId");
-
-                    b.HasIndex("ProfessionalId");
-
-                    b.HasIndex("TemplateId");
-
-                    b.ToTable("PatientTreatments");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.Payment", b =>
@@ -2747,6 +2675,11 @@ namespace MultiClinica.API.Migrations
 
             modelBuilder.Entity("MultiClinica.API.Models.PatientEvolution", b =>
                 {
+                    b.HasOne("MultiClinica.API.Models.Appointment", "Appointment")
+                        .WithMany()
+                        .HasForeignKey("AppointmentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("MultiClinica.API.Models.Patient", "Patient")
                         .WithMany()
                         .HasForeignKey("PatientId")
@@ -2759,17 +2692,11 @@ namespace MultiClinica.API.Migrations
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
-                    b.HasOne("MultiClinica.API.Models.PatientTreatment", "Treatment")
-                        .WithMany("Evolutions")
-                        .HasForeignKey("TreatmentId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
+                    b.Navigation("Appointment");
 
                     b.Navigation("Patient");
 
                     b.Navigation("Professional");
-
-                    b.Navigation("Treatment");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.PatientEvolutionValue", b =>
@@ -2800,32 +2727,6 @@ namespace MultiClinica.API.Migrations
                         .IsRequired();
 
                     b.Navigation("Clinica");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.PatientTreatment", b =>
-                {
-                    b.HasOne("MultiClinica.API.Models.Patient", "Patient")
-                        .WithMany("Treatments")
-                        .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("MultiClinica.API.Models.User", "Professional")
-                        .WithMany("PatientTreatments")
-                        .HasForeignKey("ProfessionalId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("MultiClinica.API.Models.EvolutionTemplate", "Template")
-                        .WithMany("Treatments")
-                        .HasForeignKey("TemplateId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Patient");
-
-                    b.Navigation("Professional");
-
-                    b.Navigation("Template");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.Payment", b =>
@@ -2955,8 +2856,6 @@ namespace MultiClinica.API.Migrations
             modelBuilder.Entity("MultiClinica.API.Models.EvolutionTemplate", b =>
                 {
                     b.Navigation("Fields");
-
-                    b.Navigation("Treatments");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.EvolutionTemplateField", b =>
@@ -2978,8 +2877,6 @@ namespace MultiClinica.API.Migrations
                     b.Navigation("MedicalRecords");
 
                     b.Navigation("Payments");
-
-                    b.Navigation("Treatments");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.PatientAccount", b =>
@@ -2990,11 +2887,6 @@ namespace MultiClinica.API.Migrations
             modelBuilder.Entity("MultiClinica.API.Models.PatientEvolution", b =>
                 {
                     b.Navigation("Values");
-                });
-
-            modelBuilder.Entity("MultiClinica.API.Models.PatientTreatment", b =>
-                {
-                    b.Navigation("Evolutions");
                 });
 
             modelBuilder.Entity("MultiClinica.API.Models.Plans", b =>
@@ -3009,8 +2901,6 @@ namespace MultiClinica.API.Migrations
                     b.Navigation("MedicalRecords");
 
                     b.Navigation("PatientEvolutions");
-
-                    b.Navigation("PatientTreatments");
 
                     b.Navigation("Payments");
 

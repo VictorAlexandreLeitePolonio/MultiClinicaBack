@@ -86,10 +86,9 @@ public class ConsultationsController(ConsultationService service) : ControllerBa
 
     [HttpPost("appointments/{id:int}/consultation/evolution")]
     [RequireFeature(Features.Transcription)]
-    public async Task<IActionResult> CreateEvolution(
-        int id, [FromBody] CreateEvolutionFromConsultationDto dto)
+    public async Task<IActionResult> CreateEvolution(int id)
     {
-        var result = await service.CreateEvolutionAsync(id, dto.TreatmentId);
+        var result = await service.CreateEvolutionAsync(id);
         return result.IsSuccess ? Ok(result.Value) : Error(result);
     }
 

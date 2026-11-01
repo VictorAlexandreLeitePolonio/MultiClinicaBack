@@ -588,7 +588,6 @@ public class ConsultationEndpointsTests
     {
         await using var app = ConsultationTestSupport.CreateApp();
         var seed = await ConsultationTestSupport.SeedAsync(app);
-        var treatmentId = await SeedTreatmentAsync(app, seed.ClinicaId, seed.PatientId, "Reabilitação");
         using var client = await ConsultationTestSupport.LoginAsync(app, seed.ProfessionalEmail);
         await StartAsync(client, seed.AppointmentId);
         await SetReportAsync(app, seed.AppointmentId, report =>
@@ -601,8 +600,7 @@ public class ConsultationEndpointsTests
         });
 
         var response = await client.PostAsJsonAsync(
-            $"/api/appointments/{seed.AppointmentId}/consultation/evolution",
-            new { treatmentId });
+            $"/api/appointments/{seed.AppointmentId}/consultation/evolution", new { });
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
         var body = await ReadJsonAsync(response);
@@ -611,7 +609,7 @@ public class ConsultationEndpointsTests
         {
             var evolution = await db.PatientEvolutions.SingleAsync(e => e.Id == evolutionId);
             Assert.Equal(seed.PatientId, evolution.PatientId);
-            Assert.Equal(treatmentId, evolution.TreatmentId);
+            Assert.Equal(seed.AppointmentId, evolution.AppointmentId);
             Assert.Equal(seed.ProfessionalId, evolution.ProfessionalId);
             Assert.Equal(EvolutionStatus.Draft, evolution.Status);
             Assert.Equal("Relata dor\n\nEdema leve", evolution.Description);
@@ -621,29 +619,21 @@ public class ConsultationEndpointsTests
     }
 
     [Fact]
-    public async Task Evolution_rejects_treatment_from_another_patient()
+    public async Task Consultation_can_have_several_evolutions_listed_in_the_report()
     {
         await using var app = ConsultationTestSupport.CreateApp();
         var seed = await ConsultationTestSupport.SeedAsync(app);
-        var otherPatientId = 0;
-        await app.SeedAsync(async db =>
-        {
-            var patient = new Patient { ClinicaId = seed.ClinicaId, Name = "Outro paciente" };
-            db.Patients.Add(patient);
-            await db.SaveChangesAsync();
-            otherPatientId = patient.Id;
-        });
-        var otherTreatmentId = await SeedTreatmentAsync(app, seed.ClinicaId, otherPatientId, "Outro");
         using var client = await ConsultationTestSupport.LoginAsync(app, seed.ProfessionalEmail);
         await StartAsync(client, seed.AppointmentId);
         await SetReportAsync(app, seed.AppointmentId, report => report.Status = ConsultationStatus.Ready);
 
-        var response = await client.PostAsJsonAsync(
-            $"/api/appointments/{seed.AppointmentId}/consultation/evolution",
-            new { treatmentId = otherTreatmentId });
+        var url = $"/api/appointments/{seed.AppointmentId}/consultation/evolution";
+        var first = (await ReadJsonAsync(await client.PostAsJsonAsync(url, new { }))).GetProperty("evolutionId").GetInt32();
+        var second = (await ReadJsonAsync(await client.PostAsJsonAsync(url, new { }))).GetProperty("evolutionId").GetInt32();
 
-        await AssertErrorAsync(response, HttpStatusCode.NotFound, ErrorCodes.NotFound);
-        await app.SeedAsync(async db => Assert.False(await db.PatientEvolutions.AnyAsync()));
+        var report = await ReadJsonAsync(await client.GetAsync($"/api/appointments/{seed.AppointmentId}/consultation"));
+        var ids = report.GetProperty("evolutionIds").EnumerateArray().Select(e => e.GetInt32()).ToList();
+        Assert.Equal([first, second], ids);
     }
 
     [Fact]
@@ -744,31 +734,6 @@ public class ConsultationEndpointsTests
             .AsNoTracking()
             .SingleAsync(r => r.AppointmentId == appointmentId));
         return report!;
-    }
-
-    private static async Task<int> SeedTreatmentAsync(
-        MultiClinicaFactory app, int clinicaId, int patientId, string title)
-    {
-        var treatmentId = 0;
-        await app.SeedAsync(async db =>
-        {
-            var template = new EvolutionTemplate { ClinicaId = clinicaId, Name = $"Modelo {title}" };
-            db.EvolutionTemplates.Add(template);
-            await db.SaveChangesAsync();
-
-            var treatment = new PatientTreatment
-            {
-                ClinicaId = clinicaId,
-                PatientId = patientId,
-                TemplateId = template.Id,
-                Title = title,
-                StartedAt = DateTime.UtcNow,
-            };
-            db.PatientTreatments.Add(treatment);
-            await db.SaveChangesAsync();
-            treatmentId = treatment.Id;
-        });
-        return treatmentId;
     }
 
     private static async Task<int> SeedAppointmentAsync(

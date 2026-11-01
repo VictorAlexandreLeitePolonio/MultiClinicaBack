@@ -30,7 +30,6 @@ public class AppDbContext : DbContext
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
     public DbSet<EvolutionTemplate> EvolutionTemplates { get; set; } = null!;
     public DbSet<EvolutionTemplateField> EvolutionTemplateFields { get; set; } = null!;
-    public DbSet<PatientTreatment> PatientTreatments { get; set; } = null!;
     public DbSet<PatientEvolution> PatientEvolutions { get; set; } = null!;
     public DbSet<PatientEvolutionValue> PatientEvolutionValues { get; set; } = null!;
     public DbSet<ClinicExpense> ClinicExpenses { get; set; } = null!;
@@ -138,10 +137,6 @@ public class AppDbContext : DbContext
             .Property(f => f.ExpectedDirection)
             .HasConversion<string>();
 
-        modelBuilder.Entity<PatientTreatment>()
-            .Property(t => t.Status)
-            .HasConversion<string>();
-
         modelBuilder.Entity<PatientEvolution>()
             .Property(e => e.Status)
             .HasConversion<string>();
@@ -237,15 +232,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<EvolutionTemplateField>()
             .HasIndex(f => f.TemplateId);
 
-        modelBuilder.Entity<PatientTreatment>()
-            .HasIndex(t => t.ClinicaId);
-
-        modelBuilder.Entity<PatientTreatment>()
-            .HasIndex(t => t.PatientId);
-
-        modelBuilder.Entity<PatientTreatment>()
-            .HasIndex(t => t.TemplateId);
-
         modelBuilder.Entity<PatientEvolution>()
             .HasIndex(e => e.ClinicaId);
 
@@ -253,7 +239,10 @@ public class AppDbContext : DbContext
             .HasIndex(e => e.PatientId);
 
         modelBuilder.Entity<PatientEvolution>()
-            .HasIndex(e => e.TreatmentId);
+            .HasIndex(e => e.AppointmentId);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasIndex(e => new { e.ClinicaId, e.PatientId, e.Date });
 
         modelBuilder.Entity<PatientEvolution>()
             .HasIndex(e => e.ProfessionalId);
@@ -279,34 +268,17 @@ public class AppDbContext : DbContext
             .HasForeignKey(f => f.TemplateId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<EvolutionTemplate>()
-            .HasMany(t => t.Treatments)
-            .WithOne(t => t.Template)
-            .HasForeignKey(t => t.TemplateId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Patient>()
-            .HasMany(p => p.Treatments)
-            .WithOne(t => t.Patient)
-            .HasForeignKey(t => t.PatientId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<User>()
-            .HasMany(u => u.PatientTreatments)
-            .WithOne(t => t.Professional)
-            .HasForeignKey(t => t.ProfessionalId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         modelBuilder.Entity<PatientEvolution>()
             .HasOne(e => e.Patient)
             .WithMany()
             .HasForeignKey(e => e.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Evolução pode vir de uma consulta (várias por consulta) ou ser avulsa.
         modelBuilder.Entity<PatientEvolution>()
-            .HasOne(e => e.Treatment)
-            .WithMany(t => t.Evolutions)
-            .HasForeignKey(e => e.TreatmentId)
+            .HasOne(e => e.Appointment)
+            .WithMany()
+            .HasForeignKey(e => e.AppointmentId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<PatientEvolution>()

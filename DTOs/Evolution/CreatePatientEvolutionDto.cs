@@ -5,6 +5,8 @@ namespace MultiClinica.API.DTOs.Evolution;
 public class CreatePatientEvolutionDto
 {
     public int? ProfessionalId { get; set; }
+    // Consulta de origem (mesmo paciente). Uma consulta pode ter várias evoluções.
+    public int? AppointmentId { get; set; }
     public int? ServiceId { get; set; }
     public DateTime? Date { get; set; }
     public string? Description { get; set; }

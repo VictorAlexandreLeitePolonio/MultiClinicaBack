@@ -245,7 +245,7 @@ public class ConsultationService(
 
         return access.Value!.Report is null
             ? Result<ConsultationReportDto>.Fail(ErrorCodes.NotFound, "Relatório não encontrado.")
-            : Result<ConsultationReportDto>.Ok(ToDto(access.Value.Report));
+            : Result<ConsultationReportDto>.Ok(await ToDtoAsync(access.Value.Report));
     }
 
     public async Task<Result<ConsultationReportDto>> UpdateReportAsync(
@@ -270,7 +270,7 @@ public class ConsultationService(
         report.UpdatedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
 
-        return Result<ConsultationReportDto>.Ok(ToDto(report));
+        return Result<ConsultationReportDto>.Ok(await ToDtoAsync(report));
     }
 
     public async Task<Result<ConsultationReportDto>> ReviewAsync(int appointmentId)
@@ -292,7 +292,7 @@ public class ConsultationService(
         report.UpdatedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
 
-        return Result<ConsultationReportDto>.Ok(ToDto(report));
+        return Result<ConsultationReportDto>.Ok(await ToDtoAsync(report));
     }
 
     public async Task<Result<ConsultationReportDto>> RetryAsync(int appointmentId)
@@ -326,7 +326,7 @@ public class ConsultationService(
         report.UpdatedByUserId = usuario.UserId;
         await db.SaveChangesAsync();
 
-        return Result<ConsultationReportDto>.Ok(ToDto(report));
+        return Result<ConsultationReportDto>.Ok(await ToDtoAsync(report));
     }
 
     // ── Cobrança, evolução e prontuário ──────────────────────────────────────
@@ -379,8 +379,8 @@ public class ConsultationService(
             onlineAvailable));
     }
 
-    public async Task<Result<CreateEvolutionFromConsultationResponse>> CreateEvolutionAsync(
-        int appointmentId, int treatmentId)
+    // Cria uma evolução em rascunho ligada à consulta; uma consulta pode ter várias.
+    public async Task<Result<CreateEvolutionFromConsultationResponse>> CreateEvolutionAsync(int appointmentId)
     {
         var access = await LoadAsync(appointmentId);
         if (!access.IsSuccess)
@@ -397,16 +397,6 @@ public class ConsultationService(
             return Result<CreateEvolutionFromConsultationResponse>.Fail(
                 ErrorCodes.InvalidStatus, "O relatório precisa estar pronto para gerar a evolução.");
 
-        var treatment = await db.PatientTreatments
-            .FirstOrDefaultAsync(t => t.Id == treatmentId
-                && t.PatientId == appointment.PatientId
-                && t.ClinicaId == usuario.ClinicaId
-                && !t.IsDeleted);
-
-        if (treatment is null)
-            return Result<CreateEvolutionFromConsultationResponse>.Fail(
-                ErrorCodes.NotFound, "Acompanhamento não encontrado.");
-
         var description = report.Subjective is null && report.Objective is null
             ? null
             : $"{report.Subjective}\n\n{report.Objective}";
@@ -415,7 +405,7 @@ public class ConsultationService(
         {
             ClinicaId = usuario.ClinicaId,
             PatientId = appointment.PatientId,
-            TreatmentId = treatment.Id,
+            AppointmentId = appointment.Id,
             ProfessionalId = appointment.UserId,
             Date = DateTime.SpecifyKind(appointment.AppointmentDate, DateTimeKind.Utc),
             Description = description,
@@ -501,7 +491,15 @@ public class ConsultationService(
     private static string? Normalize(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 
-    private static ConsultationReportDto ToDto(ConsultationReport report) => new(
+    private async Task<ConsultationReportDto> ToDtoAsync(ConsultationReport report)
+    {
+        var evolutionIds = await db.PatientEvolutions.AsNoTracking()
+            .Where(e => e.AppointmentId == report.AppointmentId && e.ClinicaId == usuario.ClinicaId && !e.IsDeleted)
+            .OrderBy(e => e.Id).Select(e => e.Id).ToListAsync();
+        return ToDto(report, evolutionIds);
+    }
+
+    private static ConsultationReportDto ToDto(ConsultationReport report, IReadOnlyList<int> evolutionIds) => new(
         report.Id,
         report.AppointmentId,
         report.PatientId,
@@ -521,7 +519,8 @@ public class ConsultationService(
         report.ReportPending,
         report.MinutesCharged,
         Utc(report.ReviewedAt),
-        report.ReviewedByUserId);
+        report.ReviewedByUserId,
+        evolutionIds);
 
     private static DateTime Utc(DateTime value) => DateTime.SpecifyKind(value, DateTimeKind.Utc);
     private static DateTime? Utc(DateTime? value)

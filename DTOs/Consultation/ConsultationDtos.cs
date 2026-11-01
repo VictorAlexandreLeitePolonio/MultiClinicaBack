@@ -11,7 +11,8 @@ public sealed record ConsultationReportDto(
     int Id, int AppointmentId, int PatientId, int ProfessionalId, string Status, string? FailureReason,
     DateTime StartedAt, DateTime? EndedAt, int ChunkCount, int? DurationSeconds, string? Transcript,
     string? Subjective, string? Objective, string? Assessment, string? Plan, int? SuggestedReturnDays,
-    bool ReportPending, int MinutesCharged, DateTime? ReviewedAt, int? ReviewedByUserId);
+    bool ReportPending, int MinutesCharged, DateTime? ReviewedAt, int? ReviewedByUserId,
+    IReadOnlyList<int> EvolutionIds);
 
 public sealed record UpdateConsultationReportDto(string? Subjective, string? Objective, string? Assessment, string? Plan);
 
@@ -20,7 +21,6 @@ public sealed record ChargePlanOptionDto(int Id, string Name, string PlanType, d
 public sealed record ChargeSuggestionDto(int? PlanId, string? PlanName, string? PlanType, bool AlreadyChargedThisMonth,
     IReadOnlyList<ChargePlanOptionDto> Plans, bool OnlineAvailable);
 
-public sealed record CreateEvolutionFromConsultationDto(int TreatmentId);
 public sealed record CreateEvolutionFromConsultationResponse(int EvolutionId);
 
 public sealed record ConsultationReportSummaryDto(

@@ -124,288 +124,22 @@ public class EvolutionService(AppDbContext db, IUsuarioLogadoService usuario) : 
         return Result<bool>.Ok(true);
     }
 
-    public async Task<Result<List<PatientTreatmentResponseDto>>> GetTreatmentsAsync(int patientId)
-    {
-        if (!await PatientExistsAsync(patientId))
-            return Result<List<PatientTreatmentResponseDto>>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
+    // ── Evoluções do paciente (Trilha A implementa) ─────────────────────────
 
-        var treatments = await db.PatientTreatments
-            .Where(t => t.PatientId == patientId && t.ClinicaId == usuario.ClinicaId && !t.IsDeleted)
-            .OrderByDescending(t => t.StartedAt)
-            .Select(t => ToTreatmentResponse(t))
-            .ToListAsync();
+    public Task<Result<PagedResult<PatientEvolutionResponseDto>>> GetEvolutionsAsync(int patientId, int? appointmentId, int page, int pageSize)
+        => throw new NotImplementedException("Trilha A");
 
-        return Result<List<PatientTreatmentResponseDto>>.Ok(treatments);
-    }
+    public Task<Result<PatientEvolutionResponseDto>> GetEvolutionAsync(int patientId, int evolutionId)
+        => throw new NotImplementedException("Trilha A");
 
-    public async Task<Result<PatientTreatmentResponseDto>> GetTreatmentAsync(int patientId, int treatmentId)
-    {
-        var treatment = await FindTreatmentAsync(patientId, treatmentId);
-        return treatment is null
-            ? Result<PatientTreatmentResponseDto>.Fail(ErrorCodes.NotFound, "Acompanhamento não encontrado.")
-            : Result<PatientTreatmentResponseDto>.Ok(ToTreatmentResponse(treatment));
-    }
+    public Task<Result<PatientEvolutionResponseDto>> CreateEvolutionAsync(int patientId, CreatePatientEvolutionDto dto)
+        => throw new NotImplementedException("Trilha A");
 
-    public async Task<Result<PatientTreatmentResponseDto>> CreateTreatmentAsync(int patientId, CreatePatientTreatmentDto dto)
-    {
-        if (string.IsNullOrWhiteSpace(dto.Title))
-            return Result<PatientTreatmentResponseDto>.Fail(ErrorCodes.EmptyField, "Título é obrigatório.");
-        if (!await PatientExistsAsync(patientId))
-            return Result<PatientTreatmentResponseDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
-        if (!await TemplateExistsAsync(dto.TemplateId, includeInactive: false))
-            return Result<PatientTreatmentResponseDto>.Fail(ErrorCodes.NotFound, "Modelo de evolução não encontrado.");
+    public Task<Result<bool>> UpdateEvolutionAsync(int patientId, int evolutionId, UpdatePatientEvolutionDto dto)
+        => throw new NotImplementedException("Trilha A");
 
-        if (dto.ProfessionalId.HasValue && !await ProfessionalExistsAsync(dto.ProfessionalId.Value))
-            return Result<PatientTreatmentResponseDto>.Fail(ErrorCodes.NotFound, "Profissional não encontrado.");
-
-        var treatment = new PatientTreatment
-        {
-            ClinicaId = usuario.ClinicaId,
-            PatientId = patientId,
-            TemplateId = dto.TemplateId,
-            ProfessionalId = dto.ProfessionalId ?? usuario.UserId,
-            Title = dto.Title.Trim(),
-            Description = NormalizeOptional(dto.Description),
-            StartedAt = dto.StartedAt ?? DateTime.UtcNow,
-            CreatedByUserId = usuario.UserId
-        };
-
-        db.PatientTreatments.Add(treatment);
-        await db.SaveChangesAsync();
-
-        return Result<PatientTreatmentResponseDto>.Ok(ToTreatmentResponse(treatment));
-    }
-
-    public async Task<Result<bool>> UpdateTreatmentAsync(int patientId, int treatmentId, UpdatePatientTreatmentDto dto)
-    {
-        var treatment = await FindTreatmentAsync(patientId, treatmentId);
-        if (treatment is null)
-            return Result<bool>.Fail(ErrorCodes.NotFound, "Acompanhamento não encontrado.");
-
-        if (dto.ProfessionalId.HasValue && !await ProfessionalExistsAsync(dto.ProfessionalId.Value))
-            return Result<bool>.Fail(ErrorCodes.NotFound, "Profissional não encontrado.");
-        if (dto.Title is not null)
-        {
-            if (string.IsNullOrWhiteSpace(dto.Title))
-                return Result<bool>.Fail(ErrorCodes.EmptyField, "Título é obrigatório.");
-            treatment.Title = dto.Title.Trim();
-        }
-
-        treatment.ProfessionalId = dto.ProfessionalId ?? treatment.ProfessionalId;
-        treatment.Description = dto.Description is null ? treatment.Description : NormalizeOptional(dto.Description);
-        treatment.StartedAt = dto.StartedAt ?? treatment.StartedAt;
-        treatment.EndedAt = dto.EndedAt ?? treatment.EndedAt;
-        treatment.Status = dto.Status ?? treatment.Status;
-        treatment.UpdatedByUserId = usuario.UserId;
-
-        await db.SaveChangesAsync();
-        return Result<bool>.Ok(true);
-    }
-
-    public async Task<Result<PagedResult<PatientEvolutionResponseDto>>> GetEvolutionsAsync(int patientId, int treatmentId, int page, int pageSize)
-    {
-        if (!await TreatmentExistsAsync(patientId, treatmentId))
-            return Result<PagedResult<PatientEvolutionResponseDto>>.Fail(ErrorCodes.NotFound, "Acompanhamento não encontrado.");
-
-        page = Math.Max(page, 1);
-        pageSize = Math.Clamp(pageSize, 1, 100);
-
-        var query = db.PatientEvolutions
-            .Include(e => e.Values)
-            .Where(e => e.PatientId == patientId && e.TreatmentId == treatmentId && e.ClinicaId == usuario.ClinicaId && !e.IsDeleted)
-            .OrderByDescending(e => e.Date)
-            .ThenByDescending(e => e.CreatedAt);
-
-        var total = await query.CountAsync();
-        var data = await query.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-
-        return Result<PagedResult<PatientEvolutionResponseDto>>.Ok(new PagedResult<PatientEvolutionResponseDto>
-        {
-            Data = data.Select(ToEvolutionResponse),
-            Page = page,
-            PageSize = pageSize,
-            TotalCount = total
-        });
-    }
-
-    public async Task<Result<PatientEvolutionResponseDto>> GetEvolutionAsync(int patientId, int treatmentId, int evolutionId)
-    {
-        var evolution = await FindEvolutionAsync(patientId, treatmentId, evolutionId);
-        return evolution is null
-            ? Result<PatientEvolutionResponseDto>.Fail(ErrorCodes.NotFound, "Evolução não encontrada.")
-            : Result<PatientEvolutionResponseDto>.Ok(ToEvolutionResponse(evolution));
-    }
-
-    public async Task<Result<TreatmentProgressResponseDto>> GetTreatmentProgressAsync(int patientId, int treatmentId)
-    {
-        var treatment = await FindTreatmentAsync(patientId, treatmentId);
-        if (treatment is null)
-            return Result<TreatmentProgressResponseDto>.Fail(ErrorCodes.NotFound, "Acompanhamento não encontrado.");
-
-        var fields = await db.EvolutionTemplateFields
-            .Where(f =>
-                f.TemplateId == treatment.TemplateId
-                && f.ClinicaId == usuario.ClinicaId
-                && !f.IsDeleted
-                && f.IsActive
-                && f.ShowInChart)
-            .OrderBy(f => f.Order)
-            .ThenBy(f => f.Label)
-            .ToListAsync();
-
-        var numericFields = fields
-            .Where(f => IsNumericField(f.Type))
-            .ToList();
-
-        var evolutions = await db.PatientEvolutions
-            .Include(e => e.Values)
-            .Where(e =>
-                e.PatientId == patientId
-                && e.TreatmentId == treatmentId
-                && e.ClinicaId == usuario.ClinicaId
-                && !e.IsDeleted
-                && e.Status == EvolutionStatus.Completed)
-            .OrderBy(e => e.Date)
-            .ThenBy(e => e.CreatedAt)
-            .ToListAsync();
-
-        var charts = numericFields
-            .Select(field => BuildProgressChart(field, evolutions))
-            .Where(chart => chart is not null)
-            .Select(chart => chart!)
-            .ToList();
-
-        var calculatedProgress = charts
-            .Where(c => c.Progress.HasValue)
-            .Select(c => c.Progress!.Value)
-            .ToList();
-
-        var response = new TreatmentProgressResponseDto
-        {
-            Treatment = new TreatmentProgressTreatmentDto
-            {
-                Id = treatment.Id,
-                Title = treatment.Title
-            },
-            Summary = new TreatmentProgressSummaryDto
-            {
-                TotalEvolutions = evolutions.Count,
-                OverallProgress = calculatedProgress.Count == 0 ? null : Math.Round(calculatedProgress.Average(), 2),
-                ImprovingFields = charts.Count(c => IsImproving(c)),
-                WorseningFields = charts.Count(c => IsWorsening(c)),
-                StableFields = charts.Count(c => IsStable(c)),
-                LastEvolutionDate = evolutions.LastOrDefault()?.Date
-            },
-            Charts = charts
-        };
-
-        return Result<TreatmentProgressResponseDto>.Ok(response);
-    }
-
-    public async Task<Result<PatientEvolutionResponseDto>> CreateEvolutionAsync(int patientId, int treatmentId, CreatePatientEvolutionDto dto)
-    {
-        var treatment = await FindTreatmentAsync(patientId, treatmentId);
-        if (treatment is null)
-            return Result<PatientEvolutionResponseDto>.Fail(ErrorCodes.NotFound, "Acompanhamento não encontrado.");
-
-        var professionalId = await ResolveProfessionalIdAsync(dto.ProfessionalId);
-        if (!professionalId.HasValue)
-            return Result<PatientEvolutionResponseDto>.Fail(ErrorCodes.NotFound, "Profissional não encontrado.");
-
-        var validation = await ValidateValuesAsync(treatment.TemplateId, dto.Status, dto.Values);
-        if (!validation.IsSuccess)
-            return Result<PatientEvolutionResponseDto>.Fail(validation.ErrorCode!, validation.ErrorMessage!);
-
-        var evolution = new PatientEvolution
-        {
-            ClinicaId = usuario.ClinicaId,
-            PatientId = patientId,
-            TreatmentId = treatmentId,
-            ProfessionalId = professionalId.Value,
-            ServiceId = dto.ServiceId,
-            Date = dto.Date ?? DateTime.UtcNow,
-            Description = NormalizeOptional(dto.Description),
-            Conduct = NormalizeOptional(dto.Conduct),
-            Observations = NormalizeOptional(dto.Observations),
-            NextGuidance = NormalizeOptional(dto.NextGuidance),
-            Status = dto.Status,
-            CreatedByUserId = usuario.UserId,
-            Values = BuildValues(dto.Values)
-        };
-
-        db.PatientEvolutions.Add(evolution);
-        await db.SaveChangesAsync();
-
-        return Result<PatientEvolutionResponseDto>.Ok(ToEvolutionResponse(evolution));
-    }
-
-    public async Task<Result<bool>> UpdateEvolutionAsync(int patientId, int treatmentId, int evolutionId, UpdatePatientEvolutionDto dto)
-    {
-        var evolution = await FindEvolutionAsync(patientId, treatmentId, evolutionId);
-        if (evolution is null)
-            return Result<bool>.Fail(ErrorCodes.NotFound, "Evolução não encontrada.");
-        if (evolution.Status == EvolutionStatus.Canceled)
-            return Result<bool>.Fail(ErrorCodes.CannotModify, "Evolução cancelada não pode ser editada.");
-
-        var status = dto.Status ?? evolution.Status;
-        if (dto.ProfessionalId.HasValue)
-        {
-            var professionalId = await ResolveProfessionalIdAsync(dto.ProfessionalId);
-            if (!professionalId.HasValue)
-                return Result<bool>.Fail(ErrorCodes.NotFound, "Profissional não encontrado.");
-            evolution.ProfessionalId = professionalId.Value;
-        }
-
-        if (dto.Values is not null)
-        {
-            var validation = await ValidateValuesAsync(evolution.Treatment.TemplateId, status, dto.Values);
-            if (!validation.IsSuccess)
-                return Result<bool>.Fail(validation.ErrorCode!, validation.ErrorMessage!);
-
-            db.PatientEvolutionValues.RemoveRange(evolution.Values);
-            evolution.Values = BuildValues(dto.Values);
-        }
-        else if (status == EvolutionStatus.Completed)
-        {
-            var currentValues = evolution.Values.Select(v => new CreatePatientEvolutionValueDto
-            {
-                FieldId = v.FieldId,
-                ValueNumber = v.ValueNumber,
-                ValueText = v.ValueText,
-                ValueBoolean = v.ValueBoolean,
-                ValueJson = v.ValueJson
-            }).ToList();
-            var validation = await ValidateValuesAsync(evolution.Treatment.TemplateId, status, currentValues);
-            if (!validation.IsSuccess)
-                return Result<bool>.Fail(validation.ErrorCode!, validation.ErrorMessage!);
-        }
-
-        evolution.ServiceId = dto.ServiceId ?? evolution.ServiceId;
-        evolution.Date = dto.Date ?? evolution.Date;
-        evolution.Description = dto.Description is null ? evolution.Description : NormalizeOptional(dto.Description);
-        evolution.Conduct = dto.Conduct is null ? evolution.Conduct : NormalizeOptional(dto.Conduct);
-        evolution.Observations = dto.Observations is null ? evolution.Observations : NormalizeOptional(dto.Observations);
-        evolution.NextGuidance = dto.NextGuidance is null ? evolution.NextGuidance : NormalizeOptional(dto.NextGuidance);
-        evolution.Status = status;
-        evolution.UpdatedByUserId = usuario.UserId;
-
-        await db.SaveChangesAsync();
-        return Result<bool>.Ok(true);
-    }
-
-    public async Task<Result<bool>> DeleteEvolutionAsync(int patientId, int treatmentId, int evolutionId)
-    {
-        var evolution = await FindEvolutionAsync(patientId, treatmentId, evolutionId);
-        if (evolution is null)
-            return Result<bool>.Fail(ErrorCodes.NotFound, "Evolução não encontrada.");
-
-        evolution.IsDeleted = true;
-        evolution.DeletedAt = DateTime.UtcNow;
-        evolution.DeletedByUserId = usuario.UserId;
-        await db.SaveChangesAsync();
-
-        return Result<bool>.Ok(true);
-    }
+    public Task<Result<bool>> DeleteEvolutionAsync(int patientId, int evolutionId)
+        => throw new NotImplementedException("Trilha A");
 
     private async Task<Result<bool>> ValidateValuesAsync(int templateId, EvolutionStatus status, List<CreatePatientEvolutionValueDto> values)
     {
@@ -447,91 +181,6 @@ public class EvolutionService(AppDbContext db, IUsuarioLogadoService usuario) : 
             _ => false
         };
 
-    private static TreatmentProgressChartDto? BuildProgressChart(EvolutionTemplateField field, List<PatientEvolution> evolutions)
-    {
-        var points = evolutions
-            .Select(e => new
-            {
-                e.Date,
-                Value = e.Values.FirstOrDefault(v =>
-                    v.FieldId == field.Id
-                    && !v.IsDeleted
-                    && v.ValueNumber.HasValue)?.ValueNumber
-            })
-            .Where(point => point.Value.HasValue)
-            .Select(point => new TreatmentProgressPointDto
-            {
-                Date = point.Date,
-                Value = point.Value!.Value
-            })
-            .ToList();
-
-        if (points.Count == 0)
-            return null;
-
-        var initialValue = points.First().Value;
-        var currentValue = points.Last().Value;
-
-        return new TreatmentProgressChartDto
-        {
-            FieldId = field.Id,
-            Label = field.Label,
-            Unit = field.Unit,
-            Direction = field.ExpectedDirection,
-            InitialValue = initialValue,
-            CurrentValue = currentValue,
-            TargetValue = field.TargetValue,
-            Progress = field.TargetValue.HasValue
-                ? CalculateProgress(initialValue, currentValue, field.TargetValue.Value, field.ExpectedDirection)
-                : null,
-            Data = points
-        };
-    }
-
-    private static decimal? CalculateProgress(
-        decimal initialValue,
-        decimal currentValue,
-        decimal targetValue,
-        EvolutionDirection direction)
-    {
-        if (direction == EvolutionDirection.Neutral)
-            return null;
-        if (initialValue == targetValue)
-            return 100;
-
-        var denominator = direction == EvolutionDirection.Increase
-            ? targetValue - initialValue
-            : initialValue - targetValue;
-
-        if (denominator == 0)
-            return null;
-
-        var progress = direction == EvolutionDirection.Increase
-            ? ((currentValue - initialValue) / denominator) * 100
-            : ((initialValue - currentValue) / denominator) * 100;
-
-        return Math.Round(Math.Max(0, Math.Min(100, progress)), 2);
-    }
-
-    private static bool IsImproving(TreatmentProgressChartDto chart)
-        => chart.Direction switch
-        {
-            EvolutionDirection.Increase => chart.CurrentValue > chart.InitialValue,
-            EvolutionDirection.Decrease => chart.CurrentValue < chart.InitialValue,
-            _ => false
-        };
-
-    private static bool IsWorsening(TreatmentProgressChartDto chart)
-        => chart.Direction switch
-        {
-            EvolutionDirection.Increase => chart.CurrentValue < chart.InitialValue,
-            EvolutionDirection.Decrease => chart.CurrentValue > chart.InitialValue,
-            _ => false
-        };
-
-    private static bool IsStable(TreatmentProgressChartDto chart)
-        => chart.Direction != EvolutionDirection.Neutral && chart.CurrentValue == chart.InitialValue;
-
     private List<PatientEvolutionValue> BuildValues(List<CreatePatientEvolutionValueDto> values)
         => values.Select(v => new PatientEvolutionValue
         {
@@ -562,26 +211,6 @@ public class EvolutionService(AppDbContext db, IUsuarioLogadoService usuario) : 
     private async Task<bool> TemplateExistsAsync(int templateId, bool includeInactive)
         => await db.EvolutionTemplates.AnyAsync(t =>
             t.Id == templateId && t.ClinicaId == usuario.ClinicaId && !t.IsDeleted && (includeInactive || t.IsActive));
-
-    private async Task<PatientTreatment?> FindTreatmentAsync(int patientId, int treatmentId)
-        => await db.PatientTreatments
-            .Include(t => t.Template)
-            .FirstOrDefaultAsync(t => t.Id == treatmentId && t.PatientId == patientId && t.ClinicaId == usuario.ClinicaId && !t.IsDeleted);
-
-    private async Task<bool> TreatmentExistsAsync(int patientId, int treatmentId)
-        => await db.PatientTreatments.AnyAsync(t =>
-            t.Id == treatmentId && t.PatientId == patientId && t.ClinicaId == usuario.ClinicaId && !t.IsDeleted);
-
-    private async Task<PatientEvolution?> FindEvolutionAsync(int patientId, int treatmentId, int evolutionId)
-        => await db.PatientEvolutions
-            .Include(e => e.Treatment)
-            .Include(e => e.Values)
-            .FirstOrDefaultAsync(e =>
-                e.Id == evolutionId
-                && e.PatientId == patientId
-                && e.TreatmentId == treatmentId
-                && e.ClinicaId == usuario.ClinicaId
-                && !e.IsDeleted);
 
     private async Task<string> GenerateUniqueFieldKeyAsync(int templateId, string label)
     {
@@ -727,27 +356,12 @@ public class EvolutionService(AppDbContext db, IUsuarioLogadoService usuario) : 
             OptionsJson = field.OptionsJson
         };
 
-    private static PatientTreatmentResponseDto ToTreatmentResponse(PatientTreatment treatment)
-        => new()
-        {
-            Id = treatment.Id,
-            PatientId = treatment.PatientId,
-            ProfessionalId = treatment.ProfessionalId,
-            TemplateId = treatment.TemplateId,
-            Title = treatment.Title,
-            Description = treatment.Description,
-            StartedAt = treatment.StartedAt,
-            EndedAt = treatment.EndedAt,
-            Status = treatment.Status,
-            CreatedAt = treatment.CreatedAt
-        };
-
     private static PatientEvolutionResponseDto ToEvolutionResponse(PatientEvolution evolution)
         => new()
         {
             Id = evolution.Id,
             PatientId = evolution.PatientId,
-            TreatmentId = evolution.TreatmentId,
+            AppointmentId = evolution.AppointmentId,
             ProfessionalId = evolution.ProfessionalId,
             ServiceId = evolution.ServiceId,
             Date = evolution.Date,
