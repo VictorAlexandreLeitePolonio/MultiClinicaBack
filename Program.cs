@@ -133,6 +133,12 @@ builder.Services.AddSingleton<MultiClinica.API.Services.MercadoPago.TokenCipher>
 builder.Services.AddScoped<MultiClinica.API.Services.MercadoPago.MercadoPagoAccounts>();
 MultiClinica.API.Services.MercadoPago.MercadoPagoRegistration.AddMercadoPagoOAuth(builder.Services, builder.Environment);
 MultiClinica.API.Services.MercadoPago.MercadoPagoRegistration.AddMercadoPagoPayments(builder.Services);
+builder.Services.Configure<MultiClinica.API.Services.Transcription.TranscriptionOptions>(builder.Configuration.GetSection("Transcription"));
+builder.Services.AddSingleton<MultiClinica.API.Services.Transcription.ConsultationAudioStore>();
+builder.Services.AddHttpClient<MultiClinica.API.Services.Transcription.ITranscriber, MultiClinica.API.Services.Transcription.HttpTranscriber>(
+    client => client.Timeout = TimeSpan.FromMinutes(10)).RemoveAllLoggers();
+// Consulta: registros da Trilha A
+// Consulta: registros da Trilha B
 builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
 builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client) =>
 {

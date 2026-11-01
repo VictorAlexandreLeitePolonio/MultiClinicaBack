@@ -14,4 +14,7 @@ public class AppointmentResponseDto
     public AppointmentStatus Status { get; set; }
     public DateTime CreatedAt { get; set; }
     public string? TimeZoneId { get; set; }
+    // Recording | Processing | Ready | Interrupted | Failed; null sem consulta gravada.
+    public string? ConsultationStatus { get; set; }
+    public bool ConsultationReviewed { get; set; }
 }

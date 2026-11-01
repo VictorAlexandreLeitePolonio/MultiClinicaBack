@@ -40,6 +40,7 @@ public class AppDbContext : DbContext
     public DbSet<ClinicMercadoPagoAccount> ClinicMercadoPagoAccounts { get; set; } = null!;
     public DbSet<MercadoPagoOAuthState> MercadoPagoOAuthStates { get; set; } = null!;
     public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents { get; set; } = null!;
+    public DbSet<ConsultationReport> ConsultationReports { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -537,6 +538,17 @@ public class AppDbContext : DbContext
             e.HasIndex(m => new { m.Status, m.ConversationId });
             e.HasOne(m => m.Conversation).WithMany(c => c.Messages)
                 .HasForeignKey(m => m.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Consulta gravada ─────────────────────────────────────────────────
+        modelBuilder.Entity<ConsultationReport>(e =>
+        {
+            e.Property(r => r.Status).HasConversion<string>();
+            e.HasIndex(r => r.AppointmentId).IsUnique();
+            e.HasIndex(r => new { r.Status, r.NextAttemptAt });
+            e.HasOne(r => r.Appointment).WithMany().HasForeignKey(r => r.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Patient).WithMany().HasForeignKey(r => r.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Professional).WithMany().HasForeignKey(r => r.ProfessionalId).OnDelete(DeleteBehavior.Restrict);
         });
     }
 

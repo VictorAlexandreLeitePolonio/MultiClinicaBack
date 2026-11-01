@@ -50,4 +50,11 @@ public static class ErrorCodes
     public const string PaymentHasPendingOnlinePayment = "PAYMENT_HAS_PENDING_ONLINE_PAYMENT";
     public const string PaymentPaidOnline    = "PAYMENT_PAID_ONLINE";
     public const string PaymentNotRefundable = "PAYMENT_NOT_REFUNDABLE";
+
+    // ── Consulta gravada ────────────────────────────────────────────────────
+    public const string ConsentRequired = "CONSENT_REQUIRED";
+    public const string AppointmentCancelled = "APPOINTMENT_CANCELLED";
+    public const string ConsultationExists = "CONSULTATION_EXISTS";
+    public const string TranscriptionQuotaExhausted = "TRANSCRIPTION_QUOTA_EXHAUSTED";
+    public const string ConsultationEmpty = "CONSULTATION_EMPTY";
 }
