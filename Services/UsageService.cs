@@ -44,6 +44,26 @@ public class UsageService(AppDbContext db)
         return updated == 1;
     }
 
+    // Consulta já aconteceu: soma sempre, mesmo passando do limite do mês.
+    public async Task ConsumeAllowingOverageAsync(int clinicaId, UsageMetric metric, int amount)
+    {
+        var period = CurrentPeriod(DateTime.UtcNow);
+
+        if (!db.Database.IsRelational())
+        {
+            (await GetOrCreateAsync(clinicaId, period, metric)).Used += amount;
+            await db.SaveChangesAsync();
+            return;
+        }
+
+        var metricName = metric.ToString();
+        await db.Database.ExecuteSqlInterpolatedAsync($"""
+            INSERT INTO "ClinicUsages" ("ClinicaId", "Period", "Metric", "Used", "ExtraGranted")
+            VALUES ({clinicaId}, {period}, {metricName}, {amount}, 0)
+            ON CONFLICT ("ClinicaId", "Period", "Metric") DO UPDATE SET "Used" = "ClinicUsages"."Used" + {amount}
+            """);
+    }
+
     public async Task GrantExtraAsync(int clinicaId, UsageMetric metric, int amount)
     {
         var period = CurrentPeriod(DateTime.UtcNow);
