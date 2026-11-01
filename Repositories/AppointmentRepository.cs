@@ -26,14 +26,26 @@ public class AppointmentRepository(AppDbContext db, IUsuarioLogadoService usuari
         if (status.HasValue)
             query = query.Where(a => a.Status == status.Value);
 
-        if (date.HasValue)
-            query = query.Where(a => DateOnly.FromDateTime(a.AppointmentDate) == date.Value);
+        // Dias no fuso da clínica viram intervalos UTC [início, fim) — o Postgres só aceita DateTime UTC.
+        if (date.HasValue || dateFrom.HasValue || dateTo.HasValue)
+        {
+            var timeZone = await ClinicTimeZoneAsync();
+            DateTime StartUtc(DateOnly day) => TimeZoneInfo.ConvertTimeToUtc(
+                day.ToDateTime(TimeOnly.MinValue, DateTimeKind.Unspecified), timeZone);
 
-        if (dateFrom.HasValue)
-            query = query.Where(a => a.AppointmentDate >= dateFrom.Value.ToDateTime(TimeOnly.MinValue));
-
-        if (dateTo.HasValue)
-            query = query.Where(a => a.AppointmentDate <= dateTo.Value.ToDateTime(TimeOnly.MaxValue));
+            var from = date ?? dateFrom;
+            var to = date ?? dateTo;
+            if (from.HasValue)
+            {
+                var start = StartUtc(from.Value);
+                query = query.Where(a => a.AppointmentDate >= start);
+            }
+            if (to.HasValue)
+            {
+                var end = StartUtc(to.Value.AddDays(1));
+                query = query.Where(a => a.AppointmentDate < end);
+            }
+        }
 
         if (!string.IsNullOrEmpty(patientName))
             query = query.Where(a => a.Patient.Name != null && a.Patient.Name.Contains(patientName));
@@ -45,6 +57,14 @@ public class AppointmentRepository(AppDbContext db, IUsuarioLogadoService usuari
             .ToListAsync();
 
         return (items, totalCount);
+    }
+
+    private async Task<TimeZoneInfo> ClinicTimeZoneAsync()
+    {
+        var id = await db.Clinicas.Where(c => c.Id == usuario.ClinicaId).Select(c => c.TimeZoneId).FirstOrDefaultAsync();
+        try { return TimeZoneInfo.FindSystemTimeZoneById(string.IsNullOrWhiteSpace(id) ? "America/Sao_Paulo" : id); }
+        catch (Exception exception) when (exception is TimeZoneNotFoundException or InvalidTimeZoneException)
+        { return TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo"); }
     }
 
     public async Task<Appointment?> GetByIdAsync(int id)
