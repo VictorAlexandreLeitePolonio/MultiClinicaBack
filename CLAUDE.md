@@ -43,6 +43,13 @@ Program.cs does three things in order:
 - `AppointmentStatusUpdater` — auto-cancels past Scheduled appointments
 - `PatientEmailOutboxWorker` — sends queued patient e-mails
 - `Agent/AgentWorker` — processes the AI agent inbox (owner copilot on WhatsApp)
+- `Transcription/ConsultationWorker` — processes recorded consultations
+
+### Recorded consultations (transcription)
+- Endpoints under `/api/appointments/{id}/consultation` (start, chunks, finish, report, review, retry, charge-suggestion, evolution) and `GET /api/patients/{patientId}/consultation-reports`. Spec: `docs/superpowers/specs/2026-11-01-consulta-transcricao-design.md`.
+- `ConsultationProcessor` (single instance) interrupts recordings idle for 10 min, transcribes the concatenated chunks with `HttpTranscriber`, consumes `TranscriptionMinutes` (overage allowed) and asks `IChatModel` for the SOAP JSON. Failed reports retry 1/5 min and give up after 3 transcription failures; a failed AI report stays `Ready` with `ReportPending` and retries every 30 min.
+- Audio lives in `Transcription:StoragePath` (default `App_Data/consultations`), outside `wwwroot`, and is deleted after a successful transcription or 7 days after `Failed`/`Interrupted`. Logs never include transcript, report or audio.
+- Config: `Transcription__BaseUrl`, `__ApiKey`, `__Model`, `__StoragePath`; the SOAP report uses `Agent:Model`.
 
 The owner copilot runs on the platform's WhatsApp number (Cloud API): webhook `GET|POST /webhooks/whatsapp` (verify token + `X-Hub-Signature-256`), owners link via `api/me/whatsapp-link` (one-time code sent as `conectar <code>`), each new 24h window consumes 1 `WhatsAppConversations`. Config: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__DisplayNumber`, `WhatsApp__AppSecret`, `WhatsApp__VerifyToken`. Reminders, patient chatbot (each clinic's own number via Embedded Signup) and transcription come in later specs.
 

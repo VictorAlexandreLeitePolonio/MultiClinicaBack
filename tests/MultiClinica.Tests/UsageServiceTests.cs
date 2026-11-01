@@ -51,6 +51,23 @@ public class UsageServiceTests
     }
 
     [Fact]
+    public async Task Consumo_com_excedente_soma_mesmo_passando_do_limite()
+    {
+        await using var db = NewDb();
+        var id = await SeedClinicAsync(db, ClinicPlan.Premium); // 1200 minutos
+        var service = new UsageService(db);
+
+        await service.ConsumeAllowingOverageAsync(id, UsageMetric.TranscriptionMinutes, 1200);
+        await service.ConsumeAllowingOverageAsync(id, UsageMetric.TranscriptionMinutes, 2);
+
+        var usage = await service.GetAsync(id);
+        var minutes = usage.Metrics.Single(m => m.Metric == UsageMetric.TranscriptionMinutes);
+        Assert.Equal(1202, minutes.Used);
+        Assert.Equal(1200, minutes.PlanLimit);
+        Assert.Equal(1200, minutes.Total);
+    }
+
+    [Fact]
     public async Task Pacote_soma_no_mes_corrente()
     {
         await using var db = NewDb();
