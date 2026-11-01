@@ -22,7 +22,7 @@ public class PatientEvolutionsController(IEvolutionService service) : Controller
         var result = await service.GetEvolutionsAsync(patientId, appointmentId, page, pageSize);
         return result.IsSuccess
             ? Ok(result.Value)
-            : NotFound(new { message = result.ErrorMessage });
+            : NotFound(new { code = result.ErrorCode, message = result.ErrorMessage });
     }
 
     [HttpGet("{evolutionId}")]
@@ -31,7 +31,7 @@ public class PatientEvolutionsController(IEvolutionService service) : Controller
         var result = await service.GetEvolutionAsync(patientId, evolutionId);
         return result.IsSuccess
             ? Ok(result.Value)
-            : NotFound(new { message = result.ErrorMessage });
+            : NotFound(new { code = result.ErrorCode, message = result.ErrorMessage });
     }
 
     [HttpPost]
@@ -66,7 +66,7 @@ public class PatientEvolutionsController(IEvolutionService service) : Controller
     {
         var result = await service.DeleteEvolutionAsync(patientId, evolutionId);
         if (!result.IsSuccess)
-            return NotFound(new { message = result.ErrorMessage });
+            return NotFound(new { code = result.ErrorCode, message = result.ErrorMessage });
 
         return NoContent();
     }
