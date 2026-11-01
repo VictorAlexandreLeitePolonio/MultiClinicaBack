@@ -86,21 +86,54 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
                 : cursor.ToUniversalTime();
 
         take = take <= 0 ? DefaultTimelineTake : Math.Min(take, MaxTimelineTake);
-        var pageSize = take + 1;
         // Recepção só enxerga os agendamentos, sem dados clínicos da consulta.
         var isReception = usuario.Role == UserRole.Recepcao;
 
+        var ordered = await LoadTimelineAsync(patientId, isReception, before, null, take + 1);
+        var page = ordered.Take(take).ToList();
+        DateTime? nextBefore = null;
+        if (ordered.Count > take)
+        {
+            var boundary = page[^1].Date;
+            nextBefore = boundary;
+            // Evoluções geradas da consulta herdam a data dela: o corte não pode separar um grupo
+            // de mesma data, senão "Date < before" pula o resto.
+            if (ordered[take].Date == boundary)
+            {
+                if (page.Any(e => e.Date != boundary))
+                {
+                    // O grupo vai inteiro para a próxima página.
+                    page = page.Where(e => e.Date != boundary).ToList();
+                    nextBefore = boundary.AddTicks(1);
+                }
+                else
+                {
+                    // A página toda é um grupo maior que "take": devolve o grupo completo.
+                    page = await LoadTimelineAsync(patientId, isReception, before, boundary, null);
+                }
+            }
+        }
+
+        return Result<PatientTimelineDto>.Ok(new PatientTimelineDto(page, nextBefore));
+    }
+
+    // Eventos da linha do tempo; "at" busca um grupo de mesma data inteiro (sem limite).
+    private async Task<List<PatientTimelineEventDto>> LoadTimelineAsync(
+        int patientId, bool isReception, DateTime? before, DateTime? at, int? limit)
+    {
         var appointmentQuery = db.Appointments
             .AsNoTracking()
             .Where(a => a.ClinicaId == usuario.ClinicaId && a.PatientId == patientId && !a.IsDeleted);
 
         if (before.HasValue)
             appointmentQuery = appointmentQuery.Where(a => a.AppointmentDate < before.Value);
+        if (at.HasValue)
+            appointmentQuery = appointmentQuery.Where(a => a.AppointmentDate == at.Value);
 
         var appointments = await appointmentQuery
             .Include(a => a.User)
             .OrderByDescending(a => a.AppointmentDate)
-            .Take(pageSize)
+            .Take(limit ?? int.MaxValue)
             .ToListAsync();
 
         var appointmentIds = appointments.Select(a => a.Id).ToList();
@@ -138,6 +171,8 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
 
             if (before.HasValue)
                 evolutionQuery = evolutionQuery.Where(e => e.Date < before.Value);
+            if (at.HasValue)
+                evolutionQuery = evolutionQuery.Where(e => e.Date == at.Value);
 
             evolutions = await evolutionQuery
                 .Include(e => e.Professional)
@@ -146,7 +181,7 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
                     .ThenInclude(f => f.Template)
                 .OrderByDescending(e => e.Date)
                 .ThenByDescending(e => e.CreatedAt)
-                .Take(pageSize)
+                .Take(limit ?? int.MaxValue)
                 .ToListAsync();
 
             var anamnesisQuery = db.MedicalRecords
@@ -155,11 +190,13 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
 
             if (before.HasValue)
                 anamnesisQuery = anamnesisQuery.Where(m => m.CreatedAt < before.Value);
+            if (at.HasValue)
+                anamnesisQuery = anamnesisQuery.Where(m => m.CreatedAt == at.Value);
 
             anamneses = await anamnesisQuery
                 .Include(m => m.User)
                 .OrderByDescending(m => m.CreatedAt)
-                .Take(pageSize)
+                .Take(limit ?? int.MaxValue)
                 .ToListAsync();
         }
 
@@ -208,15 +245,10 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
             0,
             [])));
 
-        var ordered = events
+        return events
             .OrderByDescending(e => e.Date)
             .ThenByDescending(e => e.Id)
             .ToList();
-
-        var page = ordered.Take(take).ToList();
-        var nextBefore = ordered.Count > take ? page[^1].Date : (DateTime?)null;
-
-        return Result<PatientTimelineDto>.Ok(new PatientTimelineDto(page, nextBefore));
     }
 
     private async Task<bool> PatientExistsAsync(int patientId)

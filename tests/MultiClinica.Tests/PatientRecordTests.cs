@@ -375,6 +375,47 @@ public class PatientRecordTests
     }
 
     [Fact]
+    public async Task Timeline_pagination_never_skips_events_sharing_the_same_date()
+    {
+        // Evoluções geradas da consulta herdam a data dela: empates de horário são comuns.
+        await using var app = ConsultationTestSupport.CreateApp();
+        var seed = await ConsultationTestSupport.SeedAsync(app);
+        await app.SeedAsync(async db =>
+        {
+            var appointment = await db.Appointments.SingleAsync(a => a.Id == seed.AppointmentId);
+            for (var i = 0; i < 2; i++)
+                db.PatientEvolutions.Add(new PatientEvolution
+                {
+                    ClinicaId = seed.ClinicaId, PatientId = seed.PatientId, ProfessionalId = seed.ProfessionalId,
+                    AppointmentId = appointment.Id, Date = appointment.AppointmentDate, Status = EvolutionStatus.Draft,
+                });
+            db.Appointments.Add(new Appointment
+            {
+                ClinicaId = seed.ClinicaId, UserId = seed.ProfessionalId, PatientId = seed.PatientId,
+                AppointmentDate = appointment.AppointmentDate.AddDays(-1),
+            });
+            await db.SaveChangesAsync();
+        });
+        using var client = await ConsultationTestSupport.LoginAsync(app, seed.AdminEmail);
+
+        var seen = new List<string>();
+        string? before = null;
+        for (var guard = 0; guard < 10; guard++)
+        {
+            var url = $"/api/patients/{seed.PatientId}/timeline?take=2"
+                + (before is null ? "" : $"&before={Uri.EscapeDataString(before)}");
+            var page = await client.GetFromJsonAsync<TimelineResponse>(url);
+            Assert.NotNull(page);
+            seen.AddRange(page.Events.Select(e => $"{e.Type}:{e.Id}"));
+            if (page.NextBefore is null) break;
+            before = page.NextBefore.Value.ToString("O");
+        }
+
+        Assert.Equal(4, seen.Count);
+        Assert.Equal(4, seen.Distinct().Count());
+    }
+
+    [Fact]
     public async Task Timeline_for_reception_has_only_appointments_without_clinical_data()
     {
         await using var app = new MultiClinicaFactory();
