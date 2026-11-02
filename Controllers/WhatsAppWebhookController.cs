@@ -47,14 +47,23 @@ public class WhatsAppWebhookController(
         if (!HasValidSignature(body)) return Unauthorized();
 
         var payload = JsonSerializer.Deserialize<WhatsAppWebhookDto>(body) ?? new();
-        var messages = payload.Entry.SelectMany(e => e.Changes).Select(c => c.Value)
-            .Where(v => v?.Metadata?.PhoneNumberId == options.Value.PhoneNumberId)
-            .SelectMany(v => v!.Messages ?? []);
-        foreach (var message in messages)
+        var values = payload.Entry.SelectMany(e => e.Changes).Select(c => c.Value)
+            .Where(v => v?.Metadata?.PhoneNumberId == options.Value.PhoneNumberId);
+        foreach (var message in values.SelectMany(v => v!.Messages ?? []))
             await HandleAsync(message, ct);
+        foreach (var status in values.SelectMany(v => v!.Statuses ?? []).Where(s => s.Status == "failed"))
+            LogFailedStatus(status);
         // Sem try/catch de propósito: falha vira 500, a Meta reentrega o lote e o wamid descarta o que já foi gravado.
         await db.SaveChangesAsync(ct);
         return Ok();
+    }
+
+    private void LogFailedStatus(WhatsAppStatusDto status)
+    {
+        // Sem errors no payload: loga código 0 para a falha não sumir.
+        foreach (var error in status.Errors is { Count: > 0 } errors ? errors : [new WhatsAppStatusErrorDto()])
+            logger.LogWarning("WhatsApp: entrega falhou {Wamid} código {ErrorCode} {ErrorTitle}",
+                status.Id, error.Code, error.Title);
     }
 
     private bool HasValidSignature(byte[] body)
