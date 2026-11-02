@@ -324,6 +324,107 @@ public class MercadoPagoOAuthTests
     }
 
     [Fact]
+    public async Task Callback_stores_account_identity_and_status_returns_it()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = CreateApp(fake);
+        var clinicId = await SeedClinicAsync(app);
+        fake.NextToken = new MpTokenResponse("access-1", "refresh-1", 15552000, 555, "PUB-1", true);
+        fake.Me = new MpUserInfo(555, "CLINICA_TESTE", "clinica@test.com");
+
+        using var login = await LoginAsync(app);
+        var state = Query(await ConnectAsync(login))["state"];
+
+        using var callback = NoRedirectClient(app);
+        var response = await CallbackAsync(callback, "code-1", state);
+
+        AssertRedirectsTo(response, "conectado");
+        Assert.Equal("access-1", Assert.Single(fake.MeRequests));
+
+        await app.SeedAsync(async db =>
+        {
+            var account = await db.ClinicMercadoPagoAccounts.SingleAsync(a => a.ClinicaId == clinicId);
+            Assert.Equal("CLINICA_TESTE", account.MpNickname);
+            Assert.Equal("clinica@test.com", account.MpEmail);
+        });
+
+        var status = await login.GetFromJsonAsync<JsonElement>("/api/mercadopago/status");
+        Assert.True(status.GetProperty("connected").GetBoolean());
+        Assert.Equal(555, status.GetProperty("accountId").GetInt64());
+        Assert.Equal("CLINICA_TESTE", status.GetProperty("nickname").GetString());
+        Assert.Equal("clinica@test.com", status.GetProperty("email").GetString());
+        Assert.True(status.GetProperty("connectedAt").GetDateTime() > DateTime.UtcNow.AddMinutes(-1));
+    }
+
+    [Fact]
+    public async Task Callback_keeps_connection_when_users_me_fails()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = CreateApp(fake);
+        var clinicId = await SeedClinicAsync(app);
+        fake.NextToken = new MpTokenResponse("access-1", "refresh-1", 15552000, 555, "PUB-1", true);
+        fake.Me = null;
+
+        using var login = await LoginAsync(app);
+        var state = Query(await ConnectAsync(login))["state"];
+
+        using var callback = NoRedirectClient(app);
+        var response = await CallbackAsync(callback, "code-1", state);
+
+        AssertRedirectsTo(response, "conectado");
+        Assert.Equal("access-1", Assert.Single(fake.MeRequests));
+
+        await app.SeedAsync(async db =>
+        {
+            var account = await db.ClinicMercadoPagoAccounts.SingleAsync(a => a.ClinicaId == clinicId);
+            Assert.Equal(MercadoPagoAccountStatus.Connected, account.Status);
+            Assert.Equal(555L, account.MpUserId);
+            Assert.Null(account.MpNickname);
+            Assert.Null(account.MpEmail);
+        });
+
+        var status = await login.GetFromJsonAsync<JsonElement>("/api/mercadopago/status");
+        Assert.True(status.GetProperty("connected").GetBoolean());
+        Assert.Equal(555, status.GetProperty("accountId").GetInt64());
+        Assert.Equal(JsonValueKind.Null, status.GetProperty("nickname").ValueKind);
+        Assert.Equal(JsonValueKind.Null, status.GetProperty("email").ValueKind);
+        Assert.NotEqual(JsonValueKind.Null, status.GetProperty("connectedAt").ValueKind);
+    }
+
+    [Fact]
+    public async Task Callback_reconnect_clears_stale_identity_when_users_me_fails()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = CreateApp(fake);
+        var clinicId = await SeedClinicAsync(app);
+        var cipher = app.Services.GetRequiredService<TokenCipher>();
+        await SeedAccountAsync(app, cipher, 555, DateTime.UtcNow.AddDays(60), clinicaId: clinicId);
+        await app.SeedAsync(async db =>
+        {
+            var account = await db.ClinicMercadoPagoAccounts.SingleAsync(a => a.ClinicaId == clinicId);
+            account.MpNickname = "CONTA_ANTIGA";
+            account.MpEmail = "antiga@test.com";
+            await db.SaveChangesAsync();
+        });
+        fake.NextToken = new MpTokenResponse("access-1", "refresh-1", 15552000, 555, "PUB-1", true);
+        fake.Me = null;
+
+        using var login = await LoginAsync(app);
+        var state = Query(await ConnectAsync(login))["state"];
+
+        using var callback = NoRedirectClient(app);
+        var response = await CallbackAsync(callback, "code-1", state);
+
+        AssertRedirectsTo(response, "conectado");
+        await app.SeedAsync(async db =>
+        {
+            var account = await db.ClinicMercadoPagoAccounts.SingleAsync(a => a.ClinicaId == clinicId);
+            Assert.Null(account.MpNickname);
+            Assert.Null(account.MpEmail);
+        });
+    }
+
+    [Fact]
     public async Task Callback_with_account_from_another_clinic_redirects_to_conta_em_uso()
     {
         var fake = new FakeMercadoPagoClient();

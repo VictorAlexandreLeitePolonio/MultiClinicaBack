@@ -88,9 +88,20 @@ public sealed class MercadoPagoClient(HttpClient http, IOptions<MercadoPagoOptio
         return await ReadPaymentAsync(response, ct);
     }
 
-    // Ajustes finais: Trilha B implementa.
-    public Task<MpUserInfo> GetMeAsync(string accessToken, CancellationToken ct) =>
-        throw new NotImplementedException();
+    // GET /users/me: identifica a conta conectada (apelido e e-mail).
+    public async Task<MpUserInfo> GetMeAsync(string accessToken, CancellationToken ct)
+    {
+        using var message = Request(HttpMethod.Get, "users/me", accessToken);
+        using var response = await http.SendAsync(message, ct);
+        await EnsureSuccessAsync(response, ct);
+        using var document = await ReadJsonAsync(response, ct);
+        var root = document.RootElement;
+
+        return new MpUserInfo(
+            root.GetProperty("id").GetInt64(),
+            StringOrNull(root, "nickname"),
+            StringOrNull(root, "email"));
+    }
 
     public async Task<MpPayment> GetPaymentAsync(string accessToken, long paymentId, CancellationToken ct)
     {
