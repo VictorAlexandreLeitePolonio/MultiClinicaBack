@@ -212,6 +212,12 @@ public class PaymentService(
         if (payment is null)
             return Result<PaymentResponseDto>.Fail(ErrorCodes.NotFound, "Pagamento não encontrado.");
 
+        // Paga online: editar (ex.: voltar para Pendente) reabriria o link e permitiria cobrar de novo.
+        if (payment.PaidOnline && payment.Status == PaymentStatus.Paid)
+            return Result<PaymentResponseDto>.Fail(
+                ErrorCodes.PaymentPaidOnline,
+                "Cobrança paga online não pode ser editada. Faça o reembolso antes.");
+
         // Cobranças antigas (ex.: "Boleto", "Cartão") continuam editáveis sem trocar a forma;
         // trocar para online ou para um valor desconhecido não é permitido.
         var methodUnchanged = string.Equals(

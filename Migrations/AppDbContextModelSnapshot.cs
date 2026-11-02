@@ -1994,6 +1994,7 @@ namespace MultiClinica.API.Migrations
                         .HasColumnType("bigint");
 
                     b.Property<string>("MpStatus")
+                        .IsConcurrencyToken()
                         .HasColumnType("text");
 
                     b.Property<string>("MpStatusDetail")

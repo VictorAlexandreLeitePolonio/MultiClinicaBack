@@ -26,10 +26,14 @@ public class UserInvitationsController(UserInvitationService service, AppDbConte
 
     [AllowAnonymous]
     [HttpPost("accept")]
-    public async Task<IActionResult> Accept(AcceptUserInvitationDto dto) =>
-        await service.AcceptAsync(dto)
-            ? Ok(new { message = "Convite aceito. Sua senha foi definida." })
-            : BadRequest(new { message = "Convite inválido ou expirado. Solicite um novo convite ao administrador." });
+    public async Task<IActionResult> Accept(AcceptUserInvitationDto dto)
+    {
+        var result = await service.AcceptAsync(dto);
+        if (result.IsSuccess) return Ok(new { message = "Convite aceito. Sua senha foi definida." });
+        return result.ErrorCode == ErrorCodes.ProfessionalLimit
+            ? Conflict(new { code = result.ErrorCode, message = result.ErrorMessage })
+            : BadRequest(new { message = result.ErrorMessage });
+    }
 
     private async Task<IActionResult> Map(Result<UserInvitationResponseDto> result)
     {

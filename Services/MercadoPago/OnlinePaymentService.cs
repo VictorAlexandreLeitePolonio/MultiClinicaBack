@@ -257,9 +257,10 @@ public sealed class OnlinePaymentService(
                 "Esta cobrança não está mais disponível.");
 
         var now = time.GetUtcNow().UtcDateTime;
-        if (payment.MpPaymentId is not null
-            && payment.MpStatus is "pending" or "in_process"
-            && payment.UpdatedAt > now.AddHours(-24))
+        if ((payment.MpPaymentId is not null
+                && payment.MpStatus is "pending" or "in_process" or "authorized"
+                && payment.UpdatedAt > now.AddHours(-24))
+            || (payment.MpStatus == ClaimingStatus && payment.UpdatedAt > now.AddMinutes(-2)))
         {
             return Result<PublicPayResultDto>.Fail(ErrorCodes.PaymentInProgress,
                 "Já existe um pagamento em andamento para esta cobrança. Aguarde a confirmação.");
@@ -315,6 +316,20 @@ public sealed class OnlinePaymentService(
             PayerIdentificationNumber: request.Payer?.Identification?.Number,
             DateOfExpiration: isPix ? now.AddHours(24) : null);
 
+        // Reserva a cobrança antes de chamar o gateway. MpStatus é token de concorrência: de duas
+        // requisições simultâneas (duplo clique, retry), só uma grava "claiming"; a outra cai aqui.
+        var previousMpStatus = payment.MpStatus;
+        payment.MpStatus = ClaimingStatus;
+        try
+        {
+            await db.SaveChangesAsync(ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            return Result<PublicPayResultDto>.Fail(ErrorCodes.PaymentInProgress,
+                "Já existe um pagamento em andamento para esta cobrança. Aguarde a confirmação.");
+        }
+
         MpPayment created;
         try
         {
@@ -323,23 +338,36 @@ public sealed class OnlinePaymentService(
         }
         catch (MercadoPagoApiException exception) when (exception.StatusCode == 401)
         {
+            await ReleaseClaimAsync(payment, previousMpStatus);
             await accounts.MarkRevokedAsync(payment.ClinicaId, ct);
             return Result<PublicPayResultDto>.Fail(ErrorCodes.MercadoPagoNotConnected,
                 "Esta cobrança não está mais disponível.");
         }
         catch (MercadoPagoApiException exception)
         {
+            await ReleaseClaimAsync(payment, previousMpStatus);
             logger.LogWarning(exception, "Mercado Pago recusou o pagamento da cobrança {PaymentId}.", payment.Id);
             return Result<PublicPayResultDto>.Fail(ErrorCodes.MercadoPagoPaymentFailed,
                 MercadoPagoMessage(exception));
         }
 
         var applied = await sync.ApplyAsync(payment.ClinicaId, created.Id, ct);
+        // O sync normalmente já gravou o status real; se não aplicou, solta a reserva com o status do gateway.
+        if (payment.MpStatus == ClaimingStatus)
+            await ReleaseClaimAsync(payment, created.Status);
         return Result<PublicPayResultDto>.Ok(new PublicPayResultDto
         {
             PaymentId = created.Id,
             Status = applied?.MpStatus ?? created.Status,
         });
+    }
+
+    private const string ClaimingStatus = "claiming";
+
+    private async Task ReleaseClaimAsync(Payment payment, string? mpStatus)
+    {
+        payment.MpStatus = mpStatus;
+        await db.SaveChangesAsync(CancellationToken.None);
     }
 
     // ── Portal do paciente ───────────────────────────────────────────────────

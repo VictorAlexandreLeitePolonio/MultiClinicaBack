@@ -415,6 +415,99 @@ public class OnlinePaymentTests
         Assert.Equal("PAYMENT_IN_PROGRESS", (await ReadJsonAsync(response)).GetProperty("code").GetString());
     }
 
+    [Fact]
+    public async Task Pay_rejects_a_concurrent_attempt_that_already_claimed_the_charge()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = MercadoPagoTestSupport.CreateApp(fake);
+        await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions
+        {
+            PaymentLinkToken = "tok-claimed",
+            MpStatus = "claiming", // outra requisição acabou de reservar (UpdatedAt = agora)
+        });
+        using var client = app.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/public/payments/tok-claimed/pay",
+            Payload("pix", payerEmail: "ana@example.com"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        Assert.Equal("PAYMENT_IN_PROGRESS", (await ReadJsonAsync(response)).GetProperty("code").GetString());
+        Assert.Empty(fake.Created); // o gateway não foi chamado
+    }
+
+    [Fact]
+    public async Task Payment_claim_is_atomic_between_two_contexts()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = MercadoPagoTestSupport.CreateApp(fake);
+        var seed = await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions { PaymentLinkToken = "tok-race" });
+
+        using var first = app.Services.CreateScope();
+        using var second = app.Services.CreateScope();
+        var db1 = first.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db2 = second.ServiceProvider.GetRequiredService<AppDbContext>();
+        var p1 = await db1.Payments.SingleAsync(p => p.Id == seed.PaymentId);
+        var p2 = await db2.Payments.SingleAsync(p => p.Id == seed.PaymentId);
+
+        p1.MpStatus = "claiming";
+        await db1.SaveChangesAsync();
+        p2.MpStatus = "claiming";
+        await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db2.SaveChangesAsync());
+    }
+
+    [Fact]
+    public async Task Pay_releases_the_claim_when_mercado_pago_fails()
+    {
+        var fake = new FakeMercadoPagoClient(); // OnCreate null = gateway falha com 500
+        await using var app = MercadoPagoTestSupport.CreateApp(fake);
+        var seed = await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions { PaymentLinkToken = "tok-fail" });
+        using var client = app.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/public/payments/tok-fail/pay",
+            Payload("pix", payerEmail: "ana@example.com"));
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        using var scope = app.Services.CreateScope();
+        var payment = await scope.ServiceProvider.GetRequiredService<AppDbContext>().Payments
+            .SingleAsync(p => p.Id == seed.PaymentId);
+        Assert.NotEqual("claiming", payment.MpStatus); // nova tentativa liberada
+    }
+
+    [Fact]
+    public async Task Payment_update_rejects_paid_online_charge()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = MercadoPagoTestSupport.CreateApp(fake);
+        var seed = await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions());
+        var paidOnlineId = 0;
+        await app.SeedAsync(async db =>
+        {
+            var payment = new Payment
+            {
+                ClinicaId = seed.ClinicaId, UserId = seed.AdminId, PatientId = seed.PatientId, PlanId = seed.PlanId,
+                ReferenceMonth = new DateOnly(2026, 11, 1), Amount = 150m, PaymentMethod = "Pix",
+                Status = PaymentStatus.Paid, PaidOnline = true, MpPaymentId = 901, MpStatus = "approved",
+            };
+            db.Payments.Add(payment);
+            await db.SaveChangesAsync();
+            paidOnlineId = payment.Id;
+        });
+        using var client = await MercadoPagoTestSupport.LoginAdminAsync(app, "mp-admin@test.local");
+
+        var update = await client.PutAsJsonAsync($"/api/payments/{paidOnlineId}", new
+        {
+            planId = seed.PlanId,
+            referenceMonth = "2026-11-01",
+            paymentMethod = "Pix",
+            status = "Pending",
+            paidAt = (string?)null,
+            paymentDate = (string?)null,
+        });
+
+        Assert.Equal(HttpStatusCode.BadRequest, update.StatusCode);
+        Assert.Contains("paga online", await update.Content.ReadAsStringAsync());
+    }
+
     // ── Sync ─────────────────────────────────────────────────────────────────
 
     [Fact]

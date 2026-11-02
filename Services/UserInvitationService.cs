@@ -70,7 +70,7 @@ public class UserInvitationService(
         return Result<UserInvitationResponseDto>.Ok(new(user.Id, await SendAsync(user, token)));
     }
 
-    public async Task<bool> AcceptAsync(AcceptUserInvitationDto dto)
+    public async Task<Result<bool>> AcceptAsync(AcceptUserInvitationDto dto)
     {
         var hash = Hash(dto.Token);
         var now = DateTime.UtcNow;
@@ -79,7 +79,11 @@ public class UserInvitationService(
             && (user.Role == UserRole.Profissional || user.Role == UserRole.Recepcao)
             && user.Clinica.IsActive && !user.Clinica.IsDeleted && !user.Clinica.IsBlockedByBilling);
         var user = await query.FirstOrDefaultAsync();
-        if (user is null) return false;
+        if (user is null) return Result<bool>.Fail(ErrorCodes.NotFound, InvalidInvitation);
+        // O convite não reserva vaga: o limite do plano vale no aceite (vários convites, uma vaga).
+        if (user.Role == UserRole.Profissional && !await clinicPlans.CanAddProfessionalAsync(user.ClinicaId))
+            return Result<bool>.Fail(ErrorCodes.ProfessionalLimit,
+                "A clínica atingiu o limite de profissionais do plano. Peça ao administrador para liberar uma vaga.");
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
         user.IsActive = true;
         user.InvitationTokenHash = null;
@@ -90,10 +94,13 @@ public class UserInvitationService(
         }
         catch (DbUpdateConcurrencyException)
         {
-            return false;
+            return Result<bool>.Fail(ErrorCodes.NotFound, InvalidInvitation);
         }
-        return true;
+        return Result<bool>.Ok(true);
     }
+
+    private const string InvalidInvitation =
+        "Convite inválido ou expirado. Solicite um novo convite ao administrador.";
 
     private static string SetInvitation(User user)
     {
