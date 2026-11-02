@@ -5,6 +5,7 @@ using System.Text;
 using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using MultiClinica.API.DTOs.Auth;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services;
@@ -20,12 +21,14 @@ public class WhatsAppTests
     private const string PlatformNumberId = "PNID";
     private const string Phone = "5511999998888";
 
-    private static MultiClinicaFactory CreateApp(FakeWhatsAppClient whatsApp, TimeProvider? clock = null) => new()
+    private static MultiClinicaFactory CreateApp(FakeWhatsAppClient whatsApp, TimeProvider? clock = null,
+        ILoggerProvider? loggerProvider = null) => new()
     {
         ConfigureTestServices = s =>
         {
             s.AddSingleton<IWhatsAppClient>(whatsApp);
             if (clock is not null) s.AddSingleton<TimeProvider>(clock);
+            if (loggerProvider is not null) s.AddSingleton(loggerProvider);
             s.Configure<WhatsAppOptions>(o =>
             {
                 o.AppSecret = AppSecret;
@@ -38,7 +41,8 @@ public class WhatsAppTests
 
     private static Task<HttpResponseMessage> PostAsync(HttpClient client, string from, string wamid, string? text,
         string type = "text", string phoneNumberId = PlatformNumberId, string? signature = null, bool sign = true,
-        bool includeStatuses = false, bool includeMessage = true)
+        bool includeStatuses = false, bool includeMessage = true, string status = "delivered",
+        object[]? errors = null)
     {
         var json = JsonSerializer.Serialize(new
         {
@@ -71,7 +75,17 @@ public class WhatsAppTests
                                     }
                                     : null,
                                 statuses = includeStatuses
-                                    ? new[] { new { id = "status-1", status = "delivered", timestamp = "1", recipient_id = from } }
+                                    ? new[]
+                                    {
+                                        new
+                                        {
+                                            id = wamid,
+                                            status,
+                                            timestamp = "1",
+                                            recipient_id = from,
+                                            errors,
+                                        },
+                                    }
                                     : null,
                             },
                         },
@@ -150,6 +164,39 @@ public class WhatsAppTests
             Assert.Empty(await db.AgentConversations.ToListAsync());
         });
         Assert.Empty(whatsApp.Sent);
+    }
+
+    [Fact]
+    public async Task Failed_status_is_logged_without_recipient()
+    {
+        var logs = new CapturingLoggerProvider();
+        await using var app = CreateApp(new FakeWhatsAppClient(), loggerProvider: logs);
+        using var client = app.CreateClient();
+
+        var response = await PostAsync(client, Phone, "wamid.falha", text: null, includeStatuses: true,
+            includeMessage: false, status: "failed",
+            errors: [new { code = 130497, title = "Business account is restricted from messaging users in this country" }]);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var warning = Assert.Single(logs.Entries,
+            e => e.Level == LogLevel.Warning && e.Message.Contains("entrega falhou"));
+        Assert.Contains("130497", warning.Message);
+        Assert.Contains("wamid.falha", warning.Message);
+        Assert.DoesNotContain(Phone, warning.Message);
+    }
+
+    [Fact]
+    public async Task Delivered_status_is_not_logged_as_failure()
+    {
+        var logs = new CapturingLoggerProvider();
+        await using var app = CreateApp(new FakeWhatsAppClient(), loggerProvider: logs);
+        using var client = app.CreateClient();
+
+        var response = await PostAsync(client, Phone, "wamid.entrega", text: null, includeStatuses: true,
+            includeMessage: false);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.DoesNotContain(logs.Entries, e => e.Level == LogLevel.Warning && e.Message.Contains("entrega falhou"));
     }
 
     [Fact]
@@ -399,5 +446,35 @@ public class WhatsAppTests
         await LoginAsync(client, "pro@test.local");
 
         Assert.Equal(HttpStatusCode.Forbidden, (await client.PostAsync("/api/me/whatsapp-link", null)).StatusCode);
+    }
+
+    private sealed record LogEntry(LogLevel Level, string Message);
+
+    private sealed class CapturingLoggerProvider : ILoggerProvider
+    {
+        private readonly List<LogEntry> _entries = [];
+
+        public IReadOnlyList<LogEntry> Entries
+        {
+            get { lock (_entries) return _entries.ToList(); }
+        }
+
+        public ILogger CreateLogger(string categoryName) => new CapturingLogger(this);
+
+        public void Dispose() { }
+
+        private sealed class CapturingLogger(CapturingLoggerProvider provider) : ILogger
+        {
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+            public bool IsEnabled(LogLevel logLevel) => true;
+
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception,
+                Func<TState, Exception?, string> formatter)
+            {
+                lock (provider._entries)
+                    provider._entries.Add(new LogEntry(logLevel, formatter(state, exception)));
+            }
+        }
     }
 }
