@@ -21,6 +21,20 @@ public sealed class WhatsAppValueDto
 {
     [JsonPropertyName("metadata")] public WhatsAppMetadataDto? Metadata { get; set; }
     [JsonPropertyName("messages")] public List<WhatsAppMessageDto>? Messages { get; set; }
+    [JsonPropertyName("statuses")] public List<WhatsAppStatusDto>? Statuses { get; set; }
+}
+
+public sealed class WhatsAppStatusDto
+{
+    [JsonPropertyName("id")] public string Id { get; set; } = string.Empty;
+    [JsonPropertyName("status")] public string Status { get; set; } = string.Empty;
+    [JsonPropertyName("errors")] public List<WhatsAppStatusErrorDto>? Errors { get; set; }
+}
+
+public sealed class WhatsAppStatusErrorDto
+{
+    [JsonPropertyName("code")] public int Code { get; set; }
+    [JsonPropertyName("title")] public string Title { get; set; } = string.Empty;
 }
 
 public sealed class WhatsAppMetadataDto

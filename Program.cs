@@ -28,6 +28,14 @@ else if (builder.Environment.IsProduction())
     builder.WebHost.UseUrls("http://0.0.0.0:8080");
 }
 
+// ponytail: sem Sentry__Dsn o SDK fica desligado (dev e testes); Warning+ vira evento no painel.
+builder.WebHost.UseSentry(o =>
+{
+    o.Dsn = builder.Configuration["Sentry:Dsn"] ?? "";
+    o.SendDefaultPii = false;
+    o.MinimumEventLevel = LogLevel.Warning;
+});
+
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
 
