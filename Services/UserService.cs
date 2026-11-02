@@ -7,7 +7,7 @@ using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
-public class UserService(IUserRepository repository, IUsuarioLogadoService usuario) : IUserService
+public class UserService(IUserRepository repository, IUsuarioLogadoService usuario, ClinicPlanService clinicPlans) : IUserService
 {
     // ── Listagem ─────────────────────────────────────────────────────────────
 
@@ -74,6 +74,10 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
         if (!usuario.IsSuperAdmin && dto.Role == UserRole.Administrador)
             return Result<UserResponseDto>.Fail(
                 ErrorCodes.Forbidden, "Administrador só pode criar Profissional ou Recepcao.");
+
+        if (dto.Role == UserRole.Profissional && !await clinicPlans.CanAddProfessionalAsync(usuario.ClinicaId))
+            return Result<UserResponseDto>.Fail(
+                ErrorCodes.ProfessionalLimit, "Limite de profissionais do plano atingido.");
 
         var user = new User
         {

@@ -25,27 +25,32 @@ public class AppDbContext : DbContext
     public DbSet<ProfessionalAvailability> ProfessionalAvailabilities { get; set; } = null!;
     public DbSet<Plans> Plans { get; set; } = null!;
     public DbSet<SessionType> SessionTypes { get; set; } = null!;
-    public DbSet<Fornecedor> Fornecedores { get; set; } = null!;
-    public DbSet<AuditoriaFinanceira> AuditoriasFinanceiras { get; set; } = null!;
-    public DbSet<CategoriaProduto> CategoriasProduto { get; set; } = null!;
-    public DbSet<Produto> Produtos { get; set; } = null!;
-    public DbSet<MovimentacaoEstoque> MovimentacoesEstoque { get; set; } = null!;
-    public DbSet<Compra> Compras { get; set; } = null!;
-    public DbSet<CompraItem> ComprasItens { get; set; } = null!;
     public DbSet<ClinicCharge> ClinicCharges { get; set; } = null!;
     public DbSet<CommercialHistoryEvent> CommercialHistoryEvents { get; set; } = null!;
     public DbSet<ClinicalAttachment> ClinicalAttachments { get; set; } = null!;
     public DbSet<EvolutionTemplate> EvolutionTemplates { get; set; } = null!;
     public DbSet<EvolutionTemplateField> EvolutionTemplateFields { get; set; } = null!;
-    public DbSet<PatientTreatment> PatientTreatments { get; set; } = null!;
     public DbSet<PatientEvolution> PatientEvolutions { get; set; } = null!;
     public DbSet<PatientEvolutionValue> PatientEvolutionValues { get; set; } = null!;
     public DbSet<ClinicExpense> ClinicExpenses { get; set; } = null!;
+    public DbSet<AgentConversation> AgentConversations { get; set; } = null!;
+    public DbSet<AgentMessage> AgentMessages { get; set; } = null!;
+    public DbSet<ClinicUsage> ClinicUsages { get; set; } = null!;
+    public DbSet<ClinicMercadoPagoAccount> ClinicMercadoPagoAccounts { get; set; } = null!;
+    public DbSet<MercadoPagoOAuthState> MercadoPagoOAuthStates { get; set; } = null!;
+    public DbSet<ProcessedWebhookEvent> ProcessedWebhookEvents { get; set; } = null!;
+    public DbSet<ConsultationReport> ConsultationReports { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Clinica>()
             .HasIndex(c => c.Cnpj);
+        modelBuilder.Entity<Clinica>().Property(c => c.Plan).HasConversion<string>().HasMaxLength(20);
+        modelBuilder.Entity<Clinica>().Property(c => c.BillingCycle).HasConversion<string>().HasMaxLength(20);
+        modelBuilder.Entity<ClinicUsage>().HasKey(u => new { u.ClinicaId, u.Period, u.Metric });
+        modelBuilder.Entity<ClinicUsage>().Property(u => u.Metric).HasConversion<string>().HasMaxLength(40);
+        modelBuilder.Entity<ClinicUsage>().Property(u => u.Period).HasMaxLength(7);
+        modelBuilder.Entity<ProcessedWebhookEvent>().HasKey(e => new { e.Provider, e.EventId });
         modelBuilder.Entity<Clinica>()
             .Property(c => c.AppointmentSlotDurationMinutes)
             .HasDefaultValue(60);
@@ -132,10 +137,6 @@ public class AppDbContext : DbContext
             .Property(f => f.ExpectedDirection)
             .HasConversion<string>();
 
-        modelBuilder.Entity<PatientTreatment>()
-            .Property(t => t.Status)
-            .HasConversion<string>();
-
         modelBuilder.Entity<PatientEvolution>()
             .Property(e => e.Status)
             .HasConversion<string>();
@@ -170,33 +171,12 @@ public class AppDbContext : DbContext
             .HasForeignKey(p => p.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<Fornecedor>()
-            .HasOne(f => f.Clinica)
-            .WithMany()
-            .HasForeignKey(f => f.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Fornecedor>().HasIndex(f => f.ClinicaId);
-
         modelBuilder.Entity<ClinicExpense>()
             .HasOne(e => e.Clinica)
             .WithMany()
             .HasForeignKey(e => e.ClinicaId)
             .OnDelete(DeleteBehavior.Restrict);
         modelBuilder.Entity<ClinicExpense>().HasIndex(e => e.ClinicaId);
-
-        modelBuilder.Entity<AuditoriaFinanceira>()
-            .HasOne(a => a.Clinica)
-            .WithMany()
-            .HasForeignKey(a => a.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<AuditoriaFinanceira>().HasIndex(a => a.ClinicaId);
-
-        modelBuilder.Entity<CategoriaProduto>()
-            .HasOne(c => c.Clinica)
-            .WithMany()
-            .HasForeignKey(c => c.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<CategoriaProduto>().HasIndex(c => c.ClinicaId);
 
         modelBuilder.Entity<SessionType>()
             .Property(item => item.Name)
@@ -212,61 +192,6 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(plan => plan.TipoSessaoId)
             .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Produto>()
-            .HasOne(p => p.Clinica)
-            .WithMany()
-            .HasForeignKey(p => p.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Produto>()
-            .HasOne(p => p.CategoriaProduto)
-            .WithMany()
-            .HasForeignKey(p => p.CategoriaProdutoId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Produto>().HasIndex(p => p.ClinicaId);
-
-        modelBuilder.Entity<MovimentacaoEstoque>()
-            .Property(m => m.Tipo)
-            .HasConversion<string>();
-        modelBuilder.Entity<MovimentacaoEstoque>()
-            .HasOne(m => m.Clinica)
-            .WithMany()
-            .HasForeignKey(m => m.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<MovimentacaoEstoque>()
-            .HasOne(m => m.Produto)
-            .WithMany()
-            .HasForeignKey(m => m.ProdutoId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ClinicaId);
-        modelBuilder.Entity<MovimentacaoEstoque>().HasIndex(m => m.ProdutoId);
-
-        modelBuilder.Entity<Compra>()
-            .Property(c => c.Status)
-            .HasConversion<string>();
-        modelBuilder.Entity<Compra>()
-            .HasOne(c => c.Clinica)
-            .WithMany()
-            .HasForeignKey(c => c.ClinicaId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Compra>()
-            .HasOne(c => c.Fornecedor)
-            .WithMany()
-            .HasForeignKey(c => c.FornecedorId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<Compra>().HasIndex(c => c.ClinicaId);
-
-        modelBuilder.Entity<CompraItem>()
-            .HasOne(i => i.Compra)
-            .WithMany(c => c.Itens)
-            .HasForeignKey(i => i.CompraId)
-            .OnDelete(DeleteBehavior.Cascade);
-        modelBuilder.Entity<CompraItem>()
-            .HasOne(i => i.Produto)
-            .WithMany()
-            .HasForeignKey(i => i.ProdutoId)
-            .OnDelete(DeleteBehavior.Restrict);
-        modelBuilder.Entity<CompraItem>().HasIndex(i => i.CompraId);
 
         modelBuilder.Entity<Patient>()
             .HasMany(p => p.Appointments)
@@ -307,15 +232,6 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<EvolutionTemplateField>()
             .HasIndex(f => f.TemplateId);
 
-        modelBuilder.Entity<PatientTreatment>()
-            .HasIndex(t => t.ClinicaId);
-
-        modelBuilder.Entity<PatientTreatment>()
-            .HasIndex(t => t.PatientId);
-
-        modelBuilder.Entity<PatientTreatment>()
-            .HasIndex(t => t.TemplateId);
-
         modelBuilder.Entity<PatientEvolution>()
             .HasIndex(e => e.ClinicaId);
 
@@ -323,7 +239,10 @@ public class AppDbContext : DbContext
             .HasIndex(e => e.PatientId);
 
         modelBuilder.Entity<PatientEvolution>()
-            .HasIndex(e => e.TreatmentId);
+            .HasIndex(e => e.AppointmentId);
+
+        modelBuilder.Entity<PatientEvolution>()
+            .HasIndex(e => new { e.ClinicaId, e.PatientId, e.Date });
 
         modelBuilder.Entity<PatientEvolution>()
             .HasIndex(e => e.ProfessionalId);
@@ -349,34 +268,17 @@ public class AppDbContext : DbContext
             .HasForeignKey(f => f.TemplateId)
             .OnDelete(DeleteBehavior.Restrict);
 
-        modelBuilder.Entity<EvolutionTemplate>()
-            .HasMany(t => t.Treatments)
-            .WithOne(t => t.Template)
-            .HasForeignKey(t => t.TemplateId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<Patient>()
-            .HasMany(p => p.Treatments)
-            .WithOne(t => t.Patient)
-            .HasForeignKey(t => t.PatientId)
-            .OnDelete(DeleteBehavior.Restrict);
-
-        modelBuilder.Entity<User>()
-            .HasMany(u => u.PatientTreatments)
-            .WithOne(t => t.Professional)
-            .HasForeignKey(t => t.ProfessionalId)
-            .OnDelete(DeleteBehavior.Restrict);
-
         modelBuilder.Entity<PatientEvolution>()
             .HasOne(e => e.Patient)
             .WithMany()
             .HasForeignKey(e => e.PatientId)
             .OnDelete(DeleteBehavior.Restrict);
 
+        // Evolução pode vir de uma consulta (várias por consulta) ou ser avulsa.
         modelBuilder.Entity<PatientEvolution>()
-            .HasOne(e => e.Treatment)
-            .WithMany(t => t.Evolutions)
-            .HasForeignKey(e => e.TreatmentId)
+            .HasOne(e => e.Appointment)
+            .WithMany()
+            .HasForeignKey(e => e.AppointmentId)
             .OnDelete(DeleteBehavior.Restrict);
 
         modelBuilder.Entity<PatientEvolution>()
@@ -573,6 +475,53 @@ public class AppDbContext : DbContext
             .WithMany()
             .HasForeignKey(l => l.ClinicaId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // ── Mercado Pago ────────────────────────────────────────────────────
+        modelBuilder.Entity<ClinicMercadoPagoAccount>(e =>
+        {
+            e.Property(a => a.Status).HasConversion<string>();
+            e.HasIndex(a => a.ClinicaId).IsUnique();
+            e.HasIndex(a => a.MpUserId).IsUnique();
+            e.HasOne(a => a.Clinica).WithMany().HasForeignKey(a => a.ClinicaId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<MercadoPagoOAuthState>().HasIndex(s => s.StateHash).IsUnique();
+        modelBuilder.Entity<Payment>().HasIndex(p => p.PaymentLinkToken).IsUnique();
+
+        // ── Agente IA (WhatsApp) ─────────────────────────────────────────────
+        modelBuilder.Entity<User>()
+            .HasIndex(u => u.WhatsAppPhone)
+            .IsUnique();
+
+        modelBuilder.Entity<AgentConversation>(e =>
+        {
+            e.Property(c => c.Channel).HasConversion<string>();
+            e.Property(c => c.Profile).HasConversion<string>();
+            e.HasIndex(c => new { c.Channel, c.ClinicaId, c.ExternalChatId }).IsUnique();
+            e.HasOne(c => c.Clinica).WithMany().HasForeignKey(c => c.ClinicaId).OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<AgentMessage>(e =>
+        {
+            e.Property(m => m.Channel).HasConversion<string>();
+            e.Property(m => m.Role).HasConversion<string>();
+            e.Property(m => m.Status).HasConversion<string>();
+            // Deduplicação de reentrega dos webhooks (Postgres trata NULLs como distintos).
+            e.HasIndex(m => new { m.Channel, m.ExternalMessageId }).IsUnique();
+            e.HasIndex(m => new { m.Status, m.ConversationId });
+            e.HasOne(m => m.Conversation).WithMany(c => c.Messages)
+                .HasForeignKey(m => m.ConversationId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ── Consulta gravada ─────────────────────────────────────────────────
+        modelBuilder.Entity<ConsultationReport>(e =>
+        {
+            e.Property(r => r.Status).HasConversion<string>();
+            e.HasIndex(r => r.AppointmentId).IsUnique();
+            e.HasIndex(r => new { r.Status, r.NextAttemptAt });
+            e.HasOne(r => r.Appointment).WithMany().HasForeignKey(r => r.AppointmentId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Patient).WithMany().HasForeignKey(r => r.PatientId).OnDelete(DeleteBehavior.Restrict);
+            e.HasOne(r => r.Professional).WithMany().HasForeignKey(r => r.ProfessionalId).OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)

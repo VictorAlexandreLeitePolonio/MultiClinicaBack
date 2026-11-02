@@ -8,7 +8,6 @@ using MultiClinica.API.Data;
 using MultiClinica.API.DTOs.Auth;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services.Interfaces;
-using MultiClinica.API.Services;
 using Xunit;
 
 namespace MultiClinica.Tests;
@@ -324,7 +323,7 @@ public class AuthIsolationTests
         {
             var clinic = await db.Clinicas.SingleAsync(c => c.Email == "contato@clinica.test");
             Assert.True(clinic.IsActive);
-            Assert.False(clinic.CobrancaAtiva);
+            Assert.Equal(ClinicPlan.Free, clinic.Plan);
             Assert.Equal("12345678000190", clinic.Cnpj);
             Assert.True(await db.Users.AnyAsync(u =>
                 u.ClinicaId == clinic.Id
@@ -456,43 +455,6 @@ public class AuthIsolationTests
     }
 
     [Fact]
-    public async Task Billing_service_generates_monthly_charge_and_blocks_overdue_clinic()
-    {
-        await using var app = new MultiClinicaFactory();
-        await app.SeedAsync(async db =>
-        {
-            db.Clinicas.Add(new Clinica
-            {
-                Nome = "Clinica Cobrança",
-                NomeResponsavel = "Victor",
-                CobrancaAtiva = true,
-                ValorMensalidade = 300,
-                DiaVencimento = 10,
-                DataInicioCobranca = new DateOnly(2026, 1, 1)
-            });
-            await db.SaveChangesAsync();
-        });
-
-        using var scope = app.Services.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<IClinicaBillingService>();
-        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-
-        await service.GenerateMonthlyChargesAsync(new DateOnly(2026, 5, 1));
-        var charge = await dbContext.ClinicCharges.SingleAsync();
-
-        Assert.Equal("05-2026", charge.ReferenceMonth);
-        Assert.Equal(new DateOnly(2026, 5, 10), charge.DueDate);
-        Assert.Equal(ClinicChargeStatus.Pending, charge.Status);
-
-        await service.BlockOverdueClinicsAsync(new DateOnly(2026, 5, 11));
-        var clinic = await dbContext.Clinicas.SingleAsync();
-
-        Assert.True(clinic.IsBlockedByBilling);
-        Assert.True(await dbContext.CommercialHistoryEvents.AnyAsync(h =>
-            h.Type == CommercialHistoryEventType.AutomaticBillingBlock));
-    }
-
-    [Fact]
     public async Task Existing_session_is_blocked_when_clinic_becomes_billing_blocked()
     {
         await using var app = new MultiClinicaFactory();
@@ -565,6 +527,8 @@ public sealed class MultiClinicaFactory : WebApplicationFactory<Program>
 {
     private readonly string _databaseName = Guid.NewGuid().ToString("N");
 
+    public Action<IServiceCollection>? ConfigureTestServices { get; init; }
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
@@ -583,6 +547,7 @@ public sealed class MultiClinicaFactory : WebApplicationFactory<Program>
             if (storageDescriptor is not null)
                 services.Remove(storageDescriptor);
             services.AddSingleton<IAttachmentStorage, FakeAttachmentStorage>();
+            ConfigureTestServices?.Invoke(services);
         });
     }
 

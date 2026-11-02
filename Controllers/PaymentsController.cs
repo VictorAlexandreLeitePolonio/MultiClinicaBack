@@ -6,13 +6,17 @@ using MultiClinica.API.DTOs;
 using MultiClinica.API.DTOs.Payment;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services.Interfaces;
+using MultiClinica.API.Services.MercadoPago;
 
 namespace MultiClinica.API.Controllers;
 
 [Authorize(Roles = "Administrador,Recepcao")]
 [ApiController]
 [Route("api/[controller]")]
-public class PaymentsController(IPaymentService service) : ControllerBase
+public class PaymentsController(
+    IPaymentService service,
+    OnlinePaymentService onlinePayments,
+    ILogger<PaymentsController> logger) : ControllerBase
 {
     [HttpGet]
     public async Task<IActionResult> GetPayments(
@@ -52,7 +56,7 @@ public class PaymentsController(IPaymentService service) : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> CreatePayment(CreatePaymentDto dto)
+    public async Task<IActionResult> CreatePayment(CreatePaymentDto dto, CancellationToken ct)
     {
         var result = await service.CreateAsync(dto);
         if (!result.IsSuccess)
@@ -60,10 +64,40 @@ public class PaymentsController(IPaymentService service) : ControllerBase
             {
                 ErrorCodes.NotFound         => NotFound(new { message = result.ErrorMessage }),
                 ErrorCodes.DuplicatePayment => Conflict(new { message = result.ErrorMessage }),
-                _                           => BadRequest(new { message = result.ErrorMessage })
+                _                           => BadRequest(new { message = result.ErrorMessage, code = result.ErrorCode })
             };
 
-        return CreatedAtAction(nameof(GetPayment), new { id = result.Value!.Id }, result.Value);
+        var created = result.Value!;
+
+        // O envio fica no controller para o PaymentService não depender do OnlinePaymentService.
+        // Se o envio falhar, a cobrança continua criada e o erro só é logado.
+        if (PaymentMethods.IsOnline(dto.PaymentMethod) && dto.SendOnline)
+        {
+            try
+            {
+                var sent = await onlinePayments.SendAsync(created.Id, ct);
+                if (sent.IsSuccess)
+                {
+                    // Devolve o token/estado já atualizados pelo envio.
+                    var refreshed = await service.GetByIdAsync(created.Id);
+                    if (refreshed.IsSuccess)
+                        created = refreshed.Value!;
+                }
+                else
+                {
+                    logger.LogError(
+                        "Falha ao enviar a cobrança {PaymentId} após criá-la: {Code} {Message}",
+                        created.Id, sent.ErrorCode, sent.ErrorMessage);
+                }
+            }
+            catch (Exception exception)
+            {
+                logger.LogError(exception,
+                    "Falha ao enviar a cobrança {PaymentId} após criá-la.", created.Id);
+            }
+        }
+
+        return CreatedAtAction(nameof(GetPayment), new { id = created.Id }, created);
     }
 
     [HttpPut("{id}")]
@@ -75,7 +109,7 @@ public class PaymentsController(IPaymentService service) : ControllerBase
             {
                 ErrorCodes.NotFound       => NotFound(new { message = result.ErrorMessage }),
                 ErrorCodes.DuplicatePayment => Conflict(new { message = result.ErrorMessage }),
-                _                         => BadRequest(new { message = result.ErrorMessage })
+                _                         => BadRequest(new { message = result.ErrorMessage, code = result.ErrorCode })
             };
 
         return Ok(result.Value);
@@ -88,7 +122,7 @@ public class PaymentsController(IPaymentService service) : ControllerBase
         if (!result.IsSuccess)
             return result.ErrorCode == ErrorCodes.NotFound
                 ? NotFound(new { message = result.ErrorMessage })
-                : BadRequest(new { message = result.ErrorMessage });
+                : BadRequest(new { message = result.ErrorMessage, code = result.ErrorCode });
 
         return NoContent();
     }

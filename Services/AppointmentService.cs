@@ -21,6 +21,13 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
         var (items, total) = await repository.GetPagedAsync(
             status, date, dateFrom, dateTo, patientName, page, pageSize);
 
+        var ids = items.Select(a => a.Id).ToList();
+        var consultationByAppointment = (await db.ConsultationReports.AsNoTracking()
+                .Where(r => ids.Contains(r.AppointmentId))
+                .Select(r => new { r.AppointmentId, r.Status, r.ReviewedAt })
+                .ToListAsync())
+            .ToDictionary(r => r.AppointmentId);
+
         var data = items.Select(a => new AppointmentResponseDto
         {
             Id              = a.Id,
@@ -31,6 +38,8 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
             AppointmentDate = DateTime.SpecifyKind(a.AppointmentDate, DateTimeKind.Utc),
             Status          = a.Status,
             CreatedAt       = DateTime.SpecifyKind(a.CreatedAt, DateTimeKind.Utc),
+            ConsultationStatus = consultationByAppointment.GetValueOrDefault(a.Id)?.Status.ToString(),
+            ConsultationReviewed = consultationByAppointment.GetValueOrDefault(a.Id)?.ReviewedAt is not null,
         });
 
         return Result<PagedResult<AppointmentResponseDto>>.Ok(new PagedResult<AppointmentResponseDto>
@@ -52,6 +61,10 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
 
         var clinicTimeZone = await db.Clinicas.Where(c => c.Id == usuario.ClinicaId)
             .Select(c => c.TimeZoneId).FirstOrDefaultAsync();
+        var consultation = await db.ConsultationReports.AsNoTracking()
+            .Where(r => r.AppointmentId == appointment.Id)
+            .Select(r => new { r.Status, r.ReviewedAt })
+            .FirstOrDefaultAsync();
         return Result<AppointmentResponseDto>.Ok(new AppointmentResponseDto
         {
             Id              = appointment.Id,
@@ -63,6 +76,8 @@ public class AppointmentService(IAppointmentRepository repository, AppDbContext 
             PatientName     = appointment.Patient.Name ?? string.Empty,
             CreatedAt       = DateTime.SpecifyKind(appointment.CreatedAt, DateTimeKind.Utc),
             TimeZoneId      = clinicTimeZone,
+            ConsultationStatus = consultation?.Status.ToString(),
+            ConsultationReviewed = consultation?.ReviewedAt is not null,
         });
     }
 

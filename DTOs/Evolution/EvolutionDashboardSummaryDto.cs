@@ -2,7 +2,8 @@ namespace MultiClinica.API.DTOs.Evolution;
 
 public class EvolutionDashboardSummaryDto
 {
-    public int ActiveTreatments { get; set; }
+    // Pacientes com evolução concluída com medição nos últimos 60 dias.
+    public int PatientsInFollowUp { get; set; }
     public int CompletedEvolutionsThisMonth { get; set; }
     public int PatientsImproving { get; set; }
     public int PatientsStable { get; set; }

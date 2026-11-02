@@ -40,6 +40,7 @@ public class MarketplaceTests
                 NomeFantasia = "Clínica Pública",
                 NomeResponsavel = "Responsável",
                 IsPublic = true,
+                IsHubApproved = true,
                 LikeCount = 8,
             };
             var privateClinic = new Clinica
@@ -223,6 +224,7 @@ public class MarketplaceTests
         Cidade = city,
         Estado = state,
         IsPublic = true,
+        IsHubApproved = true,
         LikeCount = likes,
     };
 

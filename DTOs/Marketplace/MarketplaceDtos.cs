@@ -35,6 +35,7 @@ public sealed class MarketplaceClinicCardDto
     public int LikeCount { get; set; }
     public bool LikedByMe { get; set; }
     public bool AcceptsAppointmentRequests { get; set; }
+    public string? Badge { get; set; }
 }
 
 public sealed class MarketplaceClinicDetailsDto

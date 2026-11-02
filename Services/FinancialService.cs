@@ -9,14 +9,6 @@ namespace MultiClinica.API.Services;
 
 public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : IFinancialService
 {
-    private static readonly TipoMovimentacaoEstoque[] CostMovementTypes =
-    [
-        TipoMovimentacaoEstoque.Compra,
-        TipoMovimentacaoEstoque.Saida,
-        TipoMovimentacaoEstoque.Perda,
-        TipoMovimentacaoEstoque.UsoInterno
-    ];
-
     public async Task<Result<FinancialBalanceDto>> GetBalanceAsync(FinancialBalanceQueryDto query)
     {
         var now = DateTime.UtcNow;
@@ -39,7 +31,6 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
         var money = await BuildMoneySummaryAsync(clinicaId, periodStart, periodEndExclusive);
         var appointments = await BuildAppointmentsSummaryAsync(clinicaId, periodStart, periodEndExclusive);
         var patients = await BuildPatientsSummaryAsync(clinicaId, periodStart, periodEndExclusive);
-        var stock = await BuildStockSummaryAsync(clinicaId, periodStart, periodEndExclusive);
         var evolutions = await BuildEvolutionsSummaryAsync(clinicaId, periodStart, periodEndExclusive);
         var recentMovements = await BuildRecentMovementsAsync(clinicaId, periodStart, periodEndExclusive);
 
@@ -49,7 +40,6 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             Money = money,
             Appointments = appointments,
             Patients = patients,
-            Stock = stock,
             Evolutions = evolutions,
             RecentMovements = recentMovements
         });
@@ -66,20 +56,6 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             .Select(p => p.Amount)
             .ToListAsync();
 
-        var stockCostMovements = await db.MovimentacoesEstoque
-            .Where(m => m.ClinicaId == clinicaId && !m.IsCancelada
-                && CostMovementTypes.Contains(m.Tipo)
-                && m.CreatedAt >= start && m.CreatedAt < endExclusive)
-            .Select(m => new { m.Tipo, m.TotalValue })
-            .ToListAsync();
-
-        var productSales = await db.MovimentacoesEstoque
-            .Where(m => m.ClinicaId == clinicaId && !m.IsCancelada
-                && m.Tipo == TipoMovimentacaoEstoque.Venda
-                && m.CreatedAt >= start && m.CreatedAt < endExclusive)
-            .Select(m => m.TotalValue)
-            .ToListAsync();
-
         var manualExpenses = await db.ClinicExpenses
             .Where(e => e.ClinicaId == clinicaId && !e.IsDeleted
                 && e.Date >= start && e.Date < endExclusive)
@@ -87,31 +63,16 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             .ToListAsync();
 
         var appointmentIncome = paidPayments.Sum();
-        var productSalesIncome = productSales.Sum(v => v ?? 0);
-        var totalIncome = appointmentIncome + productSalesIncome;
-
-        var purchaseCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.Compra).Sum(m => m.TotalValue ?? 0);
-        var outputCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.Saida).Sum(m => m.TotalValue ?? 0);
-        var lossCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.Perda).Sum(m => m.TotalValue ?? 0);
-        var internalUseCost = stockCostMovements.Where(m => m.Tipo == TipoMovimentacaoEstoque.UsoInterno).Sum(m => m.TotalValue ?? 0);
         var manualExpenseCost = manualExpenses.Sum();
-        var totalOutcome = purchaseCost + outputCost + lossCost + internalUseCost + manualExpenseCost;
 
         return new BalanceMoneySummaryDto
         {
             AppointmentIncome = appointmentIncome,
-            ProductSalesIncome = productSalesIncome,
-            TotalIncome = totalIncome,
-            ProductPurchaseCost = purchaseCost,
-            ProductOutputCost = outputCost,
-            ProductLossCost = lossCost,
-            ProductInternalUseCost = internalUseCost,
+            TotalIncome = appointmentIncome,
             ManualExpenseCost = manualExpenseCost,
-            TotalOutcome = totalOutcome,
-            EstimatedProfit = totalIncome - totalOutcome,
+            TotalOutcome = manualExpenseCost,
+            EstimatedProfit = appointmentIncome - manualExpenseCost,
             PaidAppointmentCount = paidPayments.Count,
-            ProductSaleCount = productSales.Count,
-            StockCostMovementCount = stockCostMovements.Count,
             ManualExpenseCount = manualExpenses.Count
         };
     }
@@ -145,55 +106,15 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
         return new BalancePatientsSummaryDto { Active = active, NewInPeriod = newInPeriod, Total = total };
     }
 
-    private async Task<BalanceStockSummaryDto> BuildStockSummaryAsync(int clinicaId, DateTime start, DateTime endExclusive)
-    {
-        var totalProducts = await db.Produtos.CountAsync(p => p.ClinicaId == clinicaId && !p.IsDeleted);
-
-        var lowStockProducts = await db.Produtos
-            .Where(p => p.ClinicaId == clinicaId && !p.IsDeleted && p.IsActive && p.QuantidadeAtual < p.QuantidadeMinima)
-            .Select(p => new BalanceLowStockProductDto
-            {
-                ProductId = p.Id,
-                Name = p.Nome,
-                CurrentQuantity = p.QuantidadeAtual,
-                MinimumQuantity = p.QuantidadeMinima
-            })
-            .ToListAsync();
-
-        var movementsInPeriod = db.MovimentacoesEstoque.Where(m =>
-            m.ClinicaId == clinicaId && !m.IsCancelada && m.CreatedAt >= start && m.CreatedAt < endExclusive);
-
-        return new BalanceStockSummaryDto
-        {
-            TotalProducts = totalProducts,
-            ProductsBelowMinimum = lowStockProducts.Count,
-            StockEntriesInPeriod = await movementsInPeriod.CountAsync(m => m.Tipo == TipoMovimentacaoEstoque.Entrada),
-            StockOutputsInPeriod = await movementsInPeriod.CountAsync(m => m.Tipo == TipoMovimentacaoEstoque.Saida),
-            ProductSalesInPeriod = await movementsInPeriod.CountAsync(m => m.Tipo == TipoMovimentacaoEstoque.Venda),
-            ProductPurchasesInPeriod = await movementsInPeriod.CountAsync(m => m.Tipo == TipoMovimentacaoEstoque.Compra),
-            ProductLossesInPeriod = await movementsInPeriod.CountAsync(m => m.Tipo == TipoMovimentacaoEstoque.Perda),
-            ProductInternalUseInPeriod = await movementsInPeriod.CountAsync(m => m.Tipo == TipoMovimentacaoEstoque.UsoInterno),
-            LowStockProducts = lowStockProducts
-        };
-    }
-
     private async Task<BalanceEvolutionSummaryDto> BuildEvolutionsSummaryAsync(int clinicaId, DateTime start, DateTime endExclusive)
     {
         var evolutionsInPeriod = await db.PatientEvolutions.CountAsync(e =>
             e.ClinicaId == clinicaId && !e.IsDeleted && e.Status == EvolutionStatus.Completed
             && e.Date >= start && e.Date < endExclusive);
 
-        var treatmentsInProgress = await db.PatientTreatments.CountAsync(t =>
-            t.ClinicaId == clinicaId && !t.IsDeleted && t.Status == TreatmentStatus.Active);
-
-        var completedTreatments = await db.PatientTreatments.CountAsync(t =>
-            t.ClinicaId == clinicaId && !t.IsDeleted && t.Status == TreatmentStatus.Completed);
-
         return new BalanceEvolutionSummaryDto
         {
-            EvolutionsInPeriod = evolutionsInPeriod,
-            TreatmentsInProgress = treatmentsInProgress,
-            CompletedTreatments = completedTreatments
+            EvolutionsInPeriod = evolutionsInPeriod
         };
     }
 
@@ -205,13 +126,6 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             .Where(p => p.ClinicaId == clinicaId && !p.IsDeleted && p.Status == PaymentStatus.Paid
                 && (p.PaidAt ?? p.PaymentDate) >= startDate
                 && (p.PaidAt ?? p.PaymentDate) < endDateExclusive)
-            .ToListAsync();
-
-        var stockMovements = await db.MovimentacoesEstoque
-            .Include(m => m.Produto)
-            .Where(m => m.ClinicaId == clinicaId && !m.IsCancelada
-                && (m.Tipo == TipoMovimentacaoEstoque.Venda || CostMovementTypes.Contains(m.Tipo))
-                && m.CreatedAt >= start && m.CreatedAt < endExclusive)
             .ToListAsync();
 
         var manualExpenses = await db.ClinicExpenses
@@ -230,17 +144,6 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             Date = (p.PaidAt ?? p.PaymentDate)!.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
         });
 
-        var fromStock = stockMovements.Select(m => new BalanceRecentMovementDto
-        {
-            Id = m.Id,
-            Source = "Stock",
-            Type = MapStockMovementType(m.Tipo),
-            Description = m.Produto.Nome,
-            Amount = m.TotalValue,
-            Quantity = m.Quantidade,
-            Date = m.CreatedAt
-        });
-
         var fromManualExpenses = manualExpenses.Select(e => new BalanceRecentMovementDto
         {
             Id = e.Id,
@@ -252,19 +155,9 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             Date = e.Date
         });
 
-        return fromPayments.Concat(fromStock).Concat(fromManualExpenses)
+        return fromPayments.Concat(fromManualExpenses)
             .OrderByDescending(m => m.Date)
             .Take(10)
             .ToList();
     }
-
-    private static string MapStockMovementType(TipoMovimentacaoEstoque tipo) => tipo switch
-    {
-        TipoMovimentacaoEstoque.Venda => "ProductSale",
-        TipoMovimentacaoEstoque.Compra => "ProductPurchase",
-        TipoMovimentacaoEstoque.Saida => "ProductOutput",
-        TipoMovimentacaoEstoque.Perda => "ProductLoss",
-        TipoMovimentacaoEstoque.UsoInterno => "InternalUse",
-        _ => tipo.ToString()
-    };
 }

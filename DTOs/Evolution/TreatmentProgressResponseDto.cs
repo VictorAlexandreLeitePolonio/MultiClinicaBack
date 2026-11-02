@@ -2,29 +2,7 @@ using MultiClinica.API.Models;
 
 namespace MultiClinica.API.DTOs.Evolution;
 
-public class TreatmentProgressResponseDto
-{
-    public TreatmentProgressTreatmentDto Treatment { get; set; } = new();
-    public TreatmentProgressSummaryDto Summary { get; set; } = new();
-    public List<TreatmentProgressChartDto> Charts { get; set; } = [];
-}
-
-public class TreatmentProgressTreatmentDto
-{
-    public int Id { get; set; }
-    public string Title { get; set; } = string.Empty;
-}
-
-public class TreatmentProgressSummaryDto
-{
-    public int TotalEvolutions { get; set; }
-    public decimal? OverallProgress { get; set; }
-    public int ImprovingFields { get; set; }
-    public int WorseningFields { get; set; }
-    public int StableFields { get; set; }
-    public DateTime? LastEvolutionDate { get; set; }
-}
-
+// Série de um campo de ficha ao longo das evoluções concluídas do paciente.
 public class TreatmentProgressChartDto
 {
     public int FieldId { get; set; }

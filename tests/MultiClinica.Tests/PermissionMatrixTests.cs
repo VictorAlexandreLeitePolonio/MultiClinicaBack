@@ -11,8 +11,8 @@ public class PermissionMatrixTests
     {
         var all = Permissions.All;
 
-        Assert.Contains(Permissions.Compras.Aprovar, all);
-        Assert.True(all.Count > 20);
+        Assert.Contains(Permissions.ClinicSettings.Update, all);
+        Assert.Equal(3, all.Count);
     }
 
     [Fact]
@@ -24,61 +24,52 @@ public class PermissionMatrixTests
     }
 
     [Fact]
-    public void Has_RecepcaoMovimentacoesVisualizar_RetornaVerdadeiro()
+    public void Has_RecepcaoClinicSettingsView_RetornaVerdadeiro()
     {
         Assert.True(PermissionMatrix.Has(
             UserRole.Recepcao,
-            Permissions.Estoque.MovimentacoesVisualizar));
+            Permissions.ClinicSettings.View));
     }
 
     [Fact]
-    public void Has_RecepcaoAprovarCompra_RetornaFalso()
+    public void Has_RecepcaoVisualizarStatusPaciente_RetornaFalso()
     {
         Assert.False(PermissionMatrix.Has(
             UserRole.Recepcao,
-            Permissions.Compras.Aprovar));
+            Permissions.Paciente.VisualizarStatus));
     }
 
     [Fact]
-    public void Has_RecepcaoVisualizarCustoProduto_RetornaFalso()
+    public void Has_RecepcaoClinicSettingsUpdate_RetornaFalso()
     {
         Assert.False(PermissionMatrix.Has(
             UserRole.Recepcao,
-            Permissions.Produtos.VisualizarCusto));
+            Permissions.ClinicSettings.Update));
     }
 
     [Fact]
-    public void PermissionsFor_Recepcao_ContemExatamente4Permissoes()
+    public void PermissionsFor_Recepcao_ContemExatamente1Permissao()
     {
         var perms = PermissionMatrix.PermissionsFor(UserRole.Recepcao);
 
-        Assert.Equal(4, perms.Count);
-        Assert.Contains(Permissions.Estoque.MovimentacoesVisualizar, perms);
+        Assert.Single(perms);
         Assert.Contains(Permissions.ClinicSettings.View, perms);
     }
 
     [Fact]
-    public void Has_AdministradorAuditoriaVisualizar_RetornaVerdadeiro()
+    public void Has_AdministradorClinicSettingsUpdate_RetornaVerdadeiro()
     {
         Assert.True(PermissionMatrix.Has(
             UserRole.Administrador,
-            Permissions.Auditoria.Visualizar));
+            Permissions.ClinicSettings.Update));
     }
 
     [Fact]
-    public void Has_RecepcaoAuditoriaVisualizar_RetornaFalso()
-    {
-        Assert.False(PermissionMatrix.Has(
-            UserRole.Recepcao,
-            Permissions.Auditoria.Visualizar));
-    }
-
-    [Fact]
-    public void Has_ProfissionalAuditoriaVisualizar_RetornaFalso()
+    public void Has_ProfissionalClinicSettingsUpdate_RetornaFalso()
     {
         Assert.False(PermissionMatrix.Has(
             UserRole.Profissional,
-            Permissions.Auditoria.Visualizar));
+            Permissions.ClinicSettings.Update));
     }
 
     [Fact]

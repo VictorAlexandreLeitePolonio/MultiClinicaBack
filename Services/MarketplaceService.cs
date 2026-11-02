@@ -44,7 +44,7 @@ public sealed class MarketplaceService(
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
         var query = db.Clinicas
             .AsNoTracking()
-            .Where(clinic => clinic.IsPublic && clinic.IsActive && !clinic.IsDeleted);
+            .Where(clinic => clinic.IsPublic && clinic.IsHubApproved && clinic.IsActive && !clinic.IsDeleted);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -87,6 +87,7 @@ public sealed class MarketplaceService(
         }
 
         var totalCount = await query.CountAsync();
+        var rotationDay = (long)DateOnly.FromDateTime(DateTime.UtcNow).DayNumber;
         query = request.Sort switch
         {
             MarketplaceClinicSort.NameAsc => query
@@ -99,7 +100,12 @@ public sealed class MarketplaceService(
                     ? (string.IsNullOrWhiteSpace(clinic.NomeFantasia) ? clinic.Nome : clinic.NomeFantasia)
                     : clinic.DisplayName)
                 .ThenBy(clinic => clinic.Id),
-            _ => query.OrderByDescending(clinic => clinic.LikeCount).ThenBy(clinic => clinic.Id),
+            _ => query
+                .OrderByDescending(clinic => clinic.Plan == ClinicPlan.Premium ? 2 : clinic.Plan == ClinicPlan.Pro ? 1 : 0)
+                // Rodízio diário determinístico dentro do mesmo plano: cada clínica sobe em dias diferentes, sem estado salvo.
+                .ThenBy(clinic => ((long)clinic.Id * 7919 + rotationDay * 104729) % 1000003)
+                .ThenByDescending(clinic => clinic.LikeCount)
+                .ThenBy(clinic => clinic.Id),
         };
 
         var clinics = await query
@@ -147,6 +153,7 @@ public sealed class MarketplaceService(
                 LikeCount = clinic.LikeCount,
                 LikedByMe = likedClinicIds.Contains(clinic.Id),
                 AcceptsAppointmentRequests = clinic.AcceptsAppointmentRequests,
+                Badge = ResolveBadge(clinic),
             });
         }
 
@@ -167,7 +174,7 @@ public sealed class MarketplaceService(
             .Include(item => item.BusinessHours)
             .Include(item => item.Media)
             .FirstOrDefaultAsync(item => item.Id == clinicId
-                && item.IsPublic && item.IsActive && !item.IsDeleted);
+                && item.IsPublic && item.IsHubApproved && item.IsActive && !item.IsDeleted);
 
         if (clinic is null)
             return Result<MarketplaceClinicDetailsDto>.Fail(ErrorCodes.NotFound, "Clínica não encontrada.");
@@ -228,6 +235,9 @@ public sealed class MarketplaceService(
 
     private static string? EmptyToNull(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : value;
+
+    private static string? ResolveBadge(Clinica clinic)
+        => clinic.IsFounder ? "Founder" : clinic.Plan == ClinicPlan.Premium ? "Featured" : null;
 
     private static IReadOnlyList<ClinicCategoryDto> MapCategories(IEnumerable<ClinicCategory> categories)
         => categories

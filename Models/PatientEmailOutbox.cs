@@ -3,7 +3,8 @@ namespace MultiClinica.API.Models;
 public enum PatientEmailOutboxType
 {
     ActivationInvitation,
-    ClinicLinkNotice
+    ClinicLinkNotice,
+    PaymentCharge
 }
 
 public enum PatientEmailOutboxStatus
@@ -19,8 +20,10 @@ public class PatientEmailOutbox : AuditableEntity
     public Clinica Clinica { get; set; } = null!;
     public int PatientId { get; set; }
     public Patient Patient { get; set; } = null!;
-    public int PatientAccountId { get; set; }
-    public PatientAccount PatientAccount { get; set; } = null!;
+    // Null em PaymentCharge para paciente sem conta no portal.
+    public int? PatientAccountId { get; set; }
+    public PatientAccount? PatientAccount { get; set; }
+    public int? PaymentId { get; set; }
     public PatientEmailOutboxType Type { get; set; }
     public string DeduplicationKey { get; set; } = string.Empty;
     public PatientEmailOutboxStatus Status { get; set; } = PatientEmailOutboxStatus.Pending;

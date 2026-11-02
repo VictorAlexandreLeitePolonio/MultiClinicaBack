@@ -6,170 +6,151 @@ using MultiClinica.API.Services.Interfaces;
 
 namespace MultiClinica.API.Services;
 
+// Métricas do dashboard por série (paciente + ficha de medição), sem acompanhamento.
 public class EvolutionDashboardService(AppDbContext db, IUsuarioLogadoService usuario) : IEvolutionDashboardService
 {
+    private const int FollowUpWindowDays = 60;
+
     public async Task<EvolutionDashboardSummaryDto> GetSummaryAsync()
     {
         var now = DateTime.UtcNow;
         var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var nextMonthStart = monthStart.AddMonths(1);
+        var windowStart = now.AddDays(-FollowUpWindowDays);
 
-        var activeTreatments = await db.PatientTreatments.CountAsync(t =>
-            t.ClinicaId == usuario.ClinicaId
-            && !t.IsDeleted
-            && t.Status == TreatmentStatus.Active);
+        // Só a janela de 60 dias vem para a memória; contagens históricas ficam no banco.
+        var recentEvolutions = await db.PatientEvolutions
+            .AsNoTracking()
+            .Where(e => e.ClinicaId == usuario.ClinicaId
+                && !e.IsDeleted
+                && e.Status == EvolutionStatus.Completed
+                && e.Date >= windowStart)
+            .Include(e => e.Values)
+                .ThenInclude(v => v.Field)
+                .ThenInclude(f => f.Template)
+            .OrderBy(e => e.Date)
+            .ThenBy(e => e.CreatedAt)
+            .ToListAsync();
+
+        var patientsInFollowUp = recentEvolutions
+            .Where(e => e.Values.Any(v => !v.IsDeleted && v.ValueNumber.HasValue))
+            .Select(e => e.PatientId)
+            .Distinct()
+            .Count();
 
         var completedEvolutionsThisMonth = await db.PatientEvolutions.CountAsync(e =>
-            e.ClinicaId == usuario.ClinicaId
-            && !e.IsDeleted
-            && e.Status == EvolutionStatus.Completed
-            && e.Date >= monthStart
-            && e.Date < nextMonthStart);
+            e.ClinicaId == usuario.ClinicaId && !e.IsDeleted && e.Status == EvolutionStatus.Completed
+            && e.Date >= monthStart && e.Date < nextMonthStart);
 
-        var treatmentProgress = await GetTreatmentProgressDataAsync();
-        var patientClassifications = treatmentProgress
-            .GroupBy(t => t.PatientId)
-            .Select(group => group.Average(t => t.DirectionScore))
+        var seriesProgress = await GetSeriesProgressDataAsync(recentEvolutions);
+        var patientClassifications = seriesProgress
+            .GroupBy(s => s.PatientId)
+            .Select(group => group.Average(s => s.DirectionScore))
             .ToList();
 
-        var averageProgressValues = treatmentProgress
-            .Where(t => t.Progress.HasValue)
-            .Select(t => t.Progress!.Value)
+        var averageProgressValues = seriesProgress
+            .Where(s => s.Progress.HasValue)
+            .Select(s => s.Progress!.Value)
             .ToList();
 
-        var mostUsedTemplates = await db.PatientEvolutions
-            .Where(e =>
-                e.ClinicaId == usuario.ClinicaId
-                && !e.IsDeleted
-                && e.Status == EvolutionStatus.Completed)
-            .GroupBy(e => new { e.Treatment.TemplateId, e.Treatment.Template.Name })
-            .OrderByDescending(group => group.Count())
-            .ThenBy(group => group.Key.Name)
+        // Evoluções distintas que usaram cada ficha (todo o histórico), agregado no banco.
+        var templateUsage = await db.PatientEvolutionValues
+            .AsNoTracking()
+            .Where(v => v.ClinicaId == usuario.ClinicaId && !v.IsDeleted
+                && !v.Evolution.IsDeleted && v.Evolution.Status == EvolutionStatus.Completed)
+            .Select(v => new { v.EvolutionId, v.Field.TemplateId, v.Field.Template.Name })
+            .Distinct()
+            .GroupBy(u => new { u.TemplateId, u.Name })
+            .Select(g => new { g.Key.TemplateId, g.Key.Name, Count = g.Count() })
+            .OrderByDescending(g => g.Count).ThenBy(g => g.Name)
             .Take(5)
-            .Select(group => new MostUsedEvolutionTemplateDto
-            {
-                TemplateId = group.Key.TemplateId,
-                Name = group.Key.Name,
-                Count = group.Count()
-            })
             .ToListAsync();
+        var mostUsedTemplates = templateUsage
+            .Select(u => new MostUsedEvolutionTemplateDto { TemplateId = u.TemplateId, Name = u.Name, Count = u.Count })
+            .ToList();
 
         return new EvolutionDashboardSummaryDto
         {
-            ActiveTreatments = activeTreatments,
+            PatientsInFollowUp = patientsInFollowUp,
             CompletedEvolutionsThisMonth = completedEvolutionsThisMonth,
             PatientsImproving = patientClassifications.Count(score => score > 0),
             PatientsStable = patientClassifications.Count(score => score == 0),
             PatientsWorsening = patientClassifications.Count(score => score < 0),
-            AverageProgress = averageProgressValues.Count == 0 ? null : Math.Round(averageProgressValues.Average(), 2),
+            AverageProgress = averageProgressValues.Count == 0
+                ? null
+                : Math.Round(averageProgressValues.Average(), 2),
             MostUsedTemplates = mostUsedTemplates
         };
     }
 
-    private async Task<List<TreatmentProgressData>> GetTreatmentProgressDataAsync()
+    private async Task<List<SeriesProgressData>> GetSeriesProgressDataAsync(List<PatientEvolution> evolutions)
     {
-        var treatments = await db.PatientTreatments
-            .Include(t => t.Template)
-                .ThenInclude(t => t.Fields)
-            .Include(t => t.Evolutions.Where(e =>
-                !e.IsDeleted
-                && e.Status == EvolutionStatus.Completed))
-                .ThenInclude(e => e.Values)
-            .Where(t => t.ClinicaId == usuario.ClinicaId && !t.IsDeleted)
+        var fields = await db.EvolutionTemplateFields
+            .AsNoTracking()
+            .Where(f => f.ClinicaId == usuario.ClinicaId
+                && !f.IsDeleted
+                && f.IsActive
+                && f.ShowInChart)
+            .OrderBy(f => f.Order)
+            .ThenBy(f => f.Label)
             .ToListAsync();
 
-        var result = new List<TreatmentProgressData>();
+        var numericFields = fields.Where(f => IsNumericField(f.Type)).ToList();
+        var templateByFieldId = numericFields.ToDictionary(f => f.Id, f => f.TemplateId);
 
-        foreach (var treatment in treatments)
+        var result = new List<SeriesProgressData>();
+
+        foreach (var templateFields in numericFields.GroupBy(f => f.TemplateId))
         {
-            var fieldProgress = treatment.Template.Fields
-                .Where(f => f.ClinicaId == usuario.ClinicaId && !f.IsDeleted && f.IsActive && f.ShowInChart && IsNumericField(f.Type))
-                .Select(field => BuildFieldProgress(field, treatment.Evolutions.OrderBy(e => e.Date).ThenBy(e => e.CreatedAt).ToList()))
-                .Where(progress => progress is not null)
-                .Select(progress => progress!)
-                .ToList();
+            var templateId = templateFields.Key;
 
-            if (fieldProgress.Count == 0)
-                continue;
+            var evolutionsByPatient = evolutions
+                .Where(e => e.Values.Any(v =>
+                    !v.IsDeleted
+                    && v.ValueNumber.HasValue
+                    && templateByFieldId.TryGetValue(v.FieldId, out var fieldTemplateId)
+                    && fieldTemplateId == templateId))
+                .GroupBy(e => e.PatientId);
 
-            var progressValues = fieldProgress
-                .Where(p => p.Progress.HasValue)
-                .Select(p => p.Progress!.Value)
-                .ToList();
+            foreach (var patientEvolutions in evolutionsByPatient)
+            {
+                var ordered = patientEvolutions
+                    .OrderBy(e => e.Date)
+                    .ThenBy(e => e.CreatedAt)
+                    .ToList();
 
-            result.Add(new TreatmentProgressData(
-                treatment.PatientId,
-                fieldProgress.Average(p => p.DirectionScore),
-                progressValues.Count == 0 ? null : Math.Round(progressValues.Average(), 2)));
+                var charts = templateFields
+                    .Select(field => EvolutionProgress.BuildProgressChart(field, ordered))
+                    .Where(chart => chart is not null)
+                    .Select(chart => chart!)
+                    .ToList();
+
+                if (charts.Count == 0)
+                    continue;
+
+                var progressValues = charts
+                    .Where(chart => chart.Progress.HasValue)
+                    .Select(chart => chart.Progress!.Value)
+                    .ToList();
+
+                result.Add(new SeriesProgressData(
+                    patientEvolutions.Key,
+                    charts.Average(DirectionScore),
+                    progressValues.Count == 0 ? null : Math.Round(progressValues.Average(), 2)));
+            }
         }
 
         return result;
     }
 
-    private static FieldProgressData? BuildFieldProgress(EvolutionTemplateField field, List<PatientEvolution> evolutions)
-    {
-        var points = evolutions
-            .Select(e => e.Values.FirstOrDefault(v =>
-                v.FieldId == field.Id
-                && !v.IsDeleted
-                && v.ValueNumber.HasValue)?.ValueNumber)
-            .Where(value => value.HasValue)
-            .Select(value => value!.Value)
-            .ToList();
-
-        if (points.Count == 0)
-            return null;
-
-        var initialValue = points.First();
-        var currentValue = points.Last();
-
-        return new FieldProgressData(
-            GetDirectionScore(field.ExpectedDirection, initialValue, currentValue),
-            field.TargetValue.HasValue
-                ? CalculateProgress(initialValue, currentValue, field.TargetValue.Value, field.ExpectedDirection)
-                : null);
-    }
-
-    private static int GetDirectionScore(EvolutionDirection direction, decimal initialValue, decimal currentValue)
-        => direction switch
-        {
-            EvolutionDirection.Increase when currentValue > initialValue => 1,
-            EvolutionDirection.Increase when currentValue < initialValue => -1,
-            EvolutionDirection.Decrease when currentValue < initialValue => 1,
-            EvolutionDirection.Decrease when currentValue > initialValue => -1,
-            EvolutionDirection.Increase or EvolutionDirection.Decrease => 0,
-            _ => 0
-        };
-
-    private static decimal? CalculateProgress(
-        decimal initialValue,
-        decimal currentValue,
-        decimal targetValue,
-        EvolutionDirection direction)
-    {
-        if (direction == EvolutionDirection.Neutral)
-            return null;
-        if (initialValue == targetValue)
-            return 100;
-
-        var denominator = direction == EvolutionDirection.Increase
-            ? targetValue - initialValue
-            : initialValue - targetValue;
-
-        if (denominator == 0)
-            return null;
-
-        var progress = direction == EvolutionDirection.Increase
-            ? ((currentValue - initialValue) / denominator) * 100
-            : ((initialValue - currentValue) / denominator) * 100;
-
-        return Math.Round(Math.Max(0, Math.Min(100, progress)), 2);
-    }
+    private static int DirectionScore(TreatmentProgressChartDto chart)
+        => EvolutionProgress.IsImproving(chart) ? 1
+            : EvolutionProgress.IsWorsening(chart) ? -1
+            : 0;
 
     private static bool IsNumericField(EvolutionFieldType type)
         => type is EvolutionFieldType.Number or EvolutionFieldType.Scale or EvolutionFieldType.Percentage or EvolutionFieldType.SelectScore;
 
-    private sealed record TreatmentProgressData(int PatientId, double DirectionScore, decimal? Progress);
+    private sealed record SeriesProgressData(int PatientId, double DirectionScore, decimal? Progress);
 
-    private sealed record FieldProgressData(int DirectionScore, decimal? Progress);
 }

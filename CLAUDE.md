@@ -40,17 +40,32 @@ Program.cs does three things in order:
 3. Seeds initial data on first run (2 users, 5 plans, sample patients/appointments/payments)
 
 ### Background Services (`/Services`)
-Three `IHostedService` implementations run hourly:
 - `AppointmentStatusUpdater` — auto-cancels past Scheduled appointments
-- `AppointmentReminderJob` — sends WhatsApp reminders 23–25h before appointments; uses `ReminderSent` flag to prevent duplicate sends
-- `PaymentReminderJob` — sends WhatsApp reminders 23–25h before payment due dates; uses `PaymentReminderSent` flag
+- `PatientEmailOutboxWorker` — sends queued patient e-mails
+- `Agent/AgentWorker` — processes the AI agent inbox (owner copilot on WhatsApp)
+- `Transcription/ConsultationWorker` — processes recorded consultations
 
-### WhatsApp Integration
-`WhatsAppService` is a typed `HttpClient` that POSTs to the Evolution API:
-- Endpoint: `POST /message/sendText/{instance}`
-- Payload: `{ "number": "55XXXXXXXXXX", "textMessage": { "text": "..." } }`
-- Normalizes Brazilian phone numbers to always include country code `55`
-- All sends are logged to `WhatsAppLog` table for auditing
+### Recorded consultations (transcription)
+- Endpoints under `/api/appointments/{id}/consultation` (start, chunks, finish, report, review, retry, charge-suggestion, evolution) and `GET /api/patients/{patientId}/consultation-reports`. Spec: `docs/superpowers/specs/2026-11-01-consulta-transcricao-design.md`.
+- `ConsultationProcessor` (single instance) interrupts recordings idle for 10 min, transcribes the concatenated chunks with `HttpTranscriber`, consumes `TranscriptionMinutes` (overage allowed) and asks `IChatModel` for the SOAP JSON. Failed reports retry 1/5 min and give up after 3 transcription failures; a failed AI report stays `Ready` with `ReportPending` and retries every 30 min.
+- Audio lives in `Transcription:StoragePath` (default `App_Data/consultations`), outside `wwwroot`, and is deleted after a successful transcription or 7 days after `Failed`/`Interrupted`. Logs never include transcript, report or audio.
+- Config: `Transcription__BaseUrl`, `__ApiKey`, `__Model`, `__StoragePath`; the SOAP report uses `Agent:Model`.
+
+The owner copilot runs on the platform's WhatsApp number (Cloud API): webhook `GET|POST /webhooks/whatsapp` (verify token + `X-Hub-Signature-256`), owners link via `api/me/whatsapp-link` (one-time code sent as `conectar <code>`), each new 24h window consumes 1 `WhatsAppConversations`. Config: `WhatsApp__AccessToken`, `WhatsApp__PhoneNumberId`, `WhatsApp__DisplayNumber`, `WhatsApp__AppSecret`, `WhatsApp__VerifyToken`. Reminders, patient chatbot (each clinic's own number via Embedded Signup) and transcription come in later specs.
+
+### Platform plans and billing
+- `Common/PlanMatrix.cs` is the single source of plans (Free / Pro / Premium): features, professional limits, monthly quotas, hub rank, prices and packs. Spec: `docs/superpowers/specs/2026-10-30-planos-plataforma-design.md`.
+- `[RequireFeature(Features.X)]` gates endpoints (402 `PLAN_REQUIRED`); the plan is read from the DB, not the JWT. Jobs call `PlanMatrix.Has` directly.
+- `ClinicPlanService` applies plan changes and deactivates professionals above the limit; `UsageService` consumes quotas atomically (`ClinicUsages`).
+- Platform subscription runs on AbacatePay (`Services/Billing`, webhook `POST /api/billing/webhooks/abacatepay`, idempotent via `ProcessedWebhookEvents`). Product ids come from `AbacatePay__Products__<key>` env vars — keys never contain `:`.
+- Existing clinics are founders (`IsFounder`, Premium forever). Self-service signup (`/api/public/signup`) creates Free clinics that only show in the hub after SuperAdmin approval (`IsHubApproved`).
+
+### Online payments (Mercado Pago)
+- Each clinic connects its own Mercado Pago account via OAuth + PKCE: `POST api/mercadopago/connect` returns the authorization URL, `GET api/mercadopago/callback` (`[AllowAnonymous]`, state is single-use, 10 min) stores the encrypted tokens and redirects to `{FRONTEND_URL}/app/configuracoes?mp=conectado|erro|conta-em-uso`. Settings (`GET status`, `PUT settings`, `DELETE`) require Administrador + `OnlinePayments`.
+- Tokens are AES-GCM encrypted by `TokenCipher` (`MercadoPago__TokenEncryptionKey`); without the key connecting returns 503 `MERCADOPAGO_NOT_CONFIGURED`.
+- `MercadoPagoTokenRefresher` runs every 24h (first pass after 1 min, outside `Testing`) and renews accounts expiring in < 30 days. MP 400/401/403 on refresh (or any clinic-token 401) marks the account `Revoked`.
+- Paid charges arrive via webhook `POST /api/payments/webhooks/mercadopago` (HMAC `x-signature` with `MercadoPago__WebhookSecret`, always re-reads the payment from MP).
+- Config: `MercadoPago__ClientId`, `__ClientSecret`, `__RedirectUri`, `__WebhookSecret`, `__TokenEncryptionKey` (32 bytes base64), optional `__ApiBaseUrl`/`__AuthBaseUrl`. Spec: `docs/superpowers/specs/2026-10-30-mercadopago-pagamento-online-design.md`.
 
 ### Data Model
 
@@ -63,7 +78,6 @@ Three `IHostedService` implementations run hourly:
 | `Plans` | TipoPlano (Mensal/Avulso), TipoSessao, Valor, IsActive | |
 | `MedicalRecord` | PDF contract + image exams stored in `wwwroot/` with GUID names | |
 | `Expense` | ReferenceMonth (YYYY-MM) | Used for monthly P&L balance |
-| `WhatsAppLog` | Phone, Message, Status, PatientId (nullable) | Audit trail |
 
 ### Authorization
 - `[AllowAnonymous]`: `POST /api/auth/login` only

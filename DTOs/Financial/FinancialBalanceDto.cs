@@ -7,7 +7,6 @@ public sealed class FinancialBalanceDto
     public BalanceMoneySummaryDto Money { get; set; } = null!;
     public BalanceAppointmentsSummaryDto Appointments { get; set; } = null!;
     public BalancePatientsSummaryDto Patients { get; set; } = null!;
-    public BalanceStockSummaryDto Stock { get; set; } = null!;
     public BalanceEvolutionSummaryDto Evolutions { get; set; } = null!;
     public List<BalanceRecentMovementDto> RecentMovements { get; set; } = [];
 }

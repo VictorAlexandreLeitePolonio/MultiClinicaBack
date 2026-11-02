@@ -48,14 +48,6 @@ public class UpdateClinicaStatusDto
     public string Reason { get; set; } = string.Empty;
 }
 
-public class UpdateBillingConfigDto
-{
-    public decimal ValorMensalidade { get; set; }
-    public int DiaVencimento { get; set; }
-    public bool CobrancaAtiva { get; set; }
-    public DateOnly? DataInicioCobranca { get; set; }
-}
-
 public class RegisterClinicPaymentDto
 {
     public string PaymentMethod { get; set; } = string.Empty;

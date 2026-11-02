@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Options;
 using System.Text.Json.Serialization;
 using MultiClinica.API.Authorization;
 using MultiClinica.API.Data;
@@ -12,6 +13,7 @@ using MultiClinica.API.Models;
 using MultiClinica.API.Services;
 using MultiClinica.API.Repositories;
 using MultiClinica.API.Repositories.Interfaces;
+using MultiClinica.API.Services.Billing;
 using MultiClinica.API.Services.Interfaces;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -25,6 +27,16 @@ else if (builder.Environment.IsProduction())
 {
     builder.WebHost.UseUrls("http://0.0.0.0:8080");
 }
+
+// ponytail: sem Sentry__Dsn o SDK fica desligado (dev e testes); Warning+ vira evento no painel.
+builder.WebHost.UseSentry(o =>
+{
+    o.Dsn = builder.Configuration["Sentry:Dsn"] ?? "";
+    o.SendDefaultPii = false;
+    o.MinimumEventLevel = LogLevel.Warning;
+    o.EnableLogs = true;
+    o.TracesSampleRate = 0.1; // ponytail: 10% das requisições; subir se faltar dado de performance
+});
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddSingleton(TimeProvider.System);
@@ -48,20 +60,6 @@ builder.Services.AddScoped<IFinancialService, FinancialService>();
 builder.Services.AddScoped<IClinicExpenseRepository, ClinicExpenseRepository>();
 builder.Services.AddScoped<IClinicExpenseService, ClinicExpenseService>();
 builder.Services.AddScoped<IClinicSettingsService, ClinicSettingsService>();
-
-// Estoque/Compras — Repository e Service
-builder.Services.AddScoped<IFornecedorRepository, FornecedorRepository>();
-builder.Services.AddScoped<IFornecedorService, FornecedorService>();
-builder.Services.AddScoped<IAuditoriaFinanceiraRepository, AuditoriaFinanceiraRepository>();
-builder.Services.AddScoped<IAuditoriaFinanceiraService, AuditoriaFinanceiraService>();
-builder.Services.AddScoped<CategoriaProdutoRepository>();
-builder.Services.AddScoped<CategoriaProdutoService>();
-builder.Services.AddScoped<ProdutoRepository>();
-builder.Services.AddScoped<ProdutoService>();
-builder.Services.AddScoped<MovimentacaoEstoqueRepository>();
-builder.Services.AddScoped<MovimentacaoEstoqueService>();
-builder.Services.AddScoped<CompraRepository>();
-builder.Services.AddScoped<CompraService>();
 
 // Patient — Repository e Service
 builder.Services.AddScoped<IPatientRepository, PatientRepository>();
@@ -120,8 +118,51 @@ builder.Services.AddScoped<SessionTypeService>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IUserService, UserService>();
 builder.Services.AddScoped<UserInvitationService>();
+builder.Services.AddScoped<ClinicPlanService>();
+builder.Services.AddScoped<SignupService>();
+builder.Services.AddScoped<UsageService>();
 builder.Services.AddScoped<IUsuarioLogadoService, UsuarioLogadoService>();
-builder.Services.AddScoped<IClinicaBillingService, ClinicaBillingService>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentIdentity>();
+builder.Services.Configure<MultiClinica.API.Services.Agent.AgentOptions>(builder.Configuration.GetSection("Agent"));
+builder.Services.AddSingleton<MultiClinica.API.Services.Agent.IChatModel, MultiClinica.API.Services.Agent.OpenAiChatModel>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.OwnerAgentTools>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.AgentRunner>();
+builder.Services.Configure<MultiClinica.API.Services.Agent.WhatsAppOptions>(builder.Configuration.GetSection("WhatsApp"));
+// O token vai no header Authorization: sem loggers, o HttpClient não o registra.
+builder.Services.AddHttpClient<MultiClinica.API.Services.Agent.IWhatsAppClient, MultiClinica.API.Services.Agent.WhatsAppClient>((sp, client) =>
+{
+    client.BaseAddress = new Uri(sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MultiClinica.API.Services.Agent.WhatsAppOptions>>().Value.GraphBaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(10);
+}).RemoveAllLoggers();
+builder.Services.AddSingleton<MultiClinica.API.Services.Agent.AgentInboxProcessor>();
+builder.Services.AddScoped<MultiClinica.API.Services.Agent.WhatsAppLinkService>();
+if (builder.Configuration.GetValue<bool>("Agent:Enabled") && !builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<MultiClinica.API.Services.Agent.AgentWorker>();
+builder.Services.Configure<MultiClinica.API.Services.MercadoPago.MercadoPagoOptions>(builder.Configuration.GetSection("MercadoPago"));
+builder.Services.AddSingleton<MultiClinica.API.Services.MercadoPago.TokenCipher>();
+builder.Services.AddScoped<MultiClinica.API.Services.MercadoPago.MercadoPagoAccounts>();
+MultiClinica.API.Services.MercadoPago.MercadoPagoRegistration.AddMercadoPagoOAuth(builder.Services, builder.Environment);
+MultiClinica.API.Services.MercadoPago.MercadoPagoRegistration.AddMercadoPagoPayments(builder.Services);
+builder.Services.Configure<MultiClinica.API.Services.Transcription.TranscriptionOptions>(builder.Configuration.GetSection("Transcription"));
+builder.Services.AddSingleton<MultiClinica.API.Services.Transcription.ConsultationAudioStore>();
+builder.Services.AddHttpClient<MultiClinica.API.Services.Transcription.ITranscriber, MultiClinica.API.Services.Transcription.HttpTranscriber>(
+    client => client.Timeout = TimeSpan.FromMinutes(10)).RemoveAllLoggers();
+// Consulta: registros da Trilha A
+builder.Services.AddScoped<ConsultationService>();
+// Consulta: registros da Trilha B
+builder.Services.AddSingleton<MultiClinica.API.Services.Transcription.ConsultationProcessor>();
+if (!builder.Environment.IsEnvironment("Testing"))
+    builder.Services.AddHostedService<MultiClinica.API.Services.Transcription.ConsultationWorker>();
+// Prontuário: registros da Trilha B (PatientRecordService)
+builder.Services.AddScoped<PatientRecordService>();
+builder.Services.Configure<AbacatePayOptions>(builder.Configuration.GetSection("AbacatePay"));
+builder.Services.AddHttpClient<IAbacatePayClient, AbacatePayClient>((sp, client) =>
+{
+    var options = sp.GetRequiredService<IOptions<AbacatePayOptions>>().Value;
+    client.BaseAddress = new Uri(options.BaseUrl);
+    client.DefaultRequestHeaders.Authorization = new("Bearer", options.ApiKey);
+});
+builder.Services.AddScoped<BillingService>();
 builder.Services.AddScoped<IAttachmentStorage, S3AttachmentStorage>();
 builder.Services.AddScoped<IEvolutionTemplateService, EvolutionTemplateService>();
 builder.Services.AddScoped<IEvolutionService, EvolutionService>();
@@ -141,7 +182,6 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddHostedService<AppointmentStatusUpdater>();
-builder.Services.AddHostedService<ClinicBillingBackgroundJob>();
 if (builder.Configuration.GetValue<bool?>("PatientEmailOutbox:Enabled") ?? !builder.Environment.IsEnvironment("Testing"))
     builder.Services.AddHostedService<PatientEmailOutboxWorker>();
 
@@ -237,6 +277,14 @@ if (rateLimitingEnabled)
                 cancellationToken);
         };
         options.AddPolicy("auth", context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+            }));
+        // Página pública de pagamento: POST /api/public/payments/{token}/pay.
+        options.AddPolicy("public-pay", context => RateLimitPartition.GetFixedWindowLimiter(
             context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
             _ => new FixedWindowRateLimiterOptions
             {
@@ -380,8 +428,7 @@ internal static class AppBootstrapper
                     NomeFantasia = "Admin Interno",
                     NomeResponsavel = name.Trim(),
                     Email = email.Trim().ToLowerInvariant(),
-                    IsActive = true,
-                    CobrancaAtiva = false
+                    IsActive = true
                 };
                 db.Clinicas.Add(adminClinic);
                 await db.SaveChangesAsync();

@@ -6,7 +6,9 @@ public class PatientEvolutionResponseDto
 {
     public int Id { get; set; }
     public int PatientId { get; set; }
-    public int TreatmentId { get; set; }
+    public int? AppointmentId { get; set; }
+    // Fichas medidas nesta evolução (nomes, na ordem dos campos).
+    public List<string> TemplateNames { get; set; } = [];
     public int ProfessionalId { get; set; }
     public int? ServiceId { get; set; }
     public DateTime Date { get; set; }

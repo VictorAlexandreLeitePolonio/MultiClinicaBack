@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Net;
 using MultiClinica.API.Models;
 using MultiClinica.API.Services.Interfaces;
@@ -12,6 +13,7 @@ public class PatientNotificationService(
 {
     private static readonly TimeSpan ActivationTtl = TimeSpan.FromHours(72);
     private static readonly TimeSpan ResetTtl = TimeSpan.FromHours(1);
+    private static readonly CultureInfo PtBr = CultureInfo.GetCultureInfo("pt-BR");
 
     private string FrontendUrl => (config["FRONTEND_URL"] ?? "https://cliniqcare.com.br").TrimEnd('/');
 
@@ -63,6 +65,24 @@ public class PatientNotificationService(
             """;
 
         return await TrySendAsync(account.Email, "Redefinição de senha", body);
+    }
+
+    public async Task<bool> SendPaymentChargeAsync(Patient patient, Payment payment, string clinicName, string payUrl)
+    {
+        if (string.IsNullOrWhiteSpace(patient.Email))
+            return false;
+
+        var amount = payment.Amount.ToString("C", PtBr);
+        var month = payment.ReferenceMonth.ToString("MMMM 'de' yyyy", PtBr);
+        month = char.ToUpper(month[0], PtBr) + month[1..];
+        var body = $"""
+            <p>Olá{NamePart(patient)},</p>
+            <p>Você tem uma cobrança de <strong>{amount}</strong> da clínica <strong>{HtmlText(clinicName)}</strong>.</p>
+            <p>Plano: {HtmlText(payment.Plan.Name)}<br />Mês de referência: {month}</p>
+            <p><a href="{payUrl}">Pagar</a></p>
+            """;
+
+        return await TrySendAsync(patient.Email, $"Cobrança de {clinicName}", body);
     }
 
     // ── Solicitações de consulta (BACK-4) ────────────────────────────────────
@@ -138,6 +158,9 @@ public class PatientNotificationService(
 
     private static string NamePart(PatientAccount account)
         => string.IsNullOrWhiteSpace(account.Name) ? "" : $" {HtmlText(account.Name)}";
+
+    private static string NamePart(Patient patient)
+        => string.IsNullOrWhiteSpace(patient.Name) ? "" : $" {HtmlText(patient.Name)}";
 
     private static string AccountLabel(PatientAccount account)
         => HtmlText(account.Name ?? account.Email);

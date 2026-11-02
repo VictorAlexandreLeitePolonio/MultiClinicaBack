@@ -11,7 +11,14 @@ public enum CommercialHistoryEventType
     ManualBillingUnblock,
     ClinicActivated,
     ClinicDeactivated,
-    AdminUserCreated
+    AdminUserCreated,
+    PlanChanged,
+    ProfessionalsDeactivatedByPlan,
+    ExtraProfessionalPurchased,
+    UsagePackPurchased,
+    SubscriptionRenewed,
+    HubApproved,
+    HubRejected
 }
 
 public class CommercialHistoryEvent : AuditableEntity

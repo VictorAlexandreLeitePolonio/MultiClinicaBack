@@ -34,8 +34,18 @@ public class Payment : AuditableEntity
     // Não tem valor padrão pois começa nulo (ainda não foi pago).
     public DateOnly? PaidAt { get; set; }
 
-    // Data de vencimento do pagamento — usada pelo PaymentReminderJob para enviar lembrete 24h antes.
+    // Data de vencimento do pagamento.
     public DateOnly? PaymentDate { get; set; }
+
+    // Pagamento online (Mercado Pago). O token compõe a URL pública /pagar/{token}.
+    public string? PaymentLinkToken { get; set; }
+    public long? MpPaymentId { get; set; }
+    public string? MpStatus { get; set; }
+    public string? MpStatusDetail { get; set; }
+    public bool PaidOnline { get; set; }
+    public DateTime? RefundedAt { get; set; }
+    // "Estornado", "Contestado" ou "PagamentoDuplicado:<mpPaymentId>".
+    public string? OnlineAlert { get; set; }
 
     public Clinica Clinica { get; set; } = null!;
     public User User { get; set; } = null!;
