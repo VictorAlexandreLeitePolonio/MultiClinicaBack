@@ -12,3 +12,7 @@ public sealed record PatientTimelineEventDto(
 
 // NextBefore: passe em ?before= para a próxima página; null quando acabou.
 public sealed record PatientTimelineDto(IReadOnlyList<PatientTimelineEventDto> Events, DateTime? NextBefore);
+
+// Linha do tempo da clínica (GET api/patient-records/timeline): mesmo evento + de qual paciente é.
+public sealed record ClinicTimelineEventDto(int PatientId, string PatientName, PatientTimelineEventDto Event);
+public sealed record ClinicTimelineDto(IReadOnlyList<ClinicTimelineEventDto> Events, DateTime? NextBefore);

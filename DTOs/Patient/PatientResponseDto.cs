@@ -20,6 +20,10 @@ namespace MultiClinica.API.DTOs.Patient
         public bool IsActive { get; set; }
         public AppointmentStatus? appointmentStatus { get; set; }
         public PaymentStatus? paymentStatus { get; set; }
+        /// <summary>Próximo agendamento Scheduled a partir de agora (Trilha B1 preenche).</summary>
+        public DateTime? NextAppointmentAt { get; set; }
+        /// <summary>Última consulta Completed (Trilha B1 preenche).</summary>
+        public DateTime? LastSessionAt { get; set; }
         public DateTime CreatedAt { get; set; }
 
         /// <summary>
