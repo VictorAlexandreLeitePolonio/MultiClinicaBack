@@ -87,6 +87,25 @@ public sealed class MercadoPagoOAuthService(
                 db.ClinicMercadoPagoAccounts.Add(account);
             }
 
+            // Identificação é informativa: falha no /users/me não impede a conexão.
+            try
+            {
+                var me = await client.GetMeAsync(token.AccessToken, CancellationToken.None);
+                account.MpNickname = me.Nickname;
+                account.MpEmail = me.Email;
+            }
+            catch (Exception exception)
+            {
+                logger.LogWarning(
+                    "Falha ao obter /users/me do Mercado Pago ({Reason}); conectando sem apelido/e-mail",
+                    exception is MercadoPagoApiException api ? $"HTTP {api.StatusCode}" : exception.GetType().Name);
+                account.MpNickname = null;
+                account.MpEmail = null;
+            }
+
+            // Outra conta do MP na mesma clínica: "Conectada em" passa a ser desta conta.
+            if (account.MpUserId != 0 && account.MpUserId != token.UserId)
+                account.ConnectedAt = now;
             account.MpUserId = token.UserId;
             account.PublicKey = token.PublicKey;
             account.AccessTokenEncrypted = cipher.Encrypt(token.AccessToken);
@@ -129,7 +148,11 @@ public sealed class MercadoPagoOAuthService(
             clinic.OnlineAcceptPix,
             clinic.OnlineAcceptCredit,
             clinic.OnlineMaxInstallments,
-            clinic.OnlineAcceptDebit);
+            clinic.OnlineAcceptDebit,
+            AccountId: account?.MpUserId,
+            Nickname: account?.MpNickname,
+            Email: account?.MpEmail,
+            ConnectedAt: account?.ConnectedAt);
     }
 
     public async Task<Result<MercadoPagoSettingsDto>> UpdateSettingsAsync(int clinicaId, MercadoPagoSettingsDto dto)

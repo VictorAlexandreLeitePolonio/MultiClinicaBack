@@ -53,6 +53,14 @@ public class MercadoPagoClientTests
         }
         """;
 
+    private const string MeJson = """
+        {
+          "id": 123456,
+          "nickname": "CLINICA_TESTE",
+          "email": "clinica@test.com"
+        }
+        """;
+
     private static HttpResponseMessage Json(string body, HttpStatusCode status = HttpStatusCode.OK) =>
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 
@@ -220,6 +228,47 @@ public class MercadoPagoClientTests
         Assert.Equal(HttpMethod.Get, call.Method);
         Assert.Equal("/v1/payments/987654", call.Path);
         Assert.Equal("Bearer APP_USR-1", call.Authorization);
+    }
+
+    [Fact]
+    public async Task GetMeAsync_uses_bearer_and_maps_id_nickname_and_email()
+    {
+        var (client, handler) = Build(_ => Json(MeJson));
+
+        var me = await client.GetMeAsync("APP_USR-1", CancellationToken.None);
+
+        Assert.Equal(123456, me.Id);
+        Assert.Equal("CLINICA_TESTE", me.Nickname);
+        Assert.Equal("clinica@test.com", me.Email);
+
+        var call = Assert.Single(handler.Calls);
+        Assert.Equal(HttpMethod.Get, call.Method);
+        Assert.Equal("/users/me", call.Path);
+        Assert.Equal("Bearer APP_USR-1", call.Authorization);
+    }
+
+    [Fact]
+    public async Task GetMeAsync_missing_optional_fields_become_null()
+    {
+        var (client, _) = Build(_ => Json("""{"id": 1}"""));
+
+        var me = await client.GetMeAsync("APP_USR-1", CancellationToken.None);
+
+        Assert.Equal(1, me.Id);
+        Assert.Null(me.Nickname);
+        Assert.Null(me.Email);
+    }
+
+    [Fact]
+    public async Task GetMeAsync_non_success_becomes_MercadoPagoApiException_with_status()
+    {
+        var (client, _) = Build(_ => Json("""{"message":"invalid_token"}""", HttpStatusCode.Unauthorized));
+
+        var exception = await Assert.ThrowsAsync<MercadoPagoApiException>(
+            () => client.GetMeAsync("APP_USR-1", CancellationToken.None));
+
+        Assert.Equal(401, exception.StatusCode);
+        Assert.Contains("invalid_token", exception.Body);
     }
 
     [Fact]
