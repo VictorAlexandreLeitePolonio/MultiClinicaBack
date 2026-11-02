@@ -227,6 +227,41 @@ public class ClinicTimelineTests
         Assert.DoesNotContain(EventKey(single), firstKeys);
     }
 
+    [Fact]
+    public async Task Clinic_timeline_hides_events_of_deleted_patients()
+    {
+        await using var app = new MultiClinicaFactory();
+        var activeId = 0;
+
+        await app.SeedAsync(async db =>
+        {
+            var clinic = new Clinica { Nome = "Clínica Excluídos", NomeResponsavel = "Victor" };
+            db.Clinicas.Add(clinic);
+            await db.SaveChangesAsync();
+
+            var admin = NewUser(clinic.Id, "Admin", "admin.deleted@test.local", UserRole.Administrador);
+            db.Users.Add(admin);
+            var active = new Patient { ClinicaId = clinic.Id, Name = "Ativo" };
+            // Só anamnese: a exclusão é permitida porque ela não olha prontuários.
+            var deleted = new Patient { ClinicaId = clinic.Id, Name = "Excluído", IsDeleted = true };
+            db.Patients.AddRange(active, deleted);
+            await db.SaveChangesAsync();
+
+            db.MedicalRecords.AddRange(
+                new MedicalRecord { ClinicaId = clinic.Id, UserId = admin.Id, PatientId = active.Id, Titulo = "Anamnese" },
+                new MedicalRecord { ClinicaId = clinic.Id, UserId = admin.Id, PatientId = deleted.Id, Titulo = "Anamnese" });
+            await db.SaveChangesAsync();
+            activeId = active.Id;
+        });
+
+        using var client = await LoginAsync(app, "admin.deleted@test.local");
+        var timeline = await client.GetFromJsonAsync<ClinicTimelineResponse>("/api/patient-records/timeline");
+
+        Assert.NotNull(timeline);
+        var only = Assert.Single(timeline.Events);
+        Assert.Equal(activeId, only.PatientId);
+    }
+
     private static string EventKey(ClinicTimelineEventResponse entry)
         => $"{entry.PatientId}:{entry.Event.Type}:{entry.Event.Id}";
 

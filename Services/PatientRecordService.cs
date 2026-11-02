@@ -162,14 +162,15 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
         return (page, nextBefore);
     }
 
-    // Eventos da linha do tempo; patientId null = clínica inteira.
+    // Eventos da linha do tempo; patientId null = clínica inteira. Paciente excluído
+    // some do feed (a exclusão só barra consultas e pagamentos, não anamnese/evolução).
     // "at" busca um grupo de mesma data inteiro (sem limite).
     private async Task<List<TimelineEntry>> LoadTimelineAsync(
         int? patientId, bool isReception, DateTime? before, DateTime? at, int? limit)
     {
         var appointmentQuery = db.Appointments
             .AsNoTracking()
-            .Where(a => a.ClinicaId == usuario.ClinicaId && !a.IsDeleted);
+            .Where(a => a.ClinicaId == usuario.ClinicaId && !a.IsDeleted && !a.Patient.IsDeleted);
 
         if (patientId.HasValue)
             appointmentQuery = appointmentQuery.Where(a => a.PatientId == patientId.Value);
@@ -219,7 +220,7 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
         {
             var evolutionQuery = db.PatientEvolutions
                 .AsNoTracking()
-                .Where(e => e.ClinicaId == usuario.ClinicaId && !e.IsDeleted);
+                .Where(e => e.ClinicaId == usuario.ClinicaId && !e.IsDeleted && !e.Patient.IsDeleted);
 
             if (patientId.HasValue)
                 evolutionQuery = evolutionQuery.Where(e => e.PatientId == patientId.Value);
@@ -240,7 +241,7 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
 
             var anamnesisQuery = db.MedicalRecords
                 .AsNoTracking()
-                .Where(m => m.ClinicaId == usuario.ClinicaId && !m.IsDeleted);
+                .Where(m => m.ClinicaId == usuario.ClinicaId && !m.IsDeleted && !m.Patient.IsDeleted);
 
             if (patientId.HasValue)
                 anamnesisQuery = anamnesisQuery.Where(m => m.PatientId == patientId.Value);
