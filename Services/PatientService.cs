@@ -33,6 +33,22 @@ public class PatientService(
     private static string? DigitsOnly(string? value)
         => string.IsNullOrWhiteSpace(value) ? null : new string(value.Where(char.IsDigit).ToArray());
 
+    // Próxima consulta futura ainda agendada (usada pelo card de paciente).
+    private static DateTime? GetNextAppointmentAt(Patient patient)
+        => patient.Appointments
+            .Where(a => !a.IsDeleted
+                && a.Status == AppointmentStatus.Scheduled
+                && a.AppointmentDate >= DateTime.UtcNow)
+            .Select(a => (DateTime?)a.AppointmentDate)
+            .Min();
+
+    // Última sessão concluída (usada pelo card de paciente).
+    private static DateTime? GetLastSessionAt(Patient patient)
+        => patient.Appointments
+            .Where(a => !a.IsDeleted && a.Status == AppointmentStatus.Completed)
+            .Select(a => (DateTime?)a.AppointmentDate)
+            .Max();
+
     private async Task<Result<bool>> ValidateBirthDateAsync(DateOnly? birthDate)
     {
         if (birthDate is null)
@@ -72,6 +88,8 @@ public class PatientService(
             IsActive          = p.IsActive,
             appointmentStatus = p.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status,
             paymentStatus     = p.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status,
+            NextAppointmentAt = GetNextAppointmentAt(p),
+            LastSessionAt     = GetLastSessionAt(p),
             CreatedAt         = p.CreatedAt,
         });
 
@@ -110,6 +128,8 @@ public class PatientService(
             IsActive          = patient.IsActive,
             appointmentStatus = patient.Appointments.OrderByDescending(a => a.AppointmentDate).FirstOrDefault()?.Status,
             paymentStatus     = patient.Payments.OrderByDescending(p => p.CreatedAt).FirstOrDefault()?.Status,
+            NextAppointmentAt = GetNextAppointmentAt(patient),
+            LastSessionAt     = GetLastSessionAt(patient),
             CreatedAt         = patient.CreatedAt,
             PortalAccessStatus = patient.PatientAccount?.Status,
         });
