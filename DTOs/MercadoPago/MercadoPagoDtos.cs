@@ -15,4 +15,9 @@ public sealed record MercadoPagoStatusDto(
     bool AcceptPix,
     bool AcceptCredit,
     int MaxInstallments,
-    bool AcceptDebit);
+    bool AcceptDebit,
+    // Conta conectada (Trilha B preenche): id do MP, apelido, e-mail e quando conectou.
+    long? AccountId = null,
+    string? Nickname = null,
+    string? Email = null,
+    DateTime? ConnectedAt = null);

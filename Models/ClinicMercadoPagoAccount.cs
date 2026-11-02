@@ -8,6 +8,9 @@ public class ClinicMercadoPagoAccount
     public int Id { get; set; }
     public int ClinicaId { get; set; }
     public long MpUserId { get; set; }
+    // Identificação da conta (GET /users/me no OAuth); nula em contas conectadas antes disso.
+    public string? MpNickname { get; set; }
+    public string? MpEmail { get; set; }
     public string PublicKey { get; set; } = string.Empty;
     public string AccessTokenEncrypted { get; set; } = string.Empty;
     public string RefreshTokenEncrypted { get; set; } = string.Empty;

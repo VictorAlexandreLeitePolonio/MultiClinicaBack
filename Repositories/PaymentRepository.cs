@@ -47,6 +47,11 @@ public class PaymentRepository(AppDbContext db, IUsuarioLogadoService usuario) :
         return (items, totalCount);
     }
 
+    // Ajustes finais: Trilha A implementa.
+    public Task<List<DTOs.Payment.PaymentStatusSummaryDto>> GetStatusSummaryAsync(
+        int? patientId, DateOnly? referenceMonth, string? patientName) =>
+        throw new NotImplementedException();
+
     public async Task<Payment?> GetByIdAsync(int id)
         => await db.Payments
             .Include(p => p.Patient)

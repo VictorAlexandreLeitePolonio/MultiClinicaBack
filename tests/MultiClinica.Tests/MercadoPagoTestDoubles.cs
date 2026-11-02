@@ -38,6 +38,15 @@ public sealed class FakeMercadoPagoClient : IMercadoPagoClient
         return Task.FromResult(payment);
     }
 
+    public MpUserInfo? Me { get; set; }
+    public List<string> MeRequests { get; } = [];
+
+    public Task<MpUserInfo> GetMeAsync(string accessToken, CancellationToken ct)
+    {
+        MeRequests.Add(accessToken);
+        return Me is null ? throw new MercadoPagoApiException(500, "sem /users/me roteirizado") : Task.FromResult(Me);
+    }
+
     public Task<MpPayment> GetPaymentAsync(string accessToken, long paymentId, CancellationToken ct)
     {
         Fail();

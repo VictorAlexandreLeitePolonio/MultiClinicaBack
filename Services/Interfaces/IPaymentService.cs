@@ -17,6 +17,9 @@ public interface IPaymentService
 
     Task<Result<PaymentResponseDto>> GetByIdAsync(int id);
 
+    Task<Result<List<PaymentStatusSummaryDto>>> GetStatusSummaryAsync(
+        int? patientId, DateOnly? referenceMonth, string? patientName);
+
     Task<Result<PaymentResponseDto>> CreateAsync(CreatePaymentDto dto);
 
     Task<Result<PaymentResponseDto>> UpdateAsync(int id, UpdatePaymentDto dto);

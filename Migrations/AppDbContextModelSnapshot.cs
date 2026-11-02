@@ -683,6 +683,12 @@ namespace MultiClinica.API.Migrations
                     b.Property<bool>("LiveMode")
                         .HasColumnType("boolean");
 
+                    b.Property<string>("MpEmail")
+                        .HasColumnType("text");
+
+                    b.Property<string>("MpNickname")
+                        .HasColumnType("text");
+
                     b.Property<long>("MpUserId")
                         .HasColumnType("bigint");
 

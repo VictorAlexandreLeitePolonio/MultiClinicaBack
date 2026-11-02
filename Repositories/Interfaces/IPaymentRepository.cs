@@ -16,6 +16,10 @@ public interface IPaymentRepository
     /// <summary>Busca um pagamento pelo Id, incluindo Patient e Plan.</summary>
     Task<Payment?> GetByIdAsync(int id);
 
+    // Mesmos filtros de GetPagedAsync, sem status nem paginação; sempre devolve os 3 status.
+    Task<List<DTOs.Payment.PaymentStatusSummaryDto>> GetStatusSummaryAsync(
+        int? patientId, DateOnly? referenceMonth, string? patientName);
+
     /// <summary>Verifica se já existe pagamento para o paciente naquele mês.</summary>
     Task<bool> ExistsAsync(int patientId, DateOnly referenceMonth, int? excludeId = null);
 

@@ -40,6 +40,11 @@ public class PaymentService(
 
     // ── Busca por Id ─────────────────────────────────────────────────────────
 
+    // Ajustes finais: Trilha A implementa.
+    public Task<Result<List<PaymentStatusSummaryDto>>> GetStatusSummaryAsync(
+        int? patientId, DateOnly? referenceMonth, string? patientName) =>
+        throw new NotImplementedException();
+
     public async Task<Result<PaymentResponseDto>> GetByIdAsync(int id)
     {
         var payment = await repository.GetByIdAsync(id);

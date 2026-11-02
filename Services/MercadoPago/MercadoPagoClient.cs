@@ -88,6 +88,10 @@ public sealed class MercadoPagoClient(HttpClient http, IOptions<MercadoPagoOptio
         return await ReadPaymentAsync(response, ct);
     }
 
+    // Ajustes finais: Trilha B implementa.
+    public Task<MpUserInfo> GetMeAsync(string accessToken, CancellationToken ct) =>
+        throw new NotImplementedException();
+
     public async Task<MpPayment> GetPaymentAsync(string accessToken, long paymentId, CancellationToken ct)
     {
         using var message = Request(HttpMethod.Get, $"v1/payments/{paymentId}", accessToken);
