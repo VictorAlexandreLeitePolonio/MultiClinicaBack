@@ -66,6 +66,11 @@ public class AppDbContext : DbContext
             .Property(u => u.InvitationTokenHash)
             .IsConcurrencyToken();
 
+        // Reserva de tentativa de pagamento online (OnlinePaymentService.PayAsync).
+        modelBuilder.Entity<Payment>()
+            .Property(p => p.MpStatus)
+            .IsConcurrencyToken();
+
         modelBuilder.Entity<User>()
             .Property(u => u.Role)
             .HasConversion<string>();

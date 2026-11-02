@@ -83,6 +83,32 @@ public class UserInvitationTests
             new AcceptUserInvitationDto { Token = Token(email.Body), Password = "new-password" })).StatusCode);
     }
 
+    [Fact]
+    public async Task Accept_enforces_professional_limit_when_several_invitations_share_one_seat()
+    {
+        var email = new CapturingEmailSender();
+        await using var app = new PatientImportFactory(emailSender: email);
+        await SeedAsync(app); // plano Free: 1 profissional
+        using var admin = app.CreateClient();
+        (await admin.PostAsJsonAsync("/api/auth/login", new LoginDto { Email = "admin@test.local", Password = "secret123" })).EnsureSuccessStatusCode();
+        using var anonymous = app.CreateClient();
+
+        (await admin.PostAsJsonAsync("/api/user-invitations",
+            new InviteUserDto { Name = "Ana", Email = "ana@test.local", Role = UserRole.Profissional })).EnsureSuccessStatusCode();
+        var anaToken = Token(email.Body);
+        (await admin.PostAsJsonAsync("/api/user-invitations",
+            new InviteUserDto { Name = "Bia", Email = "bia@test.local", Role = UserRole.Profissional })).EnsureSuccessStatusCode();
+        var biaToken = Token(email.Body);
+
+        (await anonymous.PostAsJsonAsync("/api/user-invitations/accept",
+            new AcceptUserInvitationDto { Token = anaToken, Password = "new-password" })).EnsureSuccessStatusCode();
+        var second = await anonymous.PostAsJsonAsync("/api/user-invitations/accept",
+            new AcceptUserInvitationDto { Token = biaToken, Password = "new-password" });
+
+        Assert.Equal(HttpStatusCode.Conflict, second.StatusCode);
+        Assert.Contains("limite de profissionais", await second.Content.ReadAsStringAsync());
+    }
+
     private static string Token(string body) => Regex.Match(body, @"token=([A-F0-9]+)").Groups[1].Value;
 
     private static async Task SeedAsync(WebApplicationFactory<Program> app)

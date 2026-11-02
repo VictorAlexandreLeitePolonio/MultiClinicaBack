@@ -20,6 +20,7 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             .Include(p => p.Appointments)
             .Include(p => p.Payments)
             .Include(p => p.MedicalRecords)
+            .AsSplitQuery() // várias coleções: evita o produto cartesiano (alerta do Sentry)
             .Where(p => p.ClinicaId == usuario.ClinicaId && !p.IsDeleted)
             .AsQueryable();
 
@@ -49,6 +50,7 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             .Include(p => p.Appointments)
             .Include(p => p.Payments)
             .Include(p => p.PatientAccount)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<Patient?> GetByIdWithDetailsAsync(int id)
@@ -57,6 +59,7 @@ public class PatientRepository(AppDbContext db, IUsuarioLogadoService usuario) :
             .Include(p => p.MedicalRecords).ThenInclude(m => m.User)
             .Include(p => p.Payments).ThenInclude(p => p.Plan)
             .Include(p => p.PatientAccount)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(p => p.Id == id && p.ClinicaId == usuario.ClinicaId && !p.IsDeleted);
 
     public async Task<bool> EmailExistsAsync(string? email, int? excludeId = null)

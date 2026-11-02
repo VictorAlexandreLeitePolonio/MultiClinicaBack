@@ -123,6 +123,7 @@ public class ClinicProfileService(
             .Include(c => c.Categories)
             .Include(c => c.Media)
             .Include(c => c.BusinessHours)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(c => c.PublicSlug == normalized
                 && c.IsPublic && c.IsHubApproved && c.IsActive && !c.IsDeleted);
 

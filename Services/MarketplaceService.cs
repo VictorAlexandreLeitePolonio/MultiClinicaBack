@@ -173,6 +173,7 @@ public sealed class MarketplaceService(
             .Include(item => item.Categories)
             .Include(item => item.BusinessHours)
             .Include(item => item.Media)
+            .AsSplitQuery()
             .FirstOrDefaultAsync(item => item.Id == clinicId
                 && item.IsPublic && item.IsHubApproved && item.IsActive && !item.IsDeleted);
 
