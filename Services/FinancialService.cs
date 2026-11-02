@@ -126,6 +126,14 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             .Where(p => p.ClinicaId == clinicaId && !p.IsDeleted && p.Status == PaymentStatus.Paid
                 && (p.PaidAt ?? p.PaymentDate) >= startDate
                 && (p.PaidAt ?? p.PaymentDate) < endDateExclusive)
+            .Select(p => new
+            {
+                p.Id,
+                p.Amount,
+                Date = p.PaidAt ?? p.PaymentDate,
+                PatientName = p.Patient.Name,
+                PlanName = p.Plan.Name,
+            })
             .ToListAsync();
 
         var manualExpenses = await db.ClinicExpenses
@@ -138,10 +146,11 @@ public class FinancialService(AppDbContext db, IUsuarioLogadoService usuario) : 
             Id = p.Id,
             Source = "Payment",
             Type = "AppointmentPayment",
-            Description = $"Pagamento - {p.ReferenceMonth}",
+            // Quem pagou e o quê: o extrato do Balanço precisa ser legível sem abrir a cobrança.
+            Description = string.IsNullOrWhiteSpace(p.PlanName) ? p.PatientName ?? "Pagamento" : $"{p.PatientName} · {p.PlanName}",
             Amount = p.Amount,
             Quantity = null,
-            Date = (p.PaidAt ?? p.PaymentDate)!.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
+            Date = p.Date!.Value.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc)
         });
 
         var fromManualExpenses = manualExpenses.Select(e => new BalanceRecentMovementDto

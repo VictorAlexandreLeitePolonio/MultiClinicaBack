@@ -110,6 +110,8 @@ public class FinancialBalanceTests
         Assert.Equal(150, balance.Money.TotalIncome);
         Assert.Equal(1, balance.Money.PaidAppointmentCount);
         Assert.NotEmpty(balance.RecentMovements);
+        // O extrato mostra quem pagou e o quê, não o mês de referência.
+        Assert.Contains(balance.RecentMovements, m => m.Source == "Payment" && m.Description == $"Paciente · {plan.Name}");
     }
 
     [Fact]
