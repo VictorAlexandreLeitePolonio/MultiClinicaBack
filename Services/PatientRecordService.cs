@@ -79,31 +79,76 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
         if (!await PatientExistsAsync(patientId))
             return Result<PatientTimelineDto>.Fail(ErrorCodes.NotFound, "Paciente não encontrado.");
 
-        // ?before=...Z chega como Kind=Local pelo model binding; o Postgres só aceita UTC.
-        if (before is { } cursor)
-            before = cursor.Kind == DateTimeKind.Unspecified
-                ? DateTime.SpecifyKind(cursor, DateTimeKind.Utc)
-                : cursor.ToUniversalTime();
-
-        take = take <= 0 ? DefaultTimelineTake : Math.Min(take, MaxTimelineTake);
         // Recepção só enxerga os agendamentos, sem dados clínicos da consulta.
-        var isReception = usuario.Role == UserRole.Recepcao;
+        var (page, nextBefore) = await LoadTimelinePageAsync(
+            patientId,
+            usuario.Role == UserRole.Recepcao,
+            NormalizeBefore(before),
+            NormalizeTake(take));
 
+        return Result<PatientTimelineDto>.Ok(new PatientTimelineDto(
+            page.Select(entry => entry.Event).ToList(),
+            nextBefore));
+    }
+
+    // Linha do tempo de toda a clínica; a Recepção é bloqueada no controller.
+    public async Task<Result<ClinicTimelineDto>> GetClinicTimelineAsync(DateTime? before, int take)
+    {
+        var (page, nextBefore) = await LoadTimelinePageAsync(
+            patientId: null,
+            isReception: false,
+            NormalizeBefore(before),
+            NormalizeTake(take));
+
+        var patientIds = page.Select(entry => entry.PatientId).Distinct().ToList();
+        var patientNames = await db.Patients
+            .AsNoTracking()
+            .Where(p => p.ClinicaId == usuario.ClinicaId && patientIds.Contains(p.Id))
+            .Select(p => new { p.Id, p.Name })
+            .ToDictionaryAsync(p => p.Id, p => p.Name ?? string.Empty);
+
+        var events = page
+            .Select(entry => new ClinicTimelineEventDto(
+                entry.PatientId,
+                patientNames.GetValueOrDefault(entry.PatientId, string.Empty),
+                entry.Event))
+            .ToList();
+
+        return Result<ClinicTimelineDto>.Ok(new ClinicTimelineDto(events, nextBefore));
+    }
+
+    private static DateTime? NormalizeBefore(DateTime? before)
+    {
+        if (before is not { } cursor)
+            return null;
+
+        // ?before=...Z chega como Kind=Local pelo model binding; o Postgres só aceita UTC.
+        return cursor.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(cursor, DateTimeKind.Utc)
+            : cursor.ToUniversalTime();
+    }
+
+    private static int NormalizeTake(int take)
+        => take <= 0 ? DefaultTimelineTake : Math.Min(take, MaxTimelineTake);
+
+    private async Task<(List<TimelineEntry> Page, DateTime? NextBefore)> LoadTimelinePageAsync(
+        int? patientId, bool isReception, DateTime? before, int take)
+    {
         var ordered = await LoadTimelineAsync(patientId, isReception, before, null, take + 1);
         var page = ordered.Take(take).ToList();
         DateTime? nextBefore = null;
         if (ordered.Count > take)
         {
-            var boundary = page[^1].Date;
+            var boundary = page[^1].Event.Date;
             nextBefore = boundary;
             // Evoluções geradas da consulta herdam a data dela: o corte não pode separar um grupo
             // de mesma data, senão "Date < before" pula o resto.
-            if (ordered[take].Date == boundary)
+            if (ordered[take].Event.Date == boundary)
             {
-                if (page.Any(e => e.Date != boundary))
+                if (page.Any(entry => entry.Event.Date != boundary))
                 {
                     // O grupo vai inteiro para a próxima página.
-                    page = page.Where(e => e.Date != boundary).ToList();
+                    page = page.Where(entry => entry.Event.Date != boundary).ToList();
                     nextBefore = boundary.AddTicks(1);
                 }
                 else
@@ -114,17 +159,20 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
             }
         }
 
-        return Result<PatientTimelineDto>.Ok(new PatientTimelineDto(page, nextBefore));
+        return (page, nextBefore);
     }
 
-    // Eventos da linha do tempo; "at" busca um grupo de mesma data inteiro (sem limite).
-    private async Task<List<PatientTimelineEventDto>> LoadTimelineAsync(
-        int patientId, bool isReception, DateTime? before, DateTime? at, int? limit)
+    // Eventos da linha do tempo; patientId null = clínica inteira.
+    // "at" busca um grupo de mesma data inteiro (sem limite).
+    private async Task<List<TimelineEntry>> LoadTimelineAsync(
+        int? patientId, bool isReception, DateTime? before, DateTime? at, int? limit)
     {
         var appointmentQuery = db.Appointments
             .AsNoTracking()
-            .Where(a => a.ClinicaId == usuario.ClinicaId && a.PatientId == patientId && !a.IsDeleted);
+            .Where(a => a.ClinicaId == usuario.ClinicaId && !a.IsDeleted);
 
+        if (patientId.HasValue)
+            appointmentQuery = appointmentQuery.Where(a => a.PatientId == patientId.Value);
         if (before.HasValue)
             appointmentQuery = appointmentQuery.Where(a => a.AppointmentDate < before.Value);
         if (at.HasValue)
@@ -148,13 +196,17 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
                 .Where(r => r.ClinicaId == usuario.ClinicaId && appointmentIds.Contains(r.AppointmentId))
                 .ToDictionaryAsync(r => r.AppointmentId, r => r.Status);
 
-            evolutionCounts = await db.PatientEvolutions
+            var evolutionCountsQuery = db.PatientEvolutions
                 .AsNoTracking()
                 .Where(e => e.ClinicaId == usuario.ClinicaId
-                    && e.PatientId == patientId
                     && !e.IsDeleted
                     && e.AppointmentId.HasValue
-                    && appointmentIds.Contains(e.AppointmentId.Value))
+                    && appointmentIds.Contains(e.AppointmentId.Value));
+
+            if (patientId.HasValue)
+                evolutionCountsQuery = evolutionCountsQuery.Where(e => e.PatientId == patientId.Value);
+
+            evolutionCounts = await evolutionCountsQuery
                 .GroupBy(e => e.AppointmentId!.Value)
                 .Select(group => new { AppointmentId = group.Key, Count = group.Count() })
                 .ToDictionaryAsync(item => item.AppointmentId, item => item.Count);
@@ -167,8 +219,10 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
         {
             var evolutionQuery = db.PatientEvolutions
                 .AsNoTracking()
-                .Where(e => e.ClinicaId == usuario.ClinicaId && e.PatientId == patientId && !e.IsDeleted);
+                .Where(e => e.ClinicaId == usuario.ClinicaId && !e.IsDeleted);
 
+            if (patientId.HasValue)
+                evolutionQuery = evolutionQuery.Where(e => e.PatientId == patientId.Value);
             if (before.HasValue)
                 evolutionQuery = evolutionQuery.Where(e => e.Date < before.Value);
             if (at.HasValue)
@@ -186,8 +240,10 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
 
             var anamnesisQuery = db.MedicalRecords
                 .AsNoTracking()
-                .Where(m => m.ClinicaId == usuario.ClinicaId && m.PatientId == patientId && !m.IsDeleted);
+                .Where(m => m.ClinicaId == usuario.ClinicaId && !m.IsDeleted);
 
+            if (patientId.HasValue)
+                anamnesisQuery = anamnesisQuery.Where(m => m.PatientId == patientId.Value);
             if (before.HasValue)
                 anamnesisQuery = anamnesisQuery.Where(m => m.CreatedAt < before.Value);
             if (at.HasValue)
@@ -200,56 +256,64 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
                 .ToListAsync();
         }
 
-        var events = new List<PatientTimelineEventDto>(appointments.Count + evolutions.Count + anamneses.Count);
+        var events = new List<TimelineEntry>(appointments.Count + evolutions.Count + anamneses.Count);
 
-        events.AddRange(appointments.Select(appointment => new PatientTimelineEventDto(
-            "appointment",
-            appointment.Id,
-            appointment.AppointmentDate,
-            "Consulta",
-            appointment.User?.Name,
-            appointment.Status.ToString(),
-            isReception
-                ? null
-                : reportStatuses.TryGetValue(appointment.Id, out var status) ? status.ToString() : null,
-            appointment.Id,
-            isReception ? 0 : evolutionCounts.GetValueOrDefault(appointment.Id),
-            [])));
+        events.AddRange(appointments.Select(appointment => new TimelineEntry(
+            appointment.PatientId,
+            new PatientTimelineEventDto(
+                "appointment",
+                appointment.Id,
+                appointment.AppointmentDate,
+                "Consulta",
+                appointment.User?.Name,
+                appointment.Status.ToString(),
+                isReception
+                    ? null
+                    : reportStatuses.TryGetValue(appointment.Id, out var status) ? status.ToString() : null,
+                appointment.Id,
+                isReception ? 0 : evolutionCounts.GetValueOrDefault(appointment.Id),
+                []))));
 
-        events.AddRange(evolutions.Select(evolution => new PatientTimelineEventDto(
-            "evolution",
-            evolution.Id,
-            evolution.Date,
-            "Evolução",
-            evolution.Professional?.Name,
-            evolution.Status.ToString(),
-            null,
-            evolution.AppointmentId,
-            0,
-            evolution.Values
-                .Where(v => !v.IsDeleted && !string.IsNullOrWhiteSpace(v.Field?.Template?.Name))
-                .Select(v => v.Field.Template.Name)
-                .Distinct()
-                .OrderBy(name => name)
-                .ToList())));
+        events.AddRange(evolutions.Select(evolution => new TimelineEntry(
+            evolution.PatientId,
+            new PatientTimelineEventDto(
+                "evolution",
+                evolution.Id,
+                evolution.Date,
+                "Evolução",
+                evolution.Professional?.Name,
+                evolution.Status.ToString(),
+                null,
+                evolution.AppointmentId,
+                0,
+                evolution.Values
+                    .Where(v => !v.IsDeleted && !string.IsNullOrWhiteSpace(v.Field?.Template?.Name))
+                    .Select(v => v.Field.Template.Name)
+                    .Distinct()
+                    .OrderBy(name => name)
+                    .ToList()))));
 
-        events.AddRange(anamneses.Select(record => new PatientTimelineEventDto(
-            "anamnesis",
-            record.Id,
-            record.CreatedAt,
-            string.IsNullOrWhiteSpace(record.Titulo) ? "Anamnese" : record.Titulo.Trim(),
-            record.User?.Name,
-            null,
-            null,
-            null,
-            0,
-            [])));
+        events.AddRange(anamneses.Select(record => new TimelineEntry(
+            record.PatientId,
+            new PatientTimelineEventDto(
+                "anamnesis",
+                record.Id,
+                record.CreatedAt,
+                string.IsNullOrWhiteSpace(record.Titulo) ? "Anamnese" : record.Titulo.Trim(),
+                record.User?.Name,
+                null,
+                null,
+                null,
+                0,
+                []))));
 
         return events
-            .OrderByDescending(e => e.Date)
-            .ThenByDescending(e => e.Id)
+            .OrderByDescending(entry => entry.Event.Date)
+            .ThenByDescending(entry => entry.Event.Id)
             .ToList();
     }
+
+    private sealed record TimelineEntry(int PatientId, PatientTimelineEventDto Event);
 
     private async Task<bool> PatientExistsAsync(int patientId)
         => await db.Patients.AnyAsync(p =>
