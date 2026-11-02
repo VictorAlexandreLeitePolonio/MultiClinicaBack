@@ -20,12 +20,12 @@ public sealed class PatientMarketplaceController(
 
     [HttpGet("clinics")]
     public async Task<IActionResult> GetClinics([FromQuery] MarketplaceClinicQuery query)
-        => Ok((await service.GetClinicsAsync(query)).Value);
+        => Ok((await service.GetClinicsAsync(query, patient.PatientAccountId)).Value);
 
     [HttpGet("clinics/{clinicId:int}")]
     public async Task<IActionResult> GetClinic(int clinicId)
     {
-        var result = await service.GetClinicAsync(clinicId);
+        var result = await service.GetClinicAsync(clinicId, patient.PatientAccountId);
         return result.IsSuccess
             ? Ok(result.Value)
             : NotFound(new { message = result.ErrorMessage });

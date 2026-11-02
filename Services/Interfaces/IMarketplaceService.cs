@@ -8,6 +8,6 @@ namespace MultiClinica.API.Services.Interfaces;
 public interface IMarketplaceService
 {
     Task<Result<IReadOnlyList<ClinicCategoryDto>>> GetCategoriesAsync();
-    Task<Result<PagedResult<MarketplaceClinicCardDto>>> GetClinicsAsync(MarketplaceClinicQuery query);
-    Task<Result<MarketplaceClinicDetailsDto>> GetClinicAsync(int clinicId);
+    Task<Result<PagedResult<MarketplaceClinicCardDto>>> GetClinicsAsync(MarketplaceClinicQuery query, int? patientAccountId);
+    Task<Result<MarketplaceClinicDetailsDto>> GetClinicAsync(int clinicId, int patientAccountId);
 }

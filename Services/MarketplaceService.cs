@@ -11,7 +11,6 @@ namespace MultiClinica.API.Services;
 
 public sealed class MarketplaceService(
     AppDbContext db,
-    IPatientAccountLoggedService patient,
     IAttachmentStorage storage) : IMarketplaceService
 {
     private static readonly TimeSpan MediaUrlTtl = TimeSpan.FromHours(1);
@@ -37,14 +36,20 @@ public sealed class MarketplaceService(
         return Result<IReadOnlyList<ClinicCategoryDto>>.Ok(categories);
     }
 
+    // patientAccountId == null: Hub público (sem login). O id vem sempre do chamador, nunca do
+    // HttpContext, porque numa rota anônima o NameIdentifier pode ser de um funcionário logado.
     public async Task<Result<PagedResult<MarketplaceClinicCardDto>>> GetClinicsAsync(
-        MarketplaceClinicQuery request)
+        MarketplaceClinicQuery request, int? patientAccountId)
     {
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize, 1, 50);
         var query = db.Clinicas
             .AsNoTracking()
             .Where(clinic => clinic.IsPublic && clinic.IsHubApproved && clinic.IsActive && !clinic.IsDeleted);
+
+        // Sem login o detalhe é aberto pelo slug público; clínica sem slug não tem página.
+        if (patientAccountId is null)
+            query = query.Where(clinic => clinic.PublicSlug != null);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -80,10 +85,10 @@ public sealed class MarketplaceService(
                 clinic.AcceptsAppointmentRequests == request.AcceptsAppointmentRequests.Value);
         }
 
-        if (request.LikedOnly == true)
+        if (request.LikedOnly == true && patientAccountId is not null)
         {
             query = query.Where(clinic => db.ClinicLikes.Any(like =>
-                like.ClinicaId == clinic.Id && like.PatientAccountId == patient.PatientAccountId));
+                like.ClinicaId == clinic.Id && like.PatientAccountId == patientAccountId));
         }
 
         var totalCount = await query.CountAsync();
@@ -127,7 +132,7 @@ public sealed class MarketplaceService(
             .ToDictionary(group => group.Key, group => group.First().ObjectKey);
         var likedClinicIds = (await db.ClinicLikes
             .AsNoTracking()
-            .Where(like => like.PatientAccountId == patient.PatientAccountId
+            .Where(like => like.PatientAccountId == patientAccountId
                 && clinicIds.Contains(like.ClinicaId))
             .Select(like => like.ClinicaId)
             .ToListAsync())
@@ -166,7 +171,7 @@ public sealed class MarketplaceService(
         });
     }
 
-    public async Task<Result<MarketplaceClinicDetailsDto>> GetClinicAsync(int clinicId)
+    public async Task<Result<MarketplaceClinicDetailsDto>> GetClinicAsync(int clinicId, int patientAccountId)
     {
         var clinic = await db.Clinicas
             .AsNoTracking()
@@ -187,9 +192,9 @@ public sealed class MarketplaceService(
             gallery.Add(await storage.CreateReadUrlAsync(item.ObjectKey, MediaUrlTtl));
 
         var likedByMe = await db.ClinicLikes.AsNoTracking().AnyAsync(like =>
-            like.PatientAccountId == patient.PatientAccountId && like.ClinicaId == clinicId);
+            like.PatientAccountId == patientAccountId && like.ClinicaId == clinicId);
         var isLinked = await db.Patients.AsNoTracking().AnyAsync(link =>
-            link.PatientAccountId == patient.PatientAccountId
+            link.PatientAccountId == patientAccountId
             && link.ClinicaId == clinicId
             && !link.IsDeleted);
 
