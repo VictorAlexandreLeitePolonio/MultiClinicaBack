@@ -20,6 +20,23 @@ public class ClinicPlanService(AppDbContext db)
         return limit is null || await CountActiveProfessionalsAsync(clinicaId) < limit;
     }
 
+    // Checagem de vaga + gravação sob um lock por clínica: dois aceites simultâneos com uma vaga
+    // leem a mesma contagem e cada um ativa outra linha, então só o lock serializa (chave 0 não
+    // colide com o lock da agenda, que usa o id do profissional).
+    public async Task<T> WithProfessionalSeatLockAsync<T>(int clinicaId, Func<Task<T>> body)
+    {
+        await using var transaction = db.Database.IsRelational()
+            ? await db.Database.BeginTransactionAsync()
+            : null;
+        if (db.Database.IsNpgsql())
+            await db.Database.ExecuteSqlInterpolatedAsync($"SELECT pg_advisory_xact_lock({clinicaId}, 0)");
+
+        var result = await body();
+        if (transaction is not null)
+            await transaction.CommitAsync();
+        return result;
+    }
+
     // Não salva: o chamador agrupa com o resto da operação num único SaveChanges.
     public async Task ApplyPlanAsync(Clinica clinic, ClinicPlan plan, BillingCycle? cycle)
     {

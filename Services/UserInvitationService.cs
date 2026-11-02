@@ -80,23 +80,26 @@ public class UserInvitationService(
             && user.Clinica.IsActive && !user.Clinica.IsDeleted && !user.Clinica.IsBlockedByBilling);
         var user = await query.FirstOrDefaultAsync();
         if (user is null) return Result<bool>.Fail(ErrorCodes.NotFound, InvalidInvitation);
-        // O convite não reserva vaga: o limite do plano vale no aceite (vários convites, uma vaga).
-        if (user.Role == UserRole.Profissional && !await clinicPlans.CanAddProfessionalAsync(user.ClinicaId))
-            return Result<bool>.Fail(ErrorCodes.ProfessionalLimit,
-                "A clínica atingiu o limite de profissionais do plano. Peça ao administrador para liberar uma vaga.");
         user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(dto.Password);
-        user.IsActive = true;
-        user.InvitationTokenHash = null;
-        user.InvitationExpiresAt = null;
-        try
+        // O convite não reserva vaga: o limite do plano vale no aceite (vários convites, uma vaga).
+        return await clinicPlans.WithProfessionalSeatLockAsync(user.ClinicaId, async () =>
         {
-            await db.SaveChangesAsync();
-        }
-        catch (DbUpdateConcurrencyException)
-        {
-            return Result<bool>.Fail(ErrorCodes.NotFound, InvalidInvitation);
-        }
-        return Result<bool>.Ok(true);
+            if (user.Role == UserRole.Profissional && !await clinicPlans.CanAddProfessionalAsync(user.ClinicaId))
+                return Result<bool>.Fail(ErrorCodes.ProfessionalLimit,
+                    "A clínica atingiu o limite de profissionais do plano. Peça ao administrador para liberar uma vaga.");
+            user.IsActive = true;
+            user.InvitationTokenHash = null;
+            user.InvitationExpiresAt = null;
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                return Result<bool>.Fail(ErrorCodes.NotFound, InvalidInvitation);
+            }
+            return Result<bool>.Ok(true);
+        });
     }
 
     private const string InvalidInvitation =

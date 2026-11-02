@@ -75,6 +75,11 @@ public class UserService(IUserRepository repository, IUsuarioLogadoService usuar
             return Result<UserResponseDto>.Fail(
                 ErrorCodes.Forbidden, "Administrador só pode criar Profissional ou Recepcao.");
 
+        return await clinicPlans.WithProfessionalSeatLockAsync(usuario.ClinicaId, () => CreateUnderSeatLockAsync(dto));
+    }
+
+    private async Task<Result<UserResponseDto>> CreateUnderSeatLockAsync(CreateUserDto dto)
+    {
         if (dto.Role == UserRole.Profissional && !await clinicPlans.CanAddProfessionalAsync(usuario.ClinicaId))
             return Result<UserResponseDto>.Fail(
                 ErrorCodes.ProfessionalLimit, "Limite de profissionais do plano atingido.");
