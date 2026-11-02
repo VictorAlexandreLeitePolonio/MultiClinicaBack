@@ -455,6 +455,84 @@ public class OnlinePaymentTests
         await Assert.ThrowsAsync<DbUpdateConcurrencyException>(() => db2.SaveChangesAsync());
     }
 
+    private sealed class ShiftedTime(TimeSpan shift) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => base.GetUtcNow() + shift;
+    }
+
+    [Fact]
+    public async Task Pay_rewrites_the_claim_when_retaking_a_stale_attempt()
+    {
+        var fake = new FakeMercadoPagoClient();
+        // Relógio do serviço 5 min à frente: a reserva semeada agora já passou dos 2 min.
+        await using var app = MercadoPagoTestSupport.CreateApp(fake, services =>
+        {
+            services.RemoveAll<TimeProvider>();
+            services.AddSingleton<TimeProvider>(new ShiftedTime(TimeSpan.FromMinutes(5)));
+        });
+        var seed = await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions
+        {
+            PaymentLinkToken = "tok-stale",
+            MpStatus = "claiming",
+        });
+        DateTime seededAt;
+        using (var scope = app.Services.CreateScope())
+            seededAt = (await scope.ServiceProvider.GetRequiredService<AppDbContext>().Payments
+                .AsNoTracking().SingleAsync(p => p.Id == seed.PaymentId)).UpdatedAt;
+
+        Payment? duringGateway = null;
+        fake.OnCreate = request =>
+        {
+            using var scope = app.Services.CreateScope();
+            duringGateway = scope.ServiceProvider.GetRequiredService<AppDbContext>().Payments
+                .AsNoTracking().Single(p => p.Id == seed.PaymentId);
+            return new MpPayment(9200, "pending", "pending_waiting_transfer", request.ExternalReference,
+                MercadoPagoTestSupport.DefaultMpUserId, "bank_transfer", "pix", null);
+        };
+        using var client = app.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/public/payments/tok-stale/pay",
+            Payload("pix", payerEmail: "ana@example.com"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(duringGateway);
+        // A nova reserva precisa ser um UPDATE de verdade: valor novo e UpdatedAt renovado,
+        // senão a próxima tentativa também passa pelo guard de reserva antiga.
+        Assert.NotEqual("claiming", duringGateway.MpStatus);
+        Assert.StartsWith("claiming", duringGateway.MpStatus);
+        Assert.True(duringGateway.UpdatedAt > seededAt);
+    }
+
+    [Fact]
+    public async Task Pay_survives_the_webhook_writing_before_the_sync()
+    {
+        var fake = new FakeMercadoPagoClient();
+        await using var app = MercadoPagoTestSupport.CreateApp(fake);
+        var seed = await MercadoPagoTestSupport.SeedClinicAsync(app, new ClinicSeedOptions { PaymentLinkToken = "tok-webhook" });
+        fake.OnCreate = request =>
+        {
+            // O webhook do MP chega enquanto o /pay ainda não sincronizou.
+            using var scope = app.Services.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var row = db.Payments.Single(p => p.Id == seed.PaymentId);
+            row.MpStatus = "approved";
+            db.SaveChanges();
+            return new MpPayment(9300, "approved", "accredited", request.ExternalReference,
+                MercadoPagoTestSupport.DefaultMpUserId, "bank_transfer", "pix", DateTime.UtcNow);
+        };
+        using var client = app.CreateClient();
+
+        var response = await client.PostAsJsonAsync("/api/public/payments/tok-webhook/pay",
+            Payload("pix", payerEmail: "ana@example.com"));
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        using var check = app.Services.CreateScope();
+        var payment = await check.ServiceProvider.GetRequiredService<AppDbContext>().Payments
+            .SingleAsync(p => p.Id == seed.PaymentId);
+        Assert.Equal(PaymentStatus.Paid, payment.Status);
+        Assert.Equal("approved", payment.MpStatus);
+    }
+
     [Fact]
     public async Task Pay_releases_the_claim_when_mercado_pago_fails()
     {

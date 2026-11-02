@@ -260,7 +260,7 @@ public sealed class OnlinePaymentService(
         if ((payment.MpPaymentId is not null
                 && payment.MpStatus is "pending" or "in_process" or "authorized"
                 && payment.UpdatedAt > now.AddHours(-24))
-            || (payment.MpStatus == ClaimingStatus && payment.UpdatedAt > now.AddMinutes(-2)))
+            || (IsClaim(payment.MpStatus) && payment.UpdatedAt > now.AddMinutes(-2)))
         {
             return Result<PublicPayResultDto>.Fail(ErrorCodes.PaymentInProgress,
                 "Já existe um pagamento em andamento para esta cobrança. Aguarde a confirmação.");
@@ -317,9 +317,11 @@ public sealed class OnlinePaymentService(
             DateOfExpiration: isPix ? now.AddHours(24) : null);
 
         // Reserva a cobrança antes de chamar o gateway. MpStatus é token de concorrência: de duas
-        // requisições simultâneas (duplo clique, retry), só uma grava "claiming"; a outra cai aqui.
+        // requisições simultâneas (duplo clique, retry), só uma grava a reserva; a outra cai aqui.
+        // O valor muda a cada tentativa: retomar uma reserva antiga também gera UPDATE com checagem.
         var previousMpStatus = payment.MpStatus;
-        payment.MpStatus = ClaimingStatus;
+        var claim = $"{ClaimingStatus}:{Guid.NewGuid():N}";
+        payment.MpStatus = claim;
         try
         {
             await db.SaveChangesAsync(ct);
@@ -351,9 +353,19 @@ public sealed class OnlinePaymentService(
                 MercadoPagoMessage(exception));
         }
 
-        var applied = await sync.ApplyAsync(payment.ClinicaId, created.Id, ct);
+        Payment? applied;
+        try
+        {
+            applied = await sync.ApplyAsync(payment.ClinicaId, created.Id, ct);
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            // O webhook gravou o status entre a criação e o sync: recarrega e reaplica a partir do gateway.
+            await db.Entry(payment).ReloadAsync(ct);
+            applied = await sync.ApplyAsync(payment.ClinicaId, created.Id, ct);
+        }
         // O sync normalmente já gravou o status real; se não aplicou, solta a reserva com o status do gateway.
-        if (payment.MpStatus == ClaimingStatus)
+        if (payment.MpStatus == claim)
             await ReleaseClaimAsync(payment, created.Status);
         return Result<PublicPayResultDto>.Ok(new PublicPayResultDto
         {
@@ -363,6 +375,9 @@ public sealed class OnlinePaymentService(
     }
 
     private const string ClaimingStatus = "claiming";
+
+    public static bool IsClaim(string? mpStatus) =>
+        mpStatus is not null && mpStatus.StartsWith(ClaimingStatus, StringComparison.Ordinal);
 
     private async Task ReleaseClaimAsync(Payment payment, string? mpStatus)
     {

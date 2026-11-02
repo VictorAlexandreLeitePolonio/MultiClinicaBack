@@ -194,7 +194,7 @@ public class PaymentService(
             PaymentDate         = payment.PaymentDate,
             CreatedAt           = payment.CreatedAt,
             PaidOnline          = payment.PaidOnline,
-            MpStatus            = payment.MpStatus,
+            MpStatus            = OnlinePaymentService.IsClaim(payment.MpStatus) ? "claiming" : payment.MpStatus,
             OnlineAlert         = payment.OnlineAlert,
             HasPaymentLink      = payment.PaymentLinkToken is not null
         });
@@ -323,7 +323,7 @@ public class PaymentService(
         PaymentDate         = p.PaymentDate,
         CreatedAt           = p.CreatedAt,
         PaidOnline          = p.PaidOnline,
-        MpStatus            = p.MpStatus,
+        MpStatus            = OnlinePaymentService.IsClaim(p.MpStatus) ? "claiming" : p.MpStatus,
         OnlineAlert         = p.OnlineAlert,
         HasPaymentLink      = p.PaymentLinkToken is not null
     };
