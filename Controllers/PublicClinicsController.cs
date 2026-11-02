@@ -14,6 +14,10 @@ public class PublicClinicsController(IClinicProfileService service) : Controller
     public async Task<IActionResult> GetShowcase([FromQuery] int limit = 12)
         => Ok((await service.GetPublicShowcaseAsync(limit)).Value);
 
+    // Hub público: rotas literais antes de "{slug}". Implementadas pela Trilha A.
+    // GET api/public/clinics/search  -> PagedResult<MarketplaceClinicCardDto> (IMarketplaceService.GetClinicsAsync(query, null))
+    // GET api/public/clinics/categories -> IReadOnlyList<ClinicCategoryDto>
+
     /// <summary>Perfil público — apenas clínicas IsPublic, ativas e não excluídas.</summary>
     [HttpGet("{slug}")]
     public async Task<IActionResult> GetBySlug(string slug)
