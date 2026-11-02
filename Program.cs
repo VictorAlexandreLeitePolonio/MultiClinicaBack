@@ -291,6 +291,14 @@ if (rateLimitingEnabled)
                 PermitLimit = 10,
                 Window = TimeSpan.FromMinutes(1),
             }));
+        // Hub público: busca e categorias em /api/public/clinics (navegação anônima).
+        options.AddPolicy("public-hub", context => RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 60,
+                Window = TimeSpan.FromMinutes(1),
+            }));
     });
 }
 
