@@ -8,7 +8,10 @@ using MultiClinica.API.Services.Interfaces;
 namespace MultiClinica.API.Services;
 
 // Prontuário do paciente: séries de medição por ficha e linha do tempo (consultas, evoluções e anamnese).
-public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario)
+public class PatientRecordService(
+    AppDbContext db,
+    IUsuarioLogadoService usuario,
+    TimeProvider timeProvider)
 {
     private const int DefaultTimelineTake = 30;
     private const int MaxTimelineTake = 50;
@@ -94,10 +97,13 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
     // Linha do tempo de toda a clínica; a Recepção é bloqueada no controller.
     public async Task<Result<ClinicTimelineDto>> GetClinicTimelineAsync(DateTime? before, int take)
     {
+        // A primeira página começa no fim do dia de hoje (fuso da clínica), não no futuro.
+        var cursor = NormalizeBefore(before) ?? await EndOfTodayUtcAsync();
+
         var (page, nextBefore) = await LoadTimelinePageAsync(
             patientId: null,
             isReception: false,
-            NormalizeBefore(before),
+            cursor,
             NormalizeTake(take));
 
         var patientIds = page.Select(entry => entry.PatientId).Distinct().ToList();
@@ -115,6 +121,36 @@ public class PatientRecordService(AppDbContext db, IUsuarioLogadoService usuario
             .ToList();
 
         return Result<ClinicTimelineDto>.Ok(new ClinicTimelineDto(events, nextBefore));
+    }
+
+    // Meia-noite de amanhã no fuso da clínica, convertida para UTC: inclui o dia de hoje inteiro.
+    private async Task<DateTime> EndOfTodayUtcAsync()
+    {
+        var timeZoneId = await db.Clinicas
+            .AsNoTracking()
+            .Where(clinic => clinic.Id == usuario.ClinicaId)
+            .Select(clinic => clinic.TimeZoneId)
+            .FirstOrDefaultAsync();
+
+        TimeZoneInfo timeZone;
+        try
+        {
+            timeZone = TimeZoneInfo.FindSystemTimeZoneById(
+                string.IsNullOrWhiteSpace(timeZoneId) ? "America/Sao_Paulo" : timeZoneId);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            timeZone = TimeZoneInfo.Utc;
+        }
+
+        var localNow = TimeZoneInfo.ConvertTime(timeProvider.GetUtcNow(), timeZone);
+        var localTomorrow = DateTime.SpecifyKind(localNow.Date.AddDays(1), DateTimeKind.Unspecified);
+
+        return TimeZoneInfo.ConvertTimeToUtc(localTomorrow, timeZone);
     }
 
     private static DateTime? NormalizeBefore(DateTime? before)

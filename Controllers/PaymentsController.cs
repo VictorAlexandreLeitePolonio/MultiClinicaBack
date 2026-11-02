@@ -46,7 +46,32 @@ public class PaymentsController(
         return Ok(result.Value);
     }
 
-    [HttpGet("{id}")]
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetSummary(
+        [FromQuery] int? patientId,
+        [FromQuery] string? referenceMonth,
+        [FromQuery] string? PatientName)
+    {
+        DateOnly? parsedReferenceMonth = null;
+        if (!string.IsNullOrWhiteSpace(referenceMonth))
+        {
+            if (!DateOnly.TryParseExact(
+                    referenceMonth,
+                    "yyyy-MM-dd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var parsed))
+                return BadRequest(new { message = "O mês de referência deve usar o formato YYYY-MM-DD." });
+
+            parsedReferenceMonth = parsed;
+        }
+
+        var result = await service.GetStatusSummaryAsync(
+            patientId, parsedReferenceMonth, PatientName);
+        return Ok(result.Value);
+    }
+
+    [HttpGet("{id:int}")]
     public async Task<IActionResult> GetPayment(int id)
     {
         var result = await service.GetByIdAsync(id);
