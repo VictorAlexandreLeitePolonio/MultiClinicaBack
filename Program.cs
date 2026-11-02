@@ -34,6 +34,8 @@ builder.WebHost.UseSentry(o =>
     o.Dsn = builder.Configuration["Sentry:Dsn"] ?? "";
     o.SendDefaultPii = false;
     o.MinimumEventLevel = LogLevel.Warning;
+    o.EnableLogs = true;
+    o.TracesSampleRate = 0.1; // ponytail: 10% das requisições; subir se faltar dado de performance
 });
 
 builder.Services.AddHttpContextAccessor();
