@@ -139,6 +139,65 @@ public class ClinicTimelineTests
     }
 
     [Fact]
+    public async Task Clinic_timeline_first_page_starts_at_today_and_hides_future_appointments()
+    {
+        await using var app = new MultiClinicaFactory();
+        var timeZone = TimeZoneInfo.FindSystemTimeZoneById("America/Sao_Paulo");
+        var localNow = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, timeZone);
+        var localToday = DateTime.SpecifyKind(localNow.Date, DateTimeKind.Unspecified);
+        var yesterday = TimeZoneInfo.ConvertTimeToUtc(localToday.AddDays(-1).AddHours(10), timeZone);
+        var tomorrow = TimeZoneInfo.ConvertTimeToUtc(localToday.AddDays(1).AddHours(10), timeZone);
+        var yesterdayId = 0;
+        var tomorrowId = 0;
+
+        await app.SeedAsync(async db =>
+        {
+            var clinic = new Clinica { Nome = "Clínica Hoje", NomeResponsavel = "Victor" };
+            db.Clinicas.Add(clinic);
+            await db.SaveChangesAsync();
+
+            var admin = NewUser(clinic.Id, "Admin", "admin.today@test.local", UserRole.Administrador);
+            db.Users.Add(admin);
+
+            var patient = new Patient { ClinicaId = clinic.Id, Name = "Paciente Hoje" };
+            db.Patients.Add(patient);
+            await db.SaveChangesAsync();
+
+            var past = new Appointment
+            {
+                ClinicaId = clinic.Id,
+                UserId = admin.Id,
+                PatientId = patient.Id,
+                AppointmentDate = yesterday,
+                Status = AppointmentStatus.Completed,
+            };
+            var future = new Appointment
+            {
+                ClinicaId = clinic.Id,
+                UserId = admin.Id,
+                PatientId = patient.Id,
+                AppointmentDate = tomorrow,
+                Status = AppointmentStatus.Scheduled,
+            };
+            db.Appointments.AddRange(past, future);
+            await db.SaveChangesAsync();
+
+            yesterdayId = past.Id;
+            tomorrowId = future.Id;
+        });
+
+        using var client = await LoginAsync(app, "admin.today@test.local");
+
+        var firstPage = await client.GetFromJsonAsync<ClinicTimelineResponse>("/api/patient-records/timeline");
+
+        Assert.NotNull(firstPage);
+        var only = Assert.Single(firstPage.Events);
+        Assert.Equal(yesterdayId, only.Event.Id);
+        Assert.DoesNotContain(firstPage.Events, entry => entry.Event.Id == tomorrowId);
+        Assert.Null(firstPage.NextBefore);
+    }
+
+    [Fact]
     public async Task Reception_cannot_read_the_clinic_timeline()
     {
         await using var app = new MultiClinicaFactory();
